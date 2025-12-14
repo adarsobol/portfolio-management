@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files (IMPORTANT: Keep credentials secure!)
+.env
+.env.local
+.env.*.local
+
+# Service account keys (NEVER commit these!)
+*.json.key
+service-account*.json
+credentials*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Misc
+*.zip
+*.tar.gz
+
