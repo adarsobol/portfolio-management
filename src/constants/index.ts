@@ -673,8 +673,8 @@ export const INITIAL_CONFIG: AppConfig = {
     { id: 'hs8', date: new Date().toISOString().split('T')[0], healthScore: 76, scheduleScore: 74, effortScore: 78, riskScore: 78, complianceScore: 78, initiativeCount: 11, atRiskCount: 2, completedCount: 2, totalEffort: 86, bufferUsed: 12.2, bufferTotal: 26 },
   ],
   slack: {
-    enabled: true,
-    webhookUrl: 'https://hooks.slack.com/services/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'
+    enabled: false,
+    webhookUrl: '' // Use SLACK_WEBHOOK_URL environment variable instead
   },
   rolePermissions: {
     [Role.Admin]: {
