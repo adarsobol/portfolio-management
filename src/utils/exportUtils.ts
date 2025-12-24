@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 /**
  * Get owner name by ID
  */
-function getOwnerName(users: User[], ownerId: string): string {
+function getOwnerName(users: User[], ownerId: string | undefined): string {
   if (!users || !ownerId) return ownerId || '';
   const user = users.find(u => u.id === ownerId);
   return user?.name || ownerId;
