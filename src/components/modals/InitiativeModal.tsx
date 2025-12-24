@@ -1521,14 +1521,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   )}
                   
                   {/* Effort Fields - 2 Column Layout */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 max-w-md">
                     {/* Planned Effort */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Planned Effort (weeks) <span className="text-red-500">*</span>
                       </label>
                       {isBAU && !effortOverride ? (
-                        <div className="px-4 py-2.5 text-base font-mono text-slate-700 bg-slate-100 border border-slate-300 rounded-lg">
+                        <div className="px-3 py-2 text-base font-mono text-slate-700 bg-slate-100 border border-slate-300 rounded-lg">
                           {taskEstimatedEffortSum.toFixed(1)}w
                         </div>
                       ) : (
@@ -1537,10 +1537,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             type="button"
                             onClick={() => handleChange('estimatedEffort', Math.max(0, Number(formData.estimatedEffort || 0) - 0.25))}
                             disabled={isReadOnly || (isBAU && !effortOverride)}
-                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                            className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                             title="Decrease by 0.25"
                           >
-                            <ArrowDown size={16} />
+                            <ArrowDown size={14} />
                           </button>
                           <input 
                             disabled={isReadOnly || (isBAU && !effortOverride)}
@@ -1549,7 +1549,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             step="0.25"
                             value={formData.estimatedEffort || 0}
                             onChange={(e) => handleChange('estimatedEffort', parseFloat(e.target.value) || 0)}
-                            className={`flex-1 px-4 py-2.5 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            className={`w-20 px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                               errors.estimatedEffort ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
                             }`}
                             placeholder="0.0"
@@ -1558,10 +1558,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             type="button"
                             onClick={() => handleChange('estimatedEffort', Number(formData.estimatedEffort || 0) + 0.25)}
                             disabled={isReadOnly || (isBAU && !effortOverride)}
-                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                            className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                             title="Increase by 0.25"
                           >
-                            <ArrowUp size={16} />
+                            <ArrowUp size={14} />
                           </button>
                         </div>
                       )}
@@ -1580,10 +1580,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           type="button"
                           onClick={() => handleChange('actualEffort', Math.max(0, Number(formData.actualEffort || 0) - 0.25))}
                           disabled={isReadOnly}
-                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title="Decrease by 0.25"
                         >
-                          <ArrowDown size={16} />
+                          <ArrowDown size={14} />
                         </button>
                         <input 
                           disabled={isReadOnly}
@@ -1592,35 +1592,62 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           step="0.25"
                           value={formData.actualEffort || 0}
                           onChange={(e) => handleChange('actualEffort', parseFloat(e.target.value) || 0)}
-                          className="flex-1 px-4 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-20 px-2 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           placeholder="0.0"
                         />
                         <button
                           type="button"
                           onClick={() => handleChange('actualEffort', Number(formData.actualEffort || 0) + 0.25)}
                           disabled={isReadOnly}
-                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title="Increase by 0.25"
                         >
-                          <ArrowUp size={16} />
+                          <ArrowUp size={14} />
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {/* Completion & ETA - 2 Column Layout */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Completion Rate */}
+                  <div className="grid grid-cols-2 gap-4 max-w-md">
+                    {/* Completion Rate - Manual Input */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Completion Rate
                       </label>
-                      <div className="px-4 py-2.5 text-base font-mono text-slate-700 bg-slate-50 border border-slate-300 rounded-lg">
-                        {(() => {
-                          const actual = formData.actualEffort || 0;
-                          const estimated = formData.estimatedEffort || 0;
-                          return estimated > 0 ? Math.min(100, Math.round((actual / estimated) * 100)) : 0;
-                        })()}%
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleChange('completionRate', Math.max(0, Number(formData.completionRate || 0) - 5))}
+                          disabled={isReadOnly}
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          title="Decrease by 5%"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <div className="relative">
+                          <input 
+                            disabled={isReadOnly}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="5"
+                            value={formData.completionRate || 0}
+                            onChange={(e) => handleChange('completionRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                            className="w-20 px-2 py-2 pr-6 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="0"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-slate-500">%</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleChange('completionRate', Math.min(100, Number(formData.completionRate || 0) + 5))}
+                          disabled={isReadOnly}
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          title="Increase by 5%"
+                        >
+                          <ArrowUp size={14} />
+                        </button>
                       </div>
                     </div>
 
@@ -1634,7 +1661,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         type="date"
                         value={formData.eta || ''}
                         onChange={(e) => handleChange('eta', e.target.value)}
-                        className={`w-full px-4 py-2.5 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`w-full max-w-[160px] px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.eta ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
                         }`}
                       />
