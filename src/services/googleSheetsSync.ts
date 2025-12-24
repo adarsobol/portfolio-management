@@ -395,8 +395,12 @@ class SheetsSyncManager {
 
   /** Queue initiative for sync (debounced, deduped) */
   queueInitiativeSync(initiative: Initiative): void {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      console.warn('[SYNC] Sync is disabled, skipping queue');
+      return;
+    }
 
+    console.log(`[SYNC] Queuing initiative for sync: ${initiative.id} - ${initiative.title}`);
     this.queue.initiatives.set(initiative.id, initiative);
     this.updatePendingCount();
     this.persistQueue();
@@ -466,8 +470,12 @@ class SheetsSyncManager {
 
   /** Queue change log entry */
   queueChangeLog(change: ChangeRecord): void {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      console.warn('[SYNC] Changelog sync disabled, skipping');
+      return;
+    }
 
+    console.log(`[SYNC] Queuing changelog: ${change.initiativeId} - ${change.field}: ${change.oldValue} -> ${change.newValue}`);
     this.queue.changes.push(change);
     this.updatePendingCount();
     this.persistQueue();
@@ -687,9 +695,20 @@ class SheetsSyncManager {
   }
 
   private async flushSync(): Promise<void> {
-    if (!this.enabled || !this.status.isOnline || !authService.isAuthenticated()) {
+    if (!this.enabled) {
+      console.warn('[SYNC] flushSync: Sync is disabled');
       return;
     }
+    if (!this.status.isOnline) {
+      console.warn('[SYNC] flushSync: Offline, cannot sync');
+      return;
+    }
+    if (!authService.isAuthenticated()) {
+      console.warn('[SYNC] flushSync: Not authenticated, cannot sync');
+      return;
+    }
+
+    console.log('[SYNC] flushSync: Starting sync...');
 
     // Take snapshot of current queue
     const toSync = {
@@ -707,21 +726,29 @@ class SheetsSyncManager {
     try {
       // Sync initiatives (upsert)
       if (toSync.initiatives.length > 0) {
+        console.log(`[SYNC] Syncing ${toSync.initiatives.length} initiative(s)...`);
         const success = await this.syncInitiatives(toSync.initiatives);
         if (!success) {
+          console.error('[SYNC] Initiative sync FAILED, re-queuing');
           // Re-queue failed initiatives
           toSync.initiatives.forEach(i => this.queue.initiatives.set(i.id, i));
           errors.push('initiatives');
+        } else {
+          console.log('[SYNC] Initiative sync SUCCESS');
         }
       }
 
       // Append change logs
       if (toSync.changes.length > 0) {
+        console.log(`[SYNC] Syncing ${toSync.changes.length} changelog(s)...`);
         const success = await this.appendChangeLogs(toSync.changes);
         if (!success) {
+          console.error('[SYNC] Changelog sync FAILED, re-queuing');
           // Re-queue failed changes
           this.queue.changes.push(...toSync.changes);
           errors.push('changelog');
+        } else {
+          console.log('[SYNC] Changelog sync SUCCESS');
         }
       }
 
@@ -754,11 +781,14 @@ class SheetsSyncManager {
 
   private async syncInitiatives(initiatives: Initiative[]): Promise<boolean> {
     try {
+      console.log(`[SYNC] POST ${API_ENDPOINT}/api/sheets/initiatives with ${initiatives.length} initiative(s)`);
       const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({ initiatives: initiatives.map(flattenInitiative) })
       });
+      
+      console.log(`[SYNC] Response status: ${response.status}`);
       
       if (!response.ok) {
         const errorText = await response.text();
