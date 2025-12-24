@@ -20,7 +20,7 @@ import {
 import { Initiative, AppConfig, User, Status } from '../../types';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  LineChart, Line, CartesianGrid, Legend, AreaChart, Area, ReferenceLine
+  CartesianGrid, AreaChart, Area, ReferenceLine
 } from 'recharts';
 import { useDebounce, useIntersectionObserver } from '../../hooks';
 import { calculateCompletionRate, metricsCache, paginate } from '../../utils';
@@ -1392,13 +1392,15 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   }, [scheduleMetrics, effortMetrics, changeMetrics, riskMetrics, completionMetrics, obsoleteEffortMetrics, delayDistribution, filteredInitiatives.length]);
 
   // Health Score History data (from config or mock)
-  const healthHistory = useMemo(() => {
+  // Note: Preserved for future use in health trend visualization
+  const _healthHistory = useMemo(() => {
     const history = config.healthHistory || [];
     return history.map(h => ({
       ...h,
       date: new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }));
   }, [config.healthHistory]);
+  void _healthHistory; // Suppress unused variable warning
 
   // Burndown/Burnup data (lazy evaluation - only calculate when chart is visible)
   const burndownData = useMemo(() => {
