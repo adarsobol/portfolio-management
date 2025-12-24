@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { authService, AuthUser } from '../services/authService';
 import { Role, User } from '../types';
 import { logger } from '../utils/logger';
+import { isGoogleOAuthConfigured } from '../config';
 
 interface AuthContextType {
   user: User | null;
@@ -19,10 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // DEVELOPMENT MODE: Auto-login for local development when OAuth is not configured
   // This bypass will be disabled in production builds
   const isDevelopment = import.meta.env.DEV;
-  const hasGoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID && 
-                             import.meta.env.VITE_GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID';
   
-  const shouldUseDevBypass = isDevelopment && !hasGoogleClientId;
+  const shouldUseDevBypass = isDevelopment && !isGoogleOAuthConfigured;
   
   const [user, setUser] = useState<User | null>(
     shouldUseDevBypass ? {

@@ -6,6 +6,10 @@
 # ============================================
 FROM node:20-alpine AS frontend-builder
 
+# Build arguments for frontend environment variables
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 WORKDIR /app
 
 # Copy package files
@@ -17,7 +21,7 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Build frontend
+# Build frontend (VITE_* variables are baked in at build time)
 RUN npm run build
 
 # ============================================

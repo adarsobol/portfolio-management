@@ -1,6 +1,6 @@
 // Authentication Service - handles login, logout, and token management
 
-const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
+import { API_ENDPOINT, GOOGLE_CLIENT_ID, isGoogleOAuthConfigured } from '../config';
 
 export interface AuthUser {
   id: string;
@@ -73,7 +73,7 @@ class AuthService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         credential,
-        clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID 
+        clientId: GOOGLE_CLIENT_ID 
       })
     });
 
@@ -120,10 +120,8 @@ class AuthService {
   async getCurrentUser(): Promise<AuthUser | null> {
     // DEVELOPMENT MODE: Return dev user if no Google OAuth configured
     const isDevelopment = import.meta.env.DEV;
-    const hasGoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID && 
-                               import.meta.env.VITE_GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID';
     
-    if (isDevelopment && !hasGoogleClientId) {
+    if (isDevelopment && !isGoogleOAuthConfigured) {
       // Return a mock user for development (bypasses token check)
       return {
         id: 'u_as',

@@ -4,14 +4,12 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import { AuthProvider, ToastProvider } from './contexts';
 import { ErrorBoundary } from './components/shared';
+import { GOOGLE_CLIENT_ID } from './config';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
-
-// Default placeholder to avoid crash if env var is missing during dev
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID";
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
