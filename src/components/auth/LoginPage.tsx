@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Loader2, AlertCircle, Briefcase } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { GoogleLogin } from '@react-oauth/google';
