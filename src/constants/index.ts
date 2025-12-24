@@ -243,6 +243,8 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     history: [
       {
         id: 'h1',
+        issueType: 'Initiative' as const,
+        parentId: 'i2',
         initiativeId: 'i2',
         initiativeTitle: 'Auto-Scaling Infrastructure Upgrade',
         field: 'Effort',
@@ -253,6 +255,8 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       },
       {
         id: 'h2',
+        issueType: 'Initiative' as const,
+        parentId: 'i2',
         initiativeId: 'i2',
         initiativeTitle: 'Auto-Scaling Infrastructure Upgrade',
         field: 'ETA',
