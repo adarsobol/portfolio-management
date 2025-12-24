@@ -27,89 +27,30 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
-const taskSchema = z.object({
-  id: z.string().min(1, 'Task ID is required'),
-  title: z.string().optional(),
-  estimatedEffort: z.number().min(0, 'Task estimated effort must be non-negative').optional(),
-  actualEffort: z.number().min(0, 'Task actual effort must be non-negative').optional(),
-  eta: z.string().min(1, 'Task ETA is required'),
-  ownerId: z.string().min(1, 'Task owner ID is required'),
-  status: z.enum(['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'], {
-    errorMap: () => ({ message: 'Invalid task status' }),
-  }),
-  tags: z.array(z.enum(['Unplanned', 'Risk Item', 'PM Item', 'Both'])).optional(),
-  comments: z.array(z.any()).optional(),
-});
+// Task schema is no longer strictly validated - tasks are stored as JSON strings
 
+// Lenient initiative schema - accepts any fields, only validates required ones
 export const initiativeSchema = z.object({
   id: z.string().min(1, 'ID is required'),
-  initiativeType: z.enum(['WP', 'BAU']).optional(),
-  l1_assetClass: z.enum(['PL', 'Auto', 'POS', 'Advisory'], {
-    errorMap: () => ({ message: 'Invalid asset class' }),
-  }),
-  l2_pillar: z.string().min(1, 'Pillar is required'),
-  l3_responsibility: z.string().min(1, 'Responsibility is required'),
-  l4_target: z.string().min(1, 'Target is required'),
   title: z.string().min(1, 'Title is required'),
-  ownerId: z.string().min(1, 'Owner ID is required'),
-  secondaryOwner: z.string().optional(),
-  quarter: z.string().min(1, 'Quarter is required'),
-  status: z.enum(['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'], {
-    errorMap: () => ({ message: 'Invalid status' }),
-  }),
-  priority: z.enum(['P0', 'P1', 'P2'], {
-    errorMap: () => ({ message: 'Invalid priority' }),
-  }),
-  estimatedEffort: z.number().min(0, 'Estimated effort must be non-negative').optional().default(0),
-  originalEstimatedEffort: z.number().min(0, 'Original estimated effort must be non-negative').optional(),
-  actualEffort: z.number().min(0, 'Actual effort must be non-negative').optional().default(0),
-  eta: z.string().optional(),
-  originalEta: z.string().optional(),
-  lastUpdated: z.string().optional(),
-  lastWeeklyUpdate: z.string().optional(),
-  overlookedCount: z.number().min(0, 'Overlooked count must be non-negative').optional(),
-  lastDelayDate: z.string().optional(),
-  dependencyTeams: z.union([z.array(z.string()), z.string()]).optional(),
-  dependencyTeamNotes: z.union([z.record(z.string()), z.string()]).optional(),
-  dependencies: z.union([z.array(z.any()), z.string()]).optional(),
-  workType: z.enum(['Planned Work', 'Unplanned Work'], {
-    errorMap: () => ({ message: 'Invalid work type' }),
-  }),
-  unplannedTags: z.union([z.array(z.enum(['Unplanned', 'Risk Item', 'PM Item', 'Both'])), z.string()]).optional(),
-  riskActionLog: z.string().optional(),
-  definitionOfDone: z.string().optional(),
-  comments: z.union([z.array(z.any()), z.string()]).optional(),
-  tasks: z.union([z.array(taskSchema), z.string()]).optional(),
-  history: z.union([z.array(z.any()), z.string()]).optional(),
-  isAtRisk: z.boolean().optional(),
-  completionRate: z.number().min(0).optional(),
-  version: z.number().optional(),
-}).refine((data) => {
-  const initiativeType = data.initiativeType || 'WP'; // Default to WP
-  // WP initiatives require definitionOfDone
-  if (initiativeType !== 'BAU' && (!data.definitionOfDone || data.definitionOfDone.trim().length === 0)) {
-    return false;
-  }
-  return true;
-}, {
-  message: 'WP initiatives require Definition of Done',
-});
+}).passthrough(); // Allow any additional fields without validation
 
 export const initiativesArraySchema = z.object({
   initiatives: z.array(initiativeSchema).min(1, 'At least one initiative is required'),
 });
 
+// Lenient changelog schema
 export const changelogSchema = z.object({
   changes: z.array(z.object({
     id: z.string().optional(),
-    initiativeId: z.string().min(1, 'Initiative ID is required'),
-    initiativeTitle: z.string().min(1, 'Initiative title is required'),
-    field: z.string().min(1, 'Field is required'),
+    initiativeId: z.string(),
+    initiativeTitle: z.string().optional(),
+    field: z.string().optional(),
     oldValue: z.any().optional(),
     newValue: z.any().optional(),
-    changedBy: z.string().min(1, 'Changed by is required'),
+    changedBy: z.string().optional(),
     timestamp: z.string().optional(),
-  })).min(1, 'At least one change is required'),
+  }).passthrough()).min(1, 'At least one change is required'),
 });
 
 export const snapshotSchema = z.object({
