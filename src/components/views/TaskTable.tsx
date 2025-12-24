@@ -1058,16 +1058,55 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           <div>
                             <label className="block text-[10px] font-medium text-slate-700 mb-1">
                               Effort <span className="text-red-500">*</span>
-                              <span className="text-[9px] text-slate-500 font-normal ml-0.5">(A/P)</span>
+                              <span className="text-[9px] text-slate-400 font-normal ml-0.5">(Planned / Actual)</span>
                             </label>
                             <div className="flex items-center gap-1">
+                              {/* Planned Effort - Blue theme */}
+                              <div className="flex items-center gap-0.5 bg-blue-50 border border-blue-200 rounded-md px-0.5 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Math.max(0, Number(prev.estimatedEffort || 1) - 0.25) }));
+                                  }}
+                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
+                                  title="Decrease planned"
+                                >
+                                  <ArrowDown size={9} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.25"
+                                  value={newTaskForm.estimatedEffort || 1}
+                                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, estimatedEffort: parseFloat(e.target.value) || 1 }))}
+                                  className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right text-blue-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="1"
+                                  title="Planned effort"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Number(prev.estimatedEffort || 1) + 0.25 }));
+                                  }}
+                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
+                                  title="Increase planned"
+                                >
+                                  <ArrowUp size={9} />
+                                </button>
+                              </div>
+                              <span className="text-slate-400 text-[10px]">/</span>
+                              {/* Actual Effort - Slate theme */}
                               <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-300 rounded-md px-0.5 py-0.5">
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    setNewTaskForm(prev => ({ ...prev, actualEffort: Math.max(0, (prev.actualEffort || 0) - 0.25) }));
+                                    setNewTaskForm(prev => ({ ...prev, actualEffort: Math.max(0, Number(prev.actualEffort || 0) - 0.25) }));
                                   }}
                                   className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
                                   title="Decrease actual"
@@ -1082,52 +1121,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   onChange={(e) => setNewTaskForm(prev => ({ ...prev, actualEffort: parseFloat(e.target.value) || 0 }))}
                                   className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   placeholder="0"
+                                  title="Actual effort"
                                 />
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    setNewTaskForm(prev => ({ ...prev, actualEffort: (prev.actualEffort || 0) + 0.25 }));
+                                    setNewTaskForm(prev => ({ ...prev, actualEffort: Number(prev.actualEffort || 0) + 0.25 }));
                                   }}
                                   className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
                                   title="Increase actual"
-                                >
-                                  <ArrowUp size={9} />
-                                </button>
-                              </div>
-                              <span className="text-slate-400 text-[10px]">/</span>
-                              <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-300 rounded-md px-0.5 py-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Math.max(0, (prev.estimatedEffort || 1) - 0.25) }));
-                                  }}
-                                  className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
-                                  title="Decrease planned"
-                                >
-                                  <ArrowDown size={9} />
-                                </button>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.25"
-                                  value={newTaskForm.estimatedEffort || 1}
-                                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, estimatedEffort: parseFloat(e.target.value) || 1 }))}
-                                  className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  placeholder="1"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: (prev.estimatedEffort || 1) + 0.25 }));
-                                  }}
-                                  className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
-                                  title="Increase planned"
                                 >
                                   <ArrowUp size={9} />
                                 </button>

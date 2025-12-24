@@ -1534,9 +1534,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       ) : (
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleChange('estimatedEffort', Math.max(0, (formData.estimatedEffort || 0) - 0.25))}
+                            type="button"
+                            onClick={() => handleChange('estimatedEffort', Math.max(0, Number(formData.estimatedEffort || 0) - 0.25))}
                             disabled={isReadOnly || (isBAU && !effortOverride)}
-                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                             title="Decrease by 0.25"
                           >
                             <ArrowDown size={16} />
@@ -1554,9 +1555,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             placeholder="0.0"
                           />
                           <button
-                            onClick={() => handleChange('estimatedEffort', (formData.estimatedEffort || 0) + 0.25)}
+                            type="button"
+                            onClick={() => handleChange('estimatedEffort', Number(formData.estimatedEffort || 0) + 0.25)}
                             disabled={isReadOnly || (isBAU && !effortOverride)}
-                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                             title="Increase by 0.25"
                           >
                             <ArrowUp size={16} />
@@ -1575,9 +1577,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       </label>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => handleChange('actualEffort', Math.max(0, (formData.actualEffort || 0) - 0.25))}
+                          type="button"
+                          onClick={() => handleChange('actualEffort', Math.max(0, Number(formData.actualEffort || 0) - 0.25))}
                           disabled={isReadOnly}
-                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title="Decrease by 0.25"
                         >
                           <ArrowDown size={16} />
@@ -1593,9 +1596,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           placeholder="0.0"
                         />
                         <button
-                          onClick={() => handleChange('actualEffort', (formData.actualEffort || 0) + 0.25)}
+                          type="button"
+                          onClick={() => handleChange('actualEffort', Number(formData.actualEffort || 0) + 0.25)}
                           disabled={isReadOnly}
-                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title="Increase by 0.25"
                         >
                           <ArrowUp size={16} />
@@ -1858,8 +1862,11 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               <span className="text-sm font-medium text-slate-700">
                                 {task.title || `Task ${index + 1}`}
                               </span>
-                              <span className="text-xs text-slate-500 font-mono">
-                                {task.estimatedEffort || 0}w / {task.actualEffort || 0}w
+                              <span className="text-xs font-mono flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded">
+                                <span className="text-blue-600 font-semibold">{task.estimatedEffort || 0}</span>
+                                <span className="text-slate-400">/</span>
+                                <span className="text-slate-600">{task.actualEffort || 0}</span>
+                                <span className="text-slate-400">w</span>
                               </span>
                               {task.tags && task.tags.length > 0 && (
                                 <div className="flex gap-1">
@@ -1922,76 +1929,92 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 />
                               </div>
                               
-                              {/* Effort (Actual/Planned) | ETA | Owner | Status */}
-                              <div className="grid grid-cols-4 gap-2">
+                              {/* Effort (Planned/Actual) | ETA | Owner | Status */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {/* Planned Effort */}
                                 <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                                    Effort (Actual/Planned) <span className="text-red-500">*</span>
+                                  <label className="block text-xs font-medium text-blue-600 mb-1">
+                                    Planned <span className="text-red-500">*</span>
                                   </label>
-                                  <div className="flex items-center gap-1">
-                                    <div className="flex items-center gap-0.5">
-                                      <button
-                                        onClick={() => updateTask(task.id, 'actualEffort', Math.max(0, (task.actualEffort || 0) - 0.25))}
-                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                        title="Decrease by 0.25"
-                                      >
-                                        <ArrowDown size={12} />
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.25"
-                                        value={task.actualEffort || 0}
-                                        onChange={(e) => updateTask(task.id, 'actualEffort', parseFloat(e.target.value) || 0)}
-                                        className={`w-16 px-2 py-1.5 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                          errors[`task_${task.id}_actualEffort`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                                        }`}
-                                        placeholder="0"
-                                      />
-                                      <button
-                                        onClick={() => updateTask(task.id, 'actualEffort', (task.actualEffort || 0) + 0.25)}
-                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                        title="Increase by 0.25"
-                                      >
-                                        <ArrowUp size={12} />
-                                      </button>
-                                    </div>
-                                    <span className="text-slate-300 text-sm font-medium">/</span>
-                                    <div className="flex items-center gap-0.5">
-                                      <button
-                                        onClick={() => updateTask(task.id, 'estimatedEffort', Math.max(0, (task.estimatedEffort || 0) - 0.25))}
-                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                        title="Decrease by 0.25"
-                                      >
-                                        <ArrowDown size={12} />
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.25"
-                                        value={task.estimatedEffort || 0}
-                                        onChange={(e) => updateTask(task.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
-                                        className={`w-16 px-2 py-1.5 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                          errors[`task_${task.id}_estimatedEffort`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                                        }`}
-                                        placeholder="0"
-                                      />
-                                      <button
-                                        onClick={() => updateTask(task.id, 'estimatedEffort', (task.estimatedEffort || 0) + 0.25)}
-                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                        title="Increase by 0.25"
-                                      >
-                                        <ArrowUp size={12} />
-                                      </button>
-                                    </div>
-                                    <span className="text-xs text-slate-400">w</span>
+                                  <div className="flex items-center gap-0.5 bg-blue-50 rounded-lg px-1.5 py-1 border border-blue-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateTask(task.id, 'estimatedEffort', Math.max(0, Number(task.estimatedEffort || 0) - 0.25))}
+                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
+                                      title="Decrease planned by 0.25"
+                                    >
+                                      <ArrowDown size={14} />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.25"
+                                      value={task.estimatedEffort || 0}
+                                      onChange={(e) => updateTask(task.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                                      className={`w-14 px-1.5 py-1 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-blue-300 text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                        errors[`task_${task.id}_estimatedEffort`] ? 'border-red-500 bg-red-50' : 'border-blue-300'
+                                      }`}
+                                      placeholder="0"
+                                      title="Planned effort"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateTask(task.id, 'estimatedEffort', Number(task.estimatedEffort || 0) + 0.25)}
+                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
+                                      title="Increase planned by 0.25"
+                                    >
+                                      <ArrowUp size={14} />
+                                    </button>
+                                    <span className="text-xs text-blue-500 ml-0.5">w</span>
                                   </div>
-                                  {(errors[`task_${task.id}_estimatedEffort`] || errors[`task_${task.id}_actualEffort`]) && (
-                                    <p className="text-red-500 text-xs mt-0.5">
-                                      {errors[`task_${task.id}_estimatedEffort`] || errors[`task_${task.id}_actualEffort`]}
-                                    </p>
+                                  {errors[`task_${task.id}_estimatedEffort`] && (
+                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_estimatedEffort`]}</p>
                                   )}
                                 </div>
+                                {/* Actual Effort */}
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                                    Actual
+                                  </label>
+                                  <div className="flex items-center gap-0.5 bg-slate-50 rounded-lg px-1.5 py-1 border border-slate-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateTask(task.id, 'actualEffort', Math.max(0, Number(task.actualEffort || 0) - 0.25))}
+                                      className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-700 transition-colors"
+                                      title="Decrease actual by 0.25"
+                                    >
+                                      <ArrowDown size={14} />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.25"
+                                      value={task.actualEffort || 0}
+                                      onChange={(e) => updateTask(task.id, 'actualEffort', parseFloat(e.target.value) || 0)}
+                                      className={`w-14 px-1.5 py-1 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-slate-300 text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                        errors[`task_${task.id}_actualEffort`] ? 'border-red-500 bg-red-50' : 'border-slate-300'
+                                      }`}
+                                      placeholder="0"
+                                      title="Actual effort"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateTask(task.id, 'actualEffort', Number(task.actualEffort || 0) + 0.25)}
+                                      className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-700 transition-colors"
+                                      title="Increase actual by 0.25"
+                                    >
+                                      <ArrowUp size={14} />
+                                    </button>
+                                    <span className="text-xs text-slate-400 ml-0.5">w</span>
+                                  </div>
+                                  {errors[`task_${task.id}_actualEffort`] && (
+                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_actualEffort`]}</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {/* ETA | Owner | Status - Second Row */}
+                              <div className="grid grid-cols-3 gap-3">
                                 <div>
                                   <label className="block text-xs font-medium text-slate-600 mb-1">
                                     ETA <span className="text-red-500">*</span>
