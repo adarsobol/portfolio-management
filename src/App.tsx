@@ -938,6 +938,11 @@ export default function App() {
         localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(filtered));
       }
       
+      // Delete from Google Sheets
+      sheetsSync.deleteInitiative(id).catch(err => {
+        logger.error('Failed to delete from Sheets', { context: 'App.handleDeleteInitiative', error: err });
+      });
+      
       showSuccess(`Initiative "${initiative.title}" has been deleted`);
     } catch (error) {
       logger.error('Failed to delete initiative', { context: 'App.handleDeleteInitiative', error: error instanceof Error ? error : new Error(String(error)) });
@@ -1099,6 +1104,9 @@ export default function App() {
       } else {
         realtimeService.broadcastCreate(item);
       }
+      
+      // Sync to Google Sheets
+      sheetsSync.queueInitiativeSync(item);
 
       if (tradeOffAction) {
         const targetIndex = nextInitiatives.findIndex(i => i.id === tradeOffAction.targetInitiativeId);
@@ -1131,6 +1139,9 @@ export default function App() {
             }
             localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(cachedInitiatives));
           }
+          
+          // Sync trade-off target to Google Sheets
+          sheetsSync.queueInitiativeSync(updatedTarget);
         }
       }
       return nextInitiatives;
