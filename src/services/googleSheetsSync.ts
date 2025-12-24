@@ -37,6 +37,10 @@ export interface SheetsPullData {
 // FLATTEN HELPERS (for Sheet row format)
 // ============================================
 export function flattenInitiative(i: Initiative): Record<string, string | number | boolean> {
+  const taskCount = i.tasks?.length || 0;
+  if (taskCount > 0) {
+    console.log(`[SYNC] flattenInitiative: ${i.id} has ${taskCount} tasks:`, i.tasks?.map(t => t.id));
+  }
   return {
     id: i.id,
     initiativeType: i.initiativeType || 'WP',
@@ -403,7 +407,8 @@ class SheetsSyncManager {
       return;
     }
 
-    console.log(`[SYNC] Queuing initiative for sync: ${initiative.id} - ${initiative.title}`);
+    const taskCount = initiative.tasks?.length || 0;
+    console.log(`[SYNC] Queuing initiative for sync: ${initiative.id} - ${initiative.title} (${taskCount} tasks)`);
     this.queue.initiatives.set(initiative.id, initiative);
     this.updatePendingCount();
     this.persistQueue();

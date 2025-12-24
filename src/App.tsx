@@ -1237,6 +1237,11 @@ export default function App() {
         
         const updated = { ...i, [field]: value, lastUpdated: today };
         
+        // Log task updates for debugging
+        if (field === 'tasks') {
+          console.log(`[APP] Task update for ${id}: ${(value as any)?.length || 0} tasks`);
+        }
+        
         // Track overlooked items: if ETA is pushed back, increment overlookedCount
         if (field === 'eta' && oldValue && value && oldValue < value) {
           updated.overlookedCount = (i.overlookedCount || 0) + 1;
