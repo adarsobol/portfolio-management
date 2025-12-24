@@ -203,35 +203,39 @@ const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 function parsePrivateKey(key: string | undefined): string | undefined {
   if (!key) return undefined;
   
-  // Try multiple formats:
-  // 1. Already has real newlines - use as-is
-  if (key.includes('-----BEGIN') && key.includes('\n')) {
-    return key;
+  // Clean the key: remove any leading/trailing whitespace
+  let cleanKey = key.trim();
+  
+  // Check if it's already properly formatted with newlines
+  if (cleanKey.includes('-----BEGIN') && cleanKey.includes('\n')) {
+    return cleanKey;
   }
   
-  // 2. Has escaped newlines like \\n (from JSON)
-  if (key.includes('\\n')) {
-    return key.replace(/\\n/g, '\n');
+  // Handle escaped newlines (\\n or \n)
+  if (cleanKey.includes('\\n')) {
+    return cleanKey.replace(/\\n/g, '\n');
   }
   
-  // 3. Has literal \n text (two characters)
-  if (key.includes('\\') && key.includes('n')) {
-    return key.split('\\n').join('\n');
+  // Handle single-line key format (often seen when pasting into UI)
+  if (cleanKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    // 1. Extract the actual base64 content between the markers
+    const header = '-----BEGIN PRIVATE KEY-----';
+    const footer = '-----END PRIVATE KEY-----';
+    
+    let content = cleanKey;
+    content = content.replace(header, '').replace(footer, '');
+    
+    // 2. Remove all whitespace from the content
+    content = content.replace(/\s+/g, '');
+    
+    // 3. Re-wrap the base64 content every 64 characters
+    const wrappedContent = content.match(/.{1,64}/g)?.join('\n');
+    
+    // 4. Reconstruct with proper newlines
+    return `${header}\n${wrappedContent}\n${footer}`;
   }
   
-  // 4. Base64 encoded
-  if (!key.includes('-----BEGIN')) {
-    try {
-      const decoded = Buffer.from(key, 'base64').toString('utf-8');
-      if (decoded.includes('-----BEGIN')) {
-        return decoded;
-      }
-    } catch {
-      // Not base64, continue
-    }
-  }
-  
-  return key;
+  return cleanKey;
 }
 
 const SERVICE_ACCOUNT_PRIVATE_KEY = parsePrivateKey(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
