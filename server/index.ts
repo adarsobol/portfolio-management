@@ -495,7 +495,10 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     let userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
 
     if (!userRow) {
-      res.status(403).json({ error: "this user doesn't have access to this app" });
+      res.status(403).json({ 
+        error: "Access Denied",
+        message: "You are not authorized to access this application. Please contact your administrator to request access."
+      });
       return;
     } else {
       // Update metadata
