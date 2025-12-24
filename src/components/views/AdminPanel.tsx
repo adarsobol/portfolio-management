@@ -143,7 +143,7 @@ interface ImportResult {
   total?: number;
 }
 
-const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001';
+const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   currentUser,

@@ -47,7 +47,7 @@ export function ExportDropdown({ initiatives, users, filters }: ExportDropdownPr
     
     try {
       const endpoint = format === 'excel' ? '/api/export/excel' : '/api/export/csv';
-      const response = await fetch(`http://localhost:3001${endpoint}`, {
+      const response = await fetch(`${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -350,7 +350,7 @@ class SlackService {
       });
 
       // Use backend proxy to avoid CORS issues
-      const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001';
+      const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
       const token = localStorage.getItem('authToken');
       
       const response = await fetch(`${API_ENDPOINT}/api/slack/webhook`, {

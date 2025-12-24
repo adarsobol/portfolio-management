@@ -195,6 +195,6 @@ export function getDefaultServiceConfig(): DataServiceConfig {
   // Default to sheets for now
   return {
     type: 'sheets',
-    apiEndpoint: import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001'
+    apiEndpoint: import.meta.env.VITE_API_ENDPOINT || ''
   };
 }

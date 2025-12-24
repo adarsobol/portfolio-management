@@ -26,7 +26,7 @@ import { WorkflowsView } from './components/views/WorkflowsView';
 import { DependenciesView } from './components/views/DependenciesView';
 import { LoginPage } from './components/auth';
 
-const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001';
+const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
 export default function App() {
   const { user: authUser, isAuthenticated, isLoading: authLoading, logout } = useAuth();

@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { Initiative, Comment, User } from '../types';
 
-const SOCKET_URL = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001';
+const SOCKET_URL = import.meta.env.VITE_API_ENDPOINT || (typeof window !== 'undefined' ? window.location.origin : '');
 
 export interface UserPresence {
   id: string;

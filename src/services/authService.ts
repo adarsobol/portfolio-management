@@ -1,6 +1,6 @@
 // Authentication Service - handles login, logout, and token management
 
-const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001';
+const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
 export interface AuthUser {
   id: string;
