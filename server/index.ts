@@ -359,9 +359,16 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
 // ============================================
 // GOOGLE SHEETS CONNECTION
 // ============================================
+// Store the last connection error for debugging
+let lastConnectionError: string | null = null;
+
 async function getDoc(): Promise<GoogleSpreadsheet | null> {
   if (!SPREADSHEET_ID || !SERVICE_ACCOUNT_EMAIL || !SERVICE_ACCOUNT_PRIVATE_KEY) {
-    console.error('Missing Google Sheets credentials. Check your .env file.');
+    lastConnectionError = 'Missing credentials: ' + 
+      (!SPREADSHEET_ID ? 'SPREADSHEET_ID ' : '') +
+      (!SERVICE_ACCOUNT_EMAIL ? 'EMAIL ' : '') +
+      (!SERVICE_ACCOUNT_PRIVATE_KEY ? 'PRIVATE_KEY' : '');
+    console.error(lastConnectionError);
     return null;
   }
 
@@ -374,11 +381,17 @@ async function getDoc(): Promise<GoogleSpreadsheet | null> {
 
     const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
     await doc.loadInfo();
+    lastConnectionError = null;
     return doc;
   } catch (error) {
-    console.error('Failed to connect to Google Sheets:', error);
+    lastConnectionError = error instanceof Error ? error.message : String(error);
+    console.error('Failed to connect to Google Sheets:', lastConnectionError);
     return null;
   }
+}
+
+function getLastConnectionError(): string | null {
+  return lastConnectionError;
 }
 
 // ============================================
@@ -1134,7 +1147,7 @@ app.get('/api/sheets/health', async (req, res) => {
           status: 'error',
           configured,
           connected: false,
-          error: 'getDoc returned null - check server logs'
+          error: getLastConnectionError() || 'Unknown error - getDoc returned null'
         });
       }
     } catch (error) {
