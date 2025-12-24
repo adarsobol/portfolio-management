@@ -101,8 +101,10 @@ export interface Dependency {
 
 export interface ChangeRecord {
   id: string;
+  issueType: 'Initiative' | 'Task'; // Type of item being changed
   initiativeId: string;
   initiativeTitle: string;
+  taskId?: string; // Task ID if issueType is 'Task'
   field: string;
   oldValue: InitiativeFieldValue;
   newValue: InitiativeFieldValue;

@@ -448,8 +448,8 @@ const INITIATIVE_HEADERS = [
 ];
 
 const CHANGELOG_HEADERS = [
-  'id', 'initiativeId', 'initiativeTitle', 'field',
-  'oldValue', 'newValue', 'changedBy', 'timestamp'
+  'id', 'issueType', 'initiativeId', 'initiativeTitle', 'taskId',
+  'field', 'oldValue', 'newValue', 'changedBy', 'timestamp'
 ];
 
 const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin'];
@@ -1408,8 +1408,10 @@ app.post('/api/sheets/changelog', authenticateToken, validate(changelogSchema), 
 
     await sheet.addRows(changes.map((c: Record<string, unknown>) => ({
       id: String(c.id || ''),
+      issueType: String(c.issueType || 'Initiative'),
       initiativeId: String(c.initiativeId || ''),
       initiativeTitle: String(c.initiativeTitle || ''),
+      taskId: String(c.taskId || ''),
       field: String(c.field || ''),
       oldValue: String(c.oldValue ?? ''),
       newValue: String(c.newValue ?? ''),

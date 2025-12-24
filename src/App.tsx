@@ -833,11 +833,13 @@ export default function App() {
   };
 
   // Actions
-  const recordChange = (initiative: Initiative, field: string, oldValue: any, newValue: any): ChangeRecord => {
+  const recordChange = (initiative: Initiative, field: string, oldValue: any, newValue: any, taskId?: string): ChangeRecord => {
     const change: ChangeRecord = {
       id: generateId(),
+      issueType: taskId ? 'Task' : 'Initiative',
       initiativeId: initiative.id,
       initiativeTitle: initiative.title,
+      taskId,
       field,
       oldValue,
       newValue,

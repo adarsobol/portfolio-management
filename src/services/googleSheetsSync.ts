@@ -76,8 +76,10 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
 export function flattenChangeRecord(c: ChangeRecord): Record<string, string> {
   return {
     id: c.id,
+    issueType: c.issueType || 'Initiative',
     initiativeId: c.initiativeId,
     initiativeTitle: c.initiativeTitle,
+    taskId: c.taskId || '',
     field: c.field,
     oldValue: String(c.oldValue ?? ''),
     newValue: String(c.newValue ?? ''),
@@ -740,7 +742,7 @@ class SheetsSyncManager {
 
       // Append change logs
       if (toSync.changes.length > 0) {
-        console.log(`[SYNC] Syncing ${toSync.changes.length} changelog(s)...`);
+        console.log(`[SYNC] Syncing ${toSync.changes.length} changelog(s):`, toSync.changes.map(c => `${c.field}: ${c.oldValue} -> ${c.newValue}`));
         const success = await this.appendChangeLogs(toSync.changes);
         if (!success) {
           console.error('[SYNC] Changelog sync FAILED, re-queuing');
@@ -750,6 +752,8 @@ class SheetsSyncManager {
         } else {
           console.log('[SYNC] Changelog sync SUCCESS');
         }
+      } else {
+        console.log('[SYNC] No changelogs to sync');
       }
 
       // Create snapshot tabs
