@@ -328,8 +328,25 @@ class SheetsSyncManager {
         }
 
         logger.info('Loaded initiatives from localStorage cache', { context: 'SheetsSyncManager.loadInitiatives', metadata: { count: deduplicatedCached.length } });
+        
+        // AUTO-PUSH: If Sheets is empty but we have local data, push it automatically
+        if (this.status.isOnline && authService.isAuthenticated()) {
+          logger.info('Google Sheets empty but localStorage has data - auto-pushing to Sheets', { 
+            context: 'SheetsSyncManager.loadInitiatives', 
+            metadata: { count: deduplicatedCached.length } 
+          });
+          // Push all cached initiatives to Sheets in background (don't await)
+          this.pushFullData({ initiatives: deduplicatedCached }).then((success) => {
+            if (success) {
+              logger.info('Auto-push to Sheets completed successfully', { context: 'SheetsSyncManager.loadInitiatives' });
+            }
+          }).catch((err) => {
+            logger.error('Auto-push to Sheets failed', { context: 'SheetsSyncManager.loadInitiatives', error: err });
+          });
+        }
+        
         this.status.isLoading = false;
-        this.status.error = this.status.isOnline ? 'Using cached data - Sheets empty or unavailable' : 'Offline - using cached data';
+        this.status.error = this.status.isOnline ? 'Syncing local data to Sheets...' : 'Offline - using cached data';
         this.notify();
         return deduplicatedCached;
       }
