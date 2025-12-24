@@ -104,16 +104,16 @@ export class WorkflowEngine {
         return initiative.status !== condition.value;
 
       case 'actual_effort_greater_than':
-        return initiative.actualEffort > (condition.value || 0);
+        return (initiative.actualEffort ?? 0) > (condition.value || 0);
 
       case 'actual_effort_percentage':
-        if (!condition.percentage || initiative.estimatedEffort === 0) return false;
-        const percentage = (initiative.actualEffort / initiative.estimatedEffort) * 100;
+        if (!condition.percentage || (initiative.estimatedEffort ?? 0) === 0) return false;
+        const percentage = ((initiative.actualEffort ?? 0) / (initiative.estimatedEffort ?? 1)) * 100;
         return percentage >= condition.percentage;
 
       case 'effort_variance_exceeds':
         if (!condition.value) return false;
-        const variance = Math.abs(initiative.estimatedEffort - initiative.actualEffort);
+        const variance = Math.abs((initiative.estimatedEffort ?? 0) - (initiative.actualEffort ?? 0));
         return variance > condition.value;
 
       case 'priority_equals':
@@ -171,6 +171,7 @@ export class WorkflowEngine {
           [Status.InProgress]: Status.AtRisk,
           [Status.AtRisk]: Status.Done,
           [Status.Done]: Status.Done,
+          [Status.Obsolete]: Status.Obsolete,
         };
         const newStatus = transitions[initiative.status];
         if (newStatus && newStatus !== initiative.status) {

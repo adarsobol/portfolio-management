@@ -83,8 +83,8 @@ describe('Utils', () => {
 
   describe('getOwnerName', () => {
     const mockUsers: User[] = [
-      { id: 'u1', email: 'user1@example.com', name: 'User One', role: Role.Admin },
-      { id: 'u2', email: 'user2@example.com', name: 'User Two', role: Role.TeamLead },
+      { id: 'u1', email: 'user1@example.com', name: 'User One', role: Role.Admin, avatar: '' },
+      { id: 'u2', email: 'user2@example.com', name: 'User Two', role: Role.TeamLead, avatar: '' },
     ];
 
     it('should return owner name when user exists', () => {
