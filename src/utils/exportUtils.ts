@@ -540,7 +540,7 @@ function mapStatusToNotion(status: Status): string {
 /**
  * Check if a date is within the current week (Monday to Sunday)
  */
-function isWithinCurrentWeek(dateStr: string): boolean {
+function isWithinCurrentWeek(dateStr: string | undefined): boolean {
   if (!dateStr) return false;
   try {
     const date = new Date(dateStr);
@@ -569,7 +569,7 @@ function isWithinCurrentWeek(dateStr: string): boolean {
  */
 function transformInitiativeForNotionExport(initiative: Initiative, users: User[]): Record<string, string> {
   const ownerName = getOwnerName(users, initiative.ownerId);
-  const _mustHaveThisWeek = isWithinCurrentWeek(initiative.eta);
+  const mustHaveThisWeek = isWithinCurrentWeek(initiative.eta);
   const progressCondition = initiative.riskActionLog || 'On Track';
   
   return {

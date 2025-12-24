@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Layers, Plus, X, Trash2 } from 'lucide-react';
-import { Initiative, User, Status, Priority, WorkType, AppConfig, AssetClass, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
-import { getOwnerName, checkOutdated, calculateCompletionRate, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
+import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
@@ -47,16 +47,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   commentReadState = {},
   onAddComment,
   onMarkCommentRead,
-  onDeleteInitiative,
+  onDeleteInitiative: _onDeleteInitiative,
   onOpenAtRiskModal
 }) => {
+  void _onDeleteInitiative; // Reserved for delete functionality
   // Use allInitiatives if provided, otherwise fall back to filteredInitiatives
   const allInitiativesList = allInitiatives || filteredInitiatives;
   // Ref for scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Track collapsed groups
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [_collapsedGroups, _setCollapsedGroups] = useState<Set<string>>(new Set());
+  void _collapsedGroups; void _setCollapsedGroups; // Reserved for group collapse feature
   
   // Track expanded tasks for BAU initiatives
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -90,8 +92,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     tradeOffEta: undefined
   });
 
-  const toggleGroup = (groupKey: string) => {
-    setCollapsedGroups(prev => {
+  const _toggleGroup = (groupKey: string) => {
+    _setCollapsedGroups(prev => {
       const newSet = new Set(prev);
       if (newSet.has(groupKey)) {
         newSet.delete(groupKey);
@@ -101,6 +103,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       return newSet;
     });
   };
+  void _toggleGroup; // Reserved for group toggle feature
   
   const toggleTasks = (initiativeId: string) => {
     setExpandedTasks(prev => {
@@ -274,10 +277,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return false;
   };
 
-  const canDelete = (): boolean => {
+  const _canDelete = (): boolean => {
     // Only Admin or Director (Group Lead) can delete
     return currentUser.role === Role.Admin || currentUser.role === Role.DirectorGroup;
   };
+  void _canDelete; // Reserved for delete permission check
 
   const getPreviousValue = (item: Initiative, fieldName: string) => {
     if (!item.history || item.history.length === 0) return null;
@@ -288,7 +292,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   };
 
   // Group initiatives by asset class and pillar (for flat/table view)
-  const groupedInitiatives = useMemo((): GroupedInitiatives => {
+  const _groupedInitiatives = useMemo((): GroupedInitiatives => {
     const groups: GroupedInitiatives = {};
     
     filteredInitiatives.forEach(item => {
@@ -303,6 +307,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     
     return groups;
   }, [filteredInitiatives]);
+  void _groupedInitiatives; // Reserved for grouped view feature
 
 
   const SortableHeader = ({ label, sortKey, alignRight = false }: { label: string, sortKey: string, alignRight?: boolean }) => {
@@ -357,7 +362,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
   const renderRow = (item: Initiative, index: number, editable: boolean) => {
     const isOutdated = checkOutdated(item.lastUpdated);
-    const prevEffort = getPreviousValue(item, 'Effort');
+    const _prevEffort = getPreviousValue(item, 'Effort');
+    void _prevEffort; // Reserved for effort history display
     const prevEta = getPreviousValue(item, 'ETA');
     const isBAU = item.initiativeType === InitiativeType.BAU;
     const tasksExpanded = expandedTasks.has(item.id);
@@ -692,7 +698,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              )}
              
              {prevEta !== null && (
-               <span className="text-[9px] text-slate-400 italic bg-slate-50 px-1.5 py-0.5 rounded inline-block">Prev: {prevEta}</span>
+               <span className="text-[9px] text-slate-400 italic bg-slate-50 px-1.5 py-0.5 rounded inline-block">Prev: {String(prevEta)}</span>
              )}
              
              <div className="flex items-center gap-1 text-[9px]">

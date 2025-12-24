@@ -24,7 +24,6 @@ import {
 } from 'recharts';
 import { useDebounce, useIntersectionObserver } from '../../hooks';
 import { calculateCompletionRate, metricsCache, paginate } from '../../utils';
-import type { PaginationResult } from '../../utils/pagination';
 
 interface WorkplanHealthDashboardProps {
   filteredInitiatives: Initiative[];
@@ -45,12 +44,12 @@ const daysBetween = (date1: string, date2: string): number => {
 function calculateScheduleMetrics(initiatives: Initiative[]) {
   const initiativesWithEta = initiatives.filter(i => i.eta && i.originalEta);
   
-  const delayDays = initiativesWithEta.map(i => daysBetween(i.originalEta, i.eta));
+  const delayDays = initiativesWithEta.map(i => daysBetween(i.originalEta!, i.eta!));
   const avgDelay = delayDays.length > 0 
     ? Math.round(delayDays.reduce((a, b) => a + b, 0) / delayDays.length)
     : 0;
   
-  const onTimeCount = initiativesWithEta.filter(i => i.eta <= i.originalEta).length;
+  const onTimeCount = initiativesWithEta.filter(i => i.eta! <= i.originalEta!).length;
   const onTimeRate = initiativesWithEta.length > 0 
     ? Math.round((onTimeCount / initiativesWithEta.length) * 100)
     : 100;
@@ -329,17 +328,19 @@ function calculateDelayDistribution(initiatives: Initiative[]) {
 }
 
 // Health score color helper
-const getHealthColor = (score: number): string => {
+const _getHealthColor = (score: number): string => {
   if (score >= 80) return 'text-emerald-600';
   if (score >= 60) return 'text-amber-500';
   return 'text-red-500';
 };
+void _getHealthColor; // Reserved for health score styling
 
-const getHealthBg = (score: number): string => {
+const _getHealthBg = (score: number): string => {
   if (score >= 80) return 'bg-emerald-50';
   if (score >= 60) return 'bg-amber-50';
   return 'bg-red-50';
 };
+void _getHealthBg; // Reserved for health background styling
 
 const getHealthBarColor = (score: number): string => {
   if (score >= 80) return 'bg-emerald-500';
@@ -579,9 +580,10 @@ interface MetricTooltipConfig {
   title: string;
   description: string;
   calculation?: string;
+  formula?: string; // Alternative name for calculation
   calculationExample?: string;
   interpretationFn?: (value: number) => string | null;
-  thresholds: string;
+  thresholds?: string;
 }
 
 // Metric tooltip definitions

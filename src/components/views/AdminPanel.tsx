@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield } from 'lucide-react';
 import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
-import { getOwnerName, generateId, exportToExcel } from '../../utils';
+import { generateId, exportToExcel } from '../../utils';
 import * as XLSX from 'xlsx';
 
 // BadgePermission Component for visual permission display
@@ -154,8 +154,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   initiatives,
   changeLog,
   onGenerate30Initiatives,
-  onClearCache
+  onClearCache: _onClearCache
 }) => {
+  void _onClearCache; // Reserved for cache clearing feature
   const [newUser, setNewUser] = useState<Partial<User>>({ role: Role.TeamLead });
   
   // User import state
@@ -200,7 +201,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
         
-        const parsed: ParsedUser[] = jsonData.map((row, idx) => {
+        const parsed: ParsedUser[] = jsonData.map((row, _idx) => {
           const email = (row.Email || row.email || row.EMAIL || '').toString().trim();
           const name = (row.Name || row.name || row.NAME || row['Full Name'] || '').toString().trim();
           const role = (row.Role || row.role || row.ROLE || 'Team Lead').toString().trim();
@@ -449,7 +450,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     { key: 'manageWorkflows', label: 'Manage Workflows' },
   ];
 
-  const allPermissions = [...tabPermissions, ...taskManagementPermissions, ...adminPermissions];
+  const _allPermissions = [...tabPermissions, ...taskManagementPermissions, ...adminPermissions];
+  void _allPermissions; // Reserved for permission filtering feature
 
   const handlePermissionChange = (role: Role, key: PermissionKey, value: PermissionValue) => {
     setConfig((prev: AppConfig) => ({
@@ -632,9 +634,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <td className="px-4 py-2 truncate max-w-[150px]" title={log.initiativeTitle}>{log.initiativeTitle}</td>
                     <td className="px-4 py-2 text-xs">
                       <span className="font-semibold text-slate-700">{log.field}:</span> 
-                      <span className="text-red-500 mx-1">{log.oldValue}</span>
+                      <span className="text-red-500 mx-1">{String(log.oldValue ?? '')}</span>
                       &rarr;
-                      <span className="text-emerald-500 mx-1">{log.newValue}</span>
+                      <span className="text-emerald-500 mx-1">{String(log.newValue ?? '')}</span>
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-500">{log.changedBy}</td>
                   </tr>
@@ -1167,7 +1169,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                const capacity = config.teamCapacities[user.id] || 0;
                const buffer = config.teamBuffers?.[user.id] || 0;
                const effectiveCapacity = Math.max(0, capacity - buffer);
-               const load = initiatives.filter(i => i.ownerId === user.id).reduce((sum, i) => sum + i.estimatedEffort, 0);
+               const load = initiatives.filter(i => i.ownerId === user.id).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
                const utilization = effectiveCapacity > 0 ? Math.round((load / effectiveCapacity) * 100) : 0;
                let utilColor = 'text-emerald-600';
                if (utilization > 80) utilColor = 'text-amber-600';

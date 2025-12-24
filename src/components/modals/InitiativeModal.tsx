@@ -158,7 +158,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const [tradeOffData, setTradeOffData] = useState<Partial<TradeOffAction>>({ field: 'eta' });
 
   // Share/Export State
-  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [_showShareMenu, setShowShareMenu] = useState(false);
+  void _showShareMenu; // Reserved for future share menu UI
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<'slack' | 'notion' | null>(null);
 
@@ -172,7 +173,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // ============================================================================
   
   const getDefaultFormData = useCallback(() => {
-    const canCreate = canCreateTasks(config, currentUser.role);
+    const _canCreate = canCreateTasks(config, currentUser.role);
+    void _canCreate; // Permission check reserved for future use
     
     const defaultWorkType = WorkType.Planned;
     

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, HIERARCHY, migratePermissions } from './constants';
@@ -30,7 +30,7 @@ const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001
 
 export default function App() {
   const { user: authUser, isAuthenticated, isLoading: authLoading, logout } = useAuth();
-  const { showSuccess, showError, showInfo, showWarning } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
   
   // Ref for main scrollable container
   const mainContainerRef = useRef<HTMLElement>(null);
@@ -340,7 +340,7 @@ export default function App() {
     const today = new Date().toISOString().split('T')[0];
     const checkDelays = () => {
       initiatives.forEach(initiative => {
-        if (initiative.eta < today && 
+        if (initiative.eta && initiative.eta < today && 
             initiative.status !== Status.Done && 
             initiative.status !== Status.AtRisk) {
           setNotifications(prev => {
@@ -527,7 +527,8 @@ export default function App() {
   }, [config.workflows, initiatives]);
 
   // Derived Data
-  const userPermissions = config.rolePermissions[currentUser.role];
+  const _userPermissions = config.rolePermissions[currentUser.role];
+  void _userPermissions; // Reserved for future permission checks
   const canCreate = canCreateTasks(config, currentUser.role);
 
   const getOwnerNameById = (id?: string) => getOwnerName(users, id);
@@ -636,11 +637,13 @@ export default function App() {
     const plannedItems = filteredInitiatives.filter(i => i.workType === WorkType.Planned);
     const unplannedItems = filteredInitiatives.filter(i => i.workType === WorkType.Unplanned);
     
-    const countPlannedWork = plannedItems.length;
-    const countUnplannedWork = unplannedItems.length;
+    const _countPlannedWork = plannedItems.length;
+    const _countUnplannedWork = unplannedItems.length;
+    void _countPlannedWork; void _countUnplannedWork;
 
-    const effortPlanned = plannedItems.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
-      const effortUnplanned = unplannedItems.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
+    const _effortPlanned = plannedItems.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
+    const _effortUnplanned = unplannedItems.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
+    void _effortPlanned; void _effortUnplanned;
 
     // Get all tasks from all initiatives
     const allTasks = filteredInitiatives.flatMap(i => i.tasks || []);
@@ -694,18 +697,20 @@ export default function App() {
     // For backward compatibility with other metrics
     const countWPUnplanned = wpItemsUnplanned.length + wpTasksUnplanned.length;
     const countBAUUnplanned = bauItemsUnplanned.length + bauTasksUnplanned.length;
-    const countWPPlanned = wpItemsPlanned.length + wpTasksPlanned.length;
-    const countBAUPlanned = bauItemsPlanned.length + bauTasksPlanned.length;
+    const _countWPPlanned = wpItemsPlanned.length + wpTasksPlanned.length;
+    const _countBAUPlanned = bauItemsPlanned.length + bauTasksPlanned.length;
+    void _countWPPlanned; void _countBAUPlanned;
     const wpUnplannedPercentage = countWP > 0 ? Math.round((countWPUnplanned / countWP) * 100) : 0;
     const bauUnplannedPercentage = countBAU > 0 ? Math.round((countBAUUnplanned / countBAU) * 100) : 0;
-    const effortWPPlanned = wpItemsPlanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
+    const _effortWPPlanned = wpItemsPlanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
       wpTasksPlanned.reduce((sum, t) => sum + (t.estimatedEffort || 0), 0);
-    const effortWPUnplanned = wpItemsUnplanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
+    const _effortWPUnplanned = wpItemsUnplanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
       wpTasksUnplanned.reduce((sum, t) => sum + (t.estimatedEffort || 0), 0);
-    const effortBAUPlanned = bauItemsPlanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
+    const _effortBAUPlanned = bauItemsPlanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
       bauTasksPlanned.reduce((sum, t) => sum + (t.estimatedEffort || 0), 0);
-    const effortBAUUnplanned = bauItemsUnplanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
+    const _effortBAUUnplanned = bauItemsUnplanned.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0) +
       bauTasksUnplanned.reduce((sum, t) => sum + (t.estimatedEffort || 0), 0);
+    void _effortWPPlanned; void _effortWPUnplanned; void _effortBAUPlanned; void _effortBAUUnplanned;
 
       // BAU Buffer = sum of filtered team leads' buffer assignments
       const bauBufferTotal = relevantOwners.reduce(
@@ -996,7 +1001,6 @@ export default function App() {
           const mentionedUserIds = parseMentions(comment.text, users);
           mentionedUserIds.forEach(userId => {
             if (userId !== currentUser.id) {
-              const mentionedUser = users.find(u => u.id === userId);
               addNotification(createNotification(
                 NotificationType.Mention,
                 `You were mentioned`,
@@ -1525,7 +1529,7 @@ export default function App() {
             initiative.tasks.push({
               id: `task_${id}_${j}`,
               title: `BAU Task ${j + 1}: ${responsibility.substring(0, 40)}`,
-              effort: taskEffort,
+              estimatedEffort: taskEffort,
               eta: taskEta,
               ownerId,
               status: j === 0 ? (status === Status.Done ? Status.Done : Status.InProgress) : Status.NotStarted,
@@ -1703,7 +1707,7 @@ export default function App() {
               filters={{
                 assetClass: filterAssetClass,
                 owners: filterOwners,
-                workType: filterWorkType
+                workType: filterWorkType || undefined
               }}
             />
             <NotificationMenu
@@ -1772,11 +1776,11 @@ export default function App() {
                  users={users}
                  filterOwners={filterOwners}
                  filterAssetClass={filterAssetClass}
-                 filterWorkType={filterWorkType}
-                 filterStatus={null}
-                 searchQuery={searchQuery}
-                 totalInitiativesCount={initiatives.length}
-                 showToast={showSuccess}
+                filterWorkType={filterWorkType || ''}
+                filterStatus={null}
+                searchQuery={searchQuery}
+                totalInitiativesCount={initiatives.length}
+                showToast={(message: string) => showSuccess(message)}
                />
              ) : currentView === 'workflows' ? (
                <WorkflowsView

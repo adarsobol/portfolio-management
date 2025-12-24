@@ -9,18 +9,13 @@ import {
   WorkflowActionConfig,
   WorkflowCondition,
   WorkflowConditionConfig,
-  Role,
-  Status,
-  Priority,
 } from '../../types';
 import { 
   Plus, 
   Play, 
-  Pause, 
   Edit, 
   Trash2, 
   Copy, 
-  CheckCircle2,
   Zap,
   Lock,
   ChevronDown,
@@ -500,7 +495,9 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             {isSystemRule && (
-                              <Lock size={14} className="text-slate-400" title="System Rule" />
+                              <span title="System Rule">
+                                <Lock size={14} className="text-slate-400" />
+                              </span>
                             )}
                             {item.description && (
                               <button

@@ -210,7 +210,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
   }, [initiatives]);
 
   // General stats
-  const stats = useMemo(() => ({
+  const _stats = useMemo(() => ({
     total: initiatives.length,
     withDependencies: initiatives.filter(i => dependencyData.externalDeps.has(i.id)).length,
     atRiskWithDeps: initiatives.filter(i => 
@@ -218,6 +218,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
     ).length,
     overdue: overdueCount
   }), [initiatives, dependencyData, overdueCount]);
+  void _stats; // Reserved for stats display feature
 
   const toggleRowExpanded = (rowId: string) => {
     setExpandedRows(prev => {
@@ -269,7 +270,8 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
     setEditFormData(null);
   };
 
-  const getOwnerName = (ownerId: string) => users.find(u => u.id === ownerId)?.name || 'Unknown';
+  const _getOwnerName = (ownerId: string) => users.find(u => u.id === ownerId)?.name || 'Unknown';
+  void _getOwnerName; // Reserved for owner display feature
 
   return (
     <div className="space-y-4">

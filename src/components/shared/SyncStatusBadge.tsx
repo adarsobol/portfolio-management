@@ -1,7 +1,7 @@
 // Sync Status Badge Component
 // Shows current Google Sheets sync status with visual indicators
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Upload, Download, Settings } from 'lucide-react';
 import { sheetsSync, SyncStatus } from '../../services';
 

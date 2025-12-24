@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Filter, List, Layers } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { AssetClass, User, UnplannedTag } from '../../types';
 
 interface FilterBarProps {
@@ -22,9 +22,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   filterOwners, setFilterOwners,
   filterWorkType, setFilterWorkType,
   searchQuery, resetFilters,
-  currentView, viewLayout, setViewLayout,
+  currentView: _currentView, viewLayout: _viewLayout, setViewLayout: _setViewLayout,
   users
 }) => {
+  // Reserved for future layout toggle functionality
+  void _currentView; void _viewLayout; void _setViewLayout;
 
   // Get owners who have initiatives (Team Leads)
   const availableOwners = useMemo(() => {

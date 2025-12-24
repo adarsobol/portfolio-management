@@ -1,4 +1,3 @@
-import React from 'react';
 import { Status, Priority } from '../../types';
 
 export const StatusBadge = ({ status }: { status: Status }) => {

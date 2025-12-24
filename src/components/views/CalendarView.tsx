@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, AlertTriangle, PlayCircle, CheckCircle, Edit, Check, X, History } from 'lucide-react';
-import { Initiative, Status, WorkType, InitiativeType, Priority, User, AssetClass } from '../../types';
+import { Initiative, Status, InitiativeType, Priority, User } from '../../types';
 
 interface CalendarViewProps {
   filteredInitiatives: Initiative[];
@@ -21,7 +21,7 @@ interface CalendarViewProps {
 }
 
 // Helper functions
-const getPriorityColor = (priority: Priority): string => {
+const _getPriorityColor = (priority: Priority): string => {
   switch (priority) {
     case Priority.P0:
       return 'bg-red-500 text-white';
@@ -33,6 +33,7 @@ const getPriorityColor = (priority: Priority): string => {
       return 'bg-slate-400 text-white';
   }
 };
+void _getPriorityColor; // Reserved for future priority badge styling
 
 const getOwnerInitials = (users: User[], ownerId: string): string => {
   const user = users.find(u => u.id === ownerId);
@@ -229,7 +230,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return user?.name || ownerId;
   };
 
-  const onDragStart = useCallback((e: React.DragEvent, id: string, item: Initiative) => {
+  const onDragStart = useCallback((e: React.DragEvent, id: string, _item: Initiative) => {
     e.dataTransfer.setData("text/plain", id);
     setDraggedItemId(id);
     

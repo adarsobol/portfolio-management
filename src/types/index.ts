@@ -168,7 +168,8 @@ export interface Initiative {
   overlookedCount?: number; // Number of times ETA has been pushed back
   lastDelayDate?: string; // Date of last ETA delay (ISO Date String)
   
-  // Removed: completionRate - calculate from actualEffort / estimatedEffort when needed
+  // Completion tracking
+  completionRate?: number; // Completion percentage (0-100)
 }
 
 // Legacy permission keys (for backward compatibility)

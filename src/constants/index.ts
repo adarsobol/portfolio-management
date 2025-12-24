@@ -1,4 +1,4 @@
-import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, Workflow, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, Dependency, InitiativeType, TabAccessLevel, TaskManagementScope, PermissionKey, LegacyPermissionKey, PermissionValue } from '../types';
+import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, InitiativeType, TaskManagementScope, PermissionKey, LegacyPermissionKey, PermissionValue } from '../types';
 import { generateId } from '../utils';
 
 // Dependency team options for external dependencies
