@@ -125,10 +125,8 @@ class SheetsSyncManager {
   private enabled: boolean = true;
   private debounceMs: number = 1000; // Reduced for more responsive syncing
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private onlineHandler?: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private offlineHandler?: () => void;
+  private _onlineHandler?: () => void;
+  private _offlineHandler?: () => void;
   private static listenersRegistered = false;
   private static sharedHandlers: { online?: () => void; offline?: () => void } = {};
 
@@ -811,8 +809,7 @@ class SheetsSyncManager {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private loadPersistedQueue(): void {
+  private _loadPersistedQueue(): void {
     // Don't load persisted queue - this was causing duplicates on refresh
     // Clear any existing persisted queue to prevent old items from syncing
     try {

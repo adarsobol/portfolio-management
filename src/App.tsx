@@ -1707,7 +1707,7 @@ export default function App() {
               filters={{
                 assetClass: filterAssetClass,
                 owners: filterOwners,
-                workType: filterWorkType || undefined
+                workType: filterWorkType?.[0] || undefined
               }}
             />
             <NotificationMenu
@@ -1776,7 +1776,7 @@ export default function App() {
                  users={users}
                  filterOwners={filterOwners}
                  filterAssetClass={filterAssetClass}
-                filterWorkType={filterWorkType || ''}
+                filterWorkType={filterWorkType?.[0] || ''}
                 filterStatus={null}
                 searchQuery={searchQuery}
                 totalInitiativesCount={initiatives.length}
