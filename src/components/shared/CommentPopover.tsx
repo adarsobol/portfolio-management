@@ -451,7 +451,7 @@ export const CommentPopover: React.FC<CommentPopoverProps> = ({
                   {showMentionDropdown && filteredMentionUsers.length > 0 && (
                     <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
                       <div className="px-2 py-1.5 bg-slate-50 border-b border-slate-100">
-                        <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Mention someone</span>
+                        <span className="text-[10px] text-slate-500 font-medium tracking-wider">Mention someone</span>
                       </div>
                       {filteredMentionUsers.map((user, index) => (
                         <button

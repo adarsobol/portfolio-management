@@ -11,6 +11,8 @@ export const StatusBadge = ({ status }: { status: Status }) => {
     [Status.AtRisk]: 'text-white bg-amber-500 border-amber-600 shadow-sm animate-pulse',
     // Done: Muted green to fade into background
     [Status.Done]: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    // Obsolete: Muted gray/purple to indicate deprecated items
+    [Status.Obsolete]: 'text-slate-600 bg-slate-200 border-slate-300',
   };
   return (
     <span className={`px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap border ${styles[status]}`}>

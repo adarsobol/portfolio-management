@@ -1,4 +1,4 @@
-import { User } from '../types';
+import { User, Role, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, AppConfig } from '../types';
 
 /**
  * Generate a unique ID for entities
@@ -45,6 +45,90 @@ export const checkOutdated = (dateStr: string): boolean => {
   return diffDays > 14;
 };
 
+/**
+ * Get days until/since a date (negative if overdue)
+ */
+export const getDaysUntil = (dateStr: string): number => {
+  if (!dateStr) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const targetDate = new Date(dateStr);
+  targetDate.setHours(0, 0, 0, 0);
+  const diffTime = targetDate.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+/**
+ * Check if a date is overdue (in the past)
+ */
+export const isOverdue = (dateStr: string): boolean => {
+  if (!dateStr) return false;
+  return getDaysUntil(dateStr) < 0;
+};
+
+/**
+ * Get date status category
+ */
+export const getDateStatus = (dateStr: string): 'overdue' | 'due-soon' | 'on-time' | 'future' => {
+  if (!dateStr) return 'future';
+  const daysUntil = getDaysUntil(dateStr);
+  if (daysUntil < 0) return 'overdue';
+  if (daysUntil <= 3) return 'due-soon';
+  if (daysUntil <= 7) return 'on-time';
+  return 'future';
+};
+
+/**
+ * Format date for display (human-readable or relative)
+ */
+export const formatDateDisplay = (dateStr: string): string => {
+  if (!dateStr) return '—';
+  
+  const daysUntil = getDaysUntil(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const targetDate = new Date(dateStr);
+  targetDate.setHours(0, 0, 0, 0);
+  
+  // Yesterday
+  if (daysUntil === -1) return 'Yesterday';
+  
+  // Today
+  if (daysUntil === 0) return 'Today';
+  
+  // Tomorrow
+  if (daysUntil === 1) return 'Tomorrow';
+  
+  // Overdue
+  if (daysUntil < 0) {
+    const daysOverdue = Math.abs(daysUntil);
+    return `Overdue by ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''}`;
+  }
+  
+  // Within 7 days - show relative
+  if (daysUntil <= 7) {
+    return `In ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`;
+  }
+  
+  // Beyond 7 days - show formatted date
+  return targetDate.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+};
+
+/**
+ * Calculate completion rate from actual and estimated effort
+ * Returns percentage (0-100), or 0 if estimated effort is 0 or undefined
+ */
+export const calculateCompletionRate = (actualEffort?: number, estimatedEffort?: number): number => {
+  const actual = actualEffort || 0;
+  const estimated = estimatedEffort || 0;
+  if (estimated === 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((actual / estimated) * 100)));
+};
+
 // Export mention parser utilities
 export { parseMentions, getMentionedUsers } from './mentionParser';
 
@@ -54,4 +138,144 @@ export { exportToCSV, exportToExcel, exportFilteredData, exportToClipboard, expo
 // Export error handling utilities
 export { logger } from './logger';
 export { getErrorMessage, formatErrorForUser, isNetworkError, isOfflineError } from './errorUtils';
+
+// Export rules extractor utilities
+export { getSystemRules, markSystemWorkflows } from './rulesExtractor';
+
+// Export ID generation utilities
+export { generateInitiativeId, parseQuarter, isJiraStyleId } from './idGenerator';
+
+// Export migration utilities
+export { migrateInitiativeIds, updateInitiativeIdReferences } from './migrateIds';
+
+// Export metrics cache utilities
+export { metricsCache } from './metricsCache';
+
+// Export pagination utilities
+export { paginate } from './pagination';
+export type { PaginationState, PaginationResult } from './pagination';
+
+/**
+ * Permission helper functions for checking access levels
+ */
+
+/**
+ * Check if a tab access level includes view permission
+ */
+export const hasViewAccess = (level: TabAccessLevel): boolean => {
+  return level === 'view' || level === 'edit';
+};
+
+/**
+ * Check if a tab access level includes edit permission (edit = full access)
+ */
+export const hasEditAccess = (level: TabAccessLevel): boolean => {
+  return level === 'edit';
+};
+
+/**
+ * Get permission value for a role, with fallback to default
+ */
+export const getPermission = (config: AppConfig, role: Role, key: PermissionKey): PermissionValue => {
+  const perms = config.rolePermissions[role];
+  if (!perms) {
+    // Return default based on permission type
+    if (key.startsWith('access')) {
+      return 'none';
+    }
+    return 'no';
+  }
+  return perms[key] ?? (key.startsWith('access') ? 'none' : 'no');
+};
+
+/**
+ * Check if user can view a specific tab/view
+ */
+export const canViewTab = (config: AppConfig, role: Role, tabKey: PermissionKey): boolean => {
+  const value = getPermission(config, role, tabKey);
+  if (typeof value === 'string') {
+    return hasViewAccess(value as TabAccessLevel);
+  }
+  return false;
+};
+
+/**
+ * Check if user can edit in a specific tab/view
+ */
+export const canEditTab = (config: AppConfig, role: Role, tabKey: PermissionKey): boolean => {
+  const value = getPermission(config, role, tabKey);
+  if (typeof value === 'string') {
+    return hasEditAccess(value as TabAccessLevel);
+  }
+  return false;
+};
+
+/**
+ * Get task management scope for a permission
+ */
+export const getTaskManagementScope = (config: AppConfig, role: Role, key: PermissionKey): TaskManagementScope => {
+  const value = getPermission(config, role, key);
+  if (typeof value === 'string' && (value === 'no' || value === 'yes' || value === 'own')) {
+    return value as TaskManagementScope;
+  }
+  return 'no';
+};
+
+/**
+ * Check if user has a task management permission (yes or own)
+ */
+export const hasTaskPermission = (config: AppConfig, role: Role, key: PermissionKey): boolean => {
+  const scope = getTaskManagementScope(config, role, key);
+  return scope === 'yes' || scope === 'own';
+};
+
+/**
+ * Check if user can create tasks
+ */
+export const canCreateTasks = (config: AppConfig, role: Role): boolean => {
+  return hasTaskPermission(config, role, 'createNewTasks');
+};
+
+/**
+ * Get edit tasks scope for a role
+ */
+export const getEditTasksScope = (config: AppConfig, role: Role): TaskManagementScope => {
+  return getTaskManagementScope(config, role, 'editTasks');
+};
+
+/**
+ * Check if user can edit all tasks
+ */
+export const canEditAllTasks = (config: AppConfig, role: Role): boolean => {
+  return getEditTasksScope(config, role) === 'yes';
+};
+
+/**
+ * Check if user can edit own tasks
+ */
+export const canEditOwnTasks = (config: AppConfig, role: Role): boolean => {
+  const scope = getEditTasksScope(config, role);
+  return scope === 'own' || scope === 'yes';
+};
+
+/**
+ * Check if user can delete tasks
+ */
+export const canDeleteTasks = (config: AppConfig, role: Role): boolean => {
+  return hasTaskPermission(config, role, 'deleteTasks');
+};
+
+/**
+ * Check if user can access admin panel
+ */
+export const canAccessAdmin = (config: AppConfig, role: Role): boolean => {
+  return getTaskManagementScope(config, role, 'accessAdmin') === 'yes';
+};
+
+/**
+ * Check if user can manage workflows
+ */
+export const canManageWorkflows = (config: AppConfig, role: Role): boolean => {
+  return getTaskManagementScope(config, role, 'manageWorkflows') === 'yes';
+};
 

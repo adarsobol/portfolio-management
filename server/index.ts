@@ -12,7 +12,11 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { isGCSEnabled, getGCSConfig, initializeGCSStorage, getGCSStorage } from './gcsStorage';
+import { generateInitiativeId } from './idGenerator';
 import {
   validate,
   loginSchema,
@@ -256,6 +260,30 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '10mb' }));
+
+// ============================================
+// STATIC FILE SERVING (for production deployment)
+// ============================================
+// Serve static files from dist folder if it exists (production builds)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, '..', 'dist');
+
+// Only serve static files in production or if dist folder exists
+if (NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
+  try {
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath, {
+        maxAge: NODE_ENV === 'production' ? '1y' : '0', // Cache in production
+        etag: true,
+        lastModified: true
+      }));
+      console.log(`📁 Serving static files from ${distPath}`);
+    }
+  } catch (error) {
+    console.warn('Could not serve static files:', error);
+  }
+}
 
 // ============================================
 // RATE LIMITING
@@ -851,7 +879,7 @@ app.post('/api/users/bulk-import', authenticateToken, validate(bulkImportUsersSc
 
 // Valid enum values for initiatives
 const VALID_ASSET_CLASSES = ['PL', 'Auto', 'POS', 'Advisory'];
-const VALID_STATUSES = ['Not Started', 'In Progress', 'At Risk', 'Done'];
+const VALID_STATUSES = ['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'];
 const VALID_PRIORITIES = ['P0', 'P1', 'P2'];
 const VALID_WORK_TYPES = ['Planned Work', 'Unplanned Work'];
 
@@ -898,6 +926,13 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
       });
     }
 
+    // Load existing initiatives to calculate next sequence number
+    const existingRows = await initiativesSheet.getRows();
+    const existingInitiatives = existingRows.map((r: GoogleSpreadsheetRow) => ({
+      id: r.get('id') || '',
+      quarter: r.get('quarter') || ''
+    }));
+
     const results = {
       imported: 0,
       skipped: 0,
@@ -906,6 +941,9 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
 
     const initiativesToAdd: Record<string, string>[] = [];
     const today = new Date().toISOString().split('T')[0];
+    
+    // Track generated initiatives to ensure sequential IDs
+    const generatedInitiatives: Array<{ id: string; quarter?: string }> = [...existingInitiatives];
 
     for (let i = 0; i < initiatives.length; i++) {
       const init = initiatives[i];
@@ -991,8 +1029,9 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
         eta = date.toISOString().split('T')[0];
       }
 
-      // Generate unique ID
-      const initiativeId = `i_${Date.now()}_${i}`;
+      // Generate unique ID using Jira-style format (Q425-001)
+      const quarter = init.quarter || init.Quarter || '';
+      const initiativeId = generateInitiativeId(quarter, generatedInitiatives);
 
       // Build initiative object
       const initiativeData: Record<string, string> = {
@@ -1004,7 +1043,7 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
         title: title.trim(),
         ownerId: ownerId,
         secondaryOwner: init.secondaryOwner || init['Secondary Owner'] || '',
-        quarter: init.quarter || init.Quarter || '',
+        quarter: quarter,
         status: status,
         priority: priority,
         estimatedEffort: String(estimatedEffort),
@@ -1022,13 +1061,35 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
         history: '[]'
       };
 
+      // Add to generated list for next iteration
+      generatedInitiatives.push({ id: initiativeId, quarter });
+
       initiativesToAdd.push(initiativeData);
       results.imported++;
     }
 
-    // Batch add all valid initiatives
-    if (initiativesToAdd.length > 0) {
-      await initiativesSheet.addRows(initiativesToAdd);
+    // Deduplicate initiatives before adding (keep first occurrence)
+    const seenIds = new Set<string>();
+    const deduplicatedToAdd = initiativesToAdd.filter((init: Record<string, string>) => {
+      const id = init.id;
+      if (!id || seenIds.has(id)) {
+        if (id) {
+          console.warn(`[SERVER] Bulk import: Found duplicate initiative ID: ${id}, skipping duplicate`);
+        }
+        return false;
+      }
+      seenIds.add(id);
+      return true;
+    });
+
+    if (initiativesToAdd.length !== deduplicatedToAdd.length) {
+      console.log(`[SERVER] Bulk import: Deduplicated initiatives: ${initiativesToAdd.length} -> ${deduplicatedToAdd.length} (removed ${initiativesToAdd.length - deduplicatedToAdd.length} duplicates)`);
+      results.imported = deduplicatedToAdd.length;
+    }
+
+    // Batch add all valid deduplicated initiatives
+    if (deduplicatedToAdd.length > 0) {
+      await initiativesSheet.addRows(deduplicatedToAdd);
     }
 
     console.log(`Bulk imported ${results.imported} initiatives, errors: ${results.errors.length}`);
@@ -1064,6 +1125,21 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
   try {
     const { initiatives } = req.body;
 
+    // Deduplicate incoming initiatives by ID (keep first occurrence)
+    const seenIds = new Set<string>();
+    const deduplicated = initiatives.filter((init: { id: string }) => {
+      if (seenIds.has(init.id)) {
+        console.warn(`[SERVER] Upsert: Found duplicate initiative ID in request: ${init.id}, skipping duplicate`);
+        return false;
+      }
+      seenIds.add(init.id);
+      return true;
+    });
+
+    if (initiatives.length !== deduplicated.length) {
+      console.log(`[SERVER] Upsert: Deduplicated incoming initiatives: ${initiatives.length} -> ${deduplicated.length} (removed ${initiatives.length - deduplicated.length} duplicates)`);
+    }
+
     const doc = await getDoc();
     if (!doc) {
       res.status(500).json({ error: 'Failed to connect to Google Sheets' });
@@ -1079,31 +1155,102 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
       });
     }
 
+    // Get all rows and remove duplicates from sheet first
     const rows = await sheet.getRows();
+    const seenSheetIds = new Set<string>();
+    const rowsToDelete: GoogleSpreadsheetRow[] = [];
+    
+    // Identify duplicate rows in the sheet (keep first occurrence, mark others for deletion)
+    for (const row of rows) {
+      const id = row.get('id');
+      if (!id || id.startsWith('_meta_')) continue;
+      
+      if (seenSheetIds.has(id)) {
+        rowsToDelete.push(row);
+      } else {
+        seenSheetIds.add(id);
+      }
+    }
 
-    for (const initiative of initiatives) {
+    // Delete duplicate rows from sheet
+    if (rowsToDelete.length > 0) {
+      console.log(`[SERVER] Upsert: Removing ${rowsToDelete.length} duplicate rows from sheet`);
+      for (const row of rowsToDelete) {
+        await row.delete();
+      }
+      // Reload rows after deletion
+      const updatedRows = await sheet.getRows();
+      rows.length = 0;
+      rows.push(...updatedRows);
+    }
+
+    // Now process deduplicated initiatives
+    // Create a map of existing IDs for faster lookup
+    const existingIds = new Set(rows.map((r: GoogleSpreadsheetRow) => r.get('id')).filter((id: string) => id && !id.startsWith('_meta_')));
+    
+    for (const initiative of deduplicated) {
       const existing = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === initiative.id);
 
       if (existing) {
+        // Update existing row
         Object.keys(initiative).forEach(key => {
           const value = initiative[key];
           existing.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
         });
         await existing.save();
-      } else {
+      } else if (!existingIds.has(initiative.id)) {
+        // Only add if it doesn't exist (double-check to prevent duplicates)
         const rowData: Record<string, string> = {};
         Object.keys(initiative).forEach(key => {
           const value = initiative[key];
           rowData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
         });
         await sheet.addRow(rowData);
+        existingIds.add(initiative.id); // Track that we added it
+      } else {
+        console.warn(`[SERVER] Upsert: Initiative ${initiative.id} already exists, skipping add`);
       }
     }
 
-    console.log(`Synced ${initiatives.length} initiatives`);
-    res.json({ success: true, count: initiatives.length });
+    console.log(`Synced ${deduplicated.length} initiatives`);
+    res.json({ success: true, count: deduplicated.length });
   } catch (error) {
     console.error('Error syncing initiatives:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// DELETE /api/sheets/initiatives/:id - Delete an initiative (Protected)
+app.delete('/api/sheets/initiatives/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      return;
+    }
+
+    let sheet = doc.sheetsByTitle['Initiatives'];
+    
+    if (!sheet) {
+      res.status(404).json({ error: 'Initiatives sheet not found' });
+      return;
+    }
+
+    const rows = await sheet.getRows();
+    const rowToDelete = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+    
+    if (!rowToDelete) {
+      res.status(404).json({ error: 'Initiative not found' });
+      return;
+    }
+
+    await rowToDelete.delete();
+    console.log(`Deleted initiative ${id}`);
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Error deleting initiative:', error);
     res.status(500).json({ error: String(error) });
   }
 });
@@ -1219,7 +1366,7 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
 
     const rows = await sheet.getRows();
     
-    const initiatives = rows
+    const allInitiatives = rows
       .filter((row: GoogleSpreadsheetRow) => row.get('id') && !row.get('id').startsWith('_meta_'))
       .map((row: GoogleSpreadsheetRow) => {
         const parseJson = (val: string | undefined, fallback: unknown) => {
@@ -1259,6 +1406,21 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
         };
       });
 
+    // Deduplicate initiatives by ID (keep first occurrence)
+    const seenIds = new Set<string>();
+    const initiatives = allInitiatives.filter(init => {
+      if (seenIds.has(init.id)) {
+        console.warn(`[SERVER] Found duplicate initiative ID: ${init.id}, skipping duplicate`);
+        return false;
+      }
+      seenIds.add(init.id);
+      return true;
+    });
+
+    if (allInitiatives.length !== initiatives.length) {
+      console.log(`[SERVER] Deduplicated initiatives: ${allInitiatives.length} -> ${initiatives.length} (removed ${allInitiatives.length - initiatives.length} duplicates)`);
+    }
+
     console.log(`Pulled ${initiatives.length} initiatives from Sheets`);
     res.json({ initiatives, config: null, users: null });
   } catch (error) {
@@ -1275,6 +1437,21 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
     if (!initiatives || !Array.isArray(initiatives)) {
       res.status(400).json({ error: 'Invalid data' });
       return;
+    }
+
+    // Deduplicate initiatives before pushing (keep first occurrence)
+    const seenIds = new Set<string>();
+    const deduplicated = initiatives.filter((init: { id: string }) => {
+      if (seenIds.has(init.id)) {
+        console.warn(`[SERVER] Push: Found duplicate initiative ID: ${init.id}, skipping duplicate`);
+        return false;
+      }
+      seenIds.add(init.id);
+      return true;
+    });
+
+    if (initiatives.length !== deduplicated.length) {
+      console.log(`[SERVER] Push: Deduplicated initiatives: ${initiatives.length} -> ${deduplicated.length} (removed ${initiatives.length - deduplicated.length} duplicates)`);
     }
 
     const doc = await getDoc();
@@ -1295,7 +1472,7 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
       });
     }
 
-    await sheet.addRows(initiatives.map((item: Record<string, unknown>) => {
+    await sheet.addRows(deduplicated.map((item: Record<string, unknown>) => {
       const rowData: Record<string, string> = {};
       INITIATIVE_HEADERS.forEach(header => {
         const value = item[header];
@@ -1304,8 +1481,8 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
       return rowData;
     }));
 
-    console.log(`Pushed ${initiatives.length} initiatives to Sheets`);
-    res.json({ success: true, count: initiatives.length });
+    console.log(`Pushed ${deduplicated.length} initiatives to Sheets`);
+    res.json({ success: true, count: deduplicated.length });
   } catch (error) {
     console.error('Error pushing to Sheets:', error);
     res.status(500).json({ error: String(error) });
@@ -1505,6 +1682,31 @@ app.post('/api/export/excel', authenticateToken, async (req: AuthenticatedReques
     res.status(500).json({ error: 'Export failed' });
   }
 });
+
+// ============================================
+// SPA FALLBACK (serve index.html for all non-API routes)
+// ============================================
+// This must be after all API routes
+if (NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
+  app.get('*', (req: Request, res: Response) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api/')) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    
+    const indexPath = path.join(distPath, 'index.html');
+    try {
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(path.resolve(indexPath));
+      } else {
+        res.status(404).send('Frontend not found. Please build the frontend first.');
+      }
+    } catch (error) {
+      res.status(500).send('Error serving frontend');
+    }
+  });
+}
 
 // ============================================
 // START SERVER (using httpServer for Socket.IO)

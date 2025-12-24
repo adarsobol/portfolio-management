@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Workflow, 
   User, 
@@ -6,7 +6,12 @@ import {
   Initiative,
   WorkflowTrigger,
   WorkflowAction,
+  WorkflowActionConfig,
+  WorkflowCondition,
+  WorkflowConditionConfig,
   Role,
+  Status,
+  Priority,
 } from '../../types';
 import { 
   Plus, 
@@ -16,9 +21,12 @@ import {
   Trash2, 
   Copy, 
   CheckCircle2,
-  Zap
+  Zap,
+  Lock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { generateId } from '../../utils';
+import { generateId, getSystemRules, markSystemWorkflows, canViewTab, canManageWorkflows } from '../../utils';
 import { workflowEngine } from '../../services/workflowEngine';
 import WorkflowBuilder from './WorkflowBuilder';
 
@@ -45,20 +53,99 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Get permissions with fallback to INITIAL_CONFIG if missing
-  const rolePerms = config.rolePermissions[currentUser.role] || {};
-  const canCreate = rolePerms.createWorkflows ?? (currentUser.role === Role.Admin || currentUser.role === Role.SVP || currentUser.role === Role.VP || currentUser.role === Role.DirectorDepartment || currentUser.role === Role.DirectorGroup || currentUser.role === Role.PortfolioOps || currentUser.role === Role.TeamLead);
-  const canManage = rolePerms.manageWorkflows ?? (currentUser.role === Role.Admin || currentUser.role === Role.SVP || currentUser.role === Role.VP || currentUser.role === Role.DirectorDepartment || currentUser.role === Role.PortfolioOps);
+  // Get permissions using helper functions
+  const canView = canViewTab(config, currentUser.role, 'accessWorkflows');
+  const canManage = canManageWorkflows(config, currentUser.role);
+  // For workflows, if user can view, they can create (createWorkflows permission removed, replaced with view/edit/full)
+  const canCreate = canView;
 
-  const filteredWorkflows = workflows.filter(w => 
-    w.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    w.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get system rules and merge with workflows
+  const systemRules = useMemo(() => getSystemRules(), []);
+  const allRulesAndWorkflows = useMemo(() => {
+    const markedWorkflows = markSystemWorkflows(workflows);
+    return [...systemRules, ...markedWorkflows].sort((a, b) => {
+      // System rules first, then custom workflows
+      if (a.system && !b.system) return -1;
+      if (!a.system && b.system) return 1;
+      return 0;
+    });
+  }, [workflows, systemRules]);
+
+  const filteredItems = useMemo(() => {
+    let filtered = allRulesAndWorkflows.filter(item => 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    // Apply sorting
+    if (sortConfig) {
+      filtered = [...filtered].sort((a, b) => {
+        let aVal: any, bVal: any;
+        switch (sortConfig.key) {
+          case 'name':
+            aVal = a.name.toLowerCase();
+            bVal = b.name.toLowerCase();
+            break;
+          case 'type':
+            aVal = a.system ? 0 : 1;
+            bVal = b.system ? 0 : 1;
+            break;
+          case 'trigger':
+            aVal = getTriggerLabel(a.trigger);
+            bVal = getTriggerLabel(b.trigger);
+            break;
+          case 'status':
+            aVal = a.enabled ? 0 : 1;
+            bVal = b.enabled ? 0 : 1;
+            break;
+          default:
+            return 0;
+        }
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [allRulesAndWorkflows, searchQuery, sortConfig]);
+
+  const toggleRowExpansion = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => {
+      if (prev?.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
 
   const handleToggleWorkflow = (workflowId: string) => {
     if (!canManage) return;
     
+    // Check if it's a system rule from getSystemRules (these are always enabled)
+    const systemRule = systemRules.find(r => r.id === workflowId);
+    if (systemRule) {
+      // System rules from getSystemRules are always enabled and cannot be toggled
+      alert('This system rule is always enabled and cannot be disabled.');
+      return;
+    }
+    
+    // For workflows in config (including system workflows from INITIAL_CONFIG)
     setConfig(prev => ({
       ...prev,
       workflows: (prev.workflows || []).map(w => 
@@ -69,6 +156,11 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
 
   const handleDeleteWorkflow = (workflowId: string) => {
     if (!canManage) return;
+    const item = allRulesAndWorkflows.find(w => w.id === workflowId);
+    if (item?.readOnly) {
+      alert('System rules cannot be deleted.');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this workflow?')) return;
     
     setConfig(prev => ({
@@ -78,6 +170,10 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
   };
 
   const handleDuplicateWorkflow = (workflow: Workflow) => {
+    if (workflow.readOnly) {
+      alert('System rules cannot be duplicated.');
+      return;
+    }
     const duplicated: Workflow = {
       ...workflow,
       id: generateId(),
@@ -86,6 +182,8 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
       createdAt: new Date().toISOString(),
       runCount: 0,
       executionLog: [],
+      system: false,
+      readOnly: false,
     };
     
     setConfig(prev => ({
@@ -109,20 +207,22 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
         setInitiatives(initiativesCopy);
       }
       
-      // Update workflow execution log
-      setConfig(prev => ({
-        ...prev,
-        workflows: (prev.workflows || []).map(w => 
-          w.id === workflow.id 
-            ? { 
-                ...w, 
-                lastRun: new Date().toISOString(),
-                runCount: w.runCount + 1,
-                executionLog: [...(w.executionLog || []), log].slice(-10) // Keep last 10
-              }
-            : w
-        )
-      }));
+      // Update workflow execution log (only for custom workflows)
+      if (!workflow.system) {
+        setConfig(prev => ({
+          ...prev,
+          workflows: (prev.workflows || []).map(w => 
+            w.id === workflow.id 
+              ? { 
+                  ...w, 
+                  lastRun: new Date().toISOString(),
+                  runCount: w.runCount + 1,
+                  executionLog: [...(w.executionLog || []), log].slice(-10) // Keep last 10
+                }
+              : w
+          )
+        }));
+      }
       
       alert(`Workflow executed: ${log.initiativesAffected.length} initiatives affected`);
     } catch (error) {
@@ -131,6 +231,10 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
   };
 
   const handleEditWorkflow = (workflow: Workflow) => {
+    if (workflow.readOnly) {
+      alert('System rules cannot be edited.');
+      return;
+    }
     setEditingWorkflow(workflow);
     setIsBuilderOpen(true);
   };
@@ -167,28 +271,98 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
     }
   };
 
-  const getTriggerColor = (trigger: WorkflowTrigger): string => {
-    switch (trigger) {
-      case WorkflowTrigger.OnSchedule: return 'bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border border-blue-200';
-      case WorkflowTrigger.OnFieldChange: return 'bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200';
-      case WorkflowTrigger.OnStatusChange: return 'bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border border-purple-200';
-      case WorkflowTrigger.OnEtaChange: return 'bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 border border-amber-200';
-      case WorkflowTrigger.OnEffortChange: return 'bg-gradient-to-r from-cyan-50 to-cyan-100 text-cyan-700 border border-cyan-200';
-      default: return 'bg-slate-100 text-slate-700 border border-slate-200';
+  const getTriggerDisplay = (workflow: Workflow): string => {
+    const baseLabel = getTriggerLabel(workflow.trigger);
+    if (workflow.trigger === WorkflowTrigger.OnSchedule && workflow.triggerConfig?.schedule) {
+      const schedule = workflow.triggerConfig.schedule;
+      const time = workflow.triggerConfig.time || '';
+      return `${schedule.charAt(0).toUpperCase() + schedule.slice(1)}${time ? ` at ${time}` : ''}`;
+    }
+    if (workflow.trigger === WorkflowTrigger.OnFieldChange && workflow.triggerConfig?.fields) {
+      return `On ${workflow.triggerConfig.fields.join(', ')} change`;
+    }
+    return baseLabel;
+  };
+
+  const formatCondition = (condition?: WorkflowConditionConfig): string => {
+    if (!condition) return 'None';
+    
+    const formatSingleCondition = (cond: WorkflowConditionConfig): string => {
+      switch (cond.type) {
+        case WorkflowCondition.DueDatePassed:
+          return 'Due date passed';
+        case WorkflowCondition.DueDateWithinDays:
+          return `Due date within ${cond.days || 0} days`;
+        case WorkflowCondition.LastUpdatedOlderThan:
+          return `Last updated > ${cond.days || 0} days ago`;
+        case WorkflowCondition.StatusEquals:
+          return `Status = ${cond.value || ''}`;
+        case WorkflowCondition.StatusNotEquals:
+          return `Status ≠ ${cond.value || ''}`;
+        case WorkflowCondition.ActualEffortGreaterThan:
+          return `Actual effort > ${cond.value || 0}`;
+        case WorkflowCondition.ActualEffortPercentageOfEstimated:
+          return `Actual effort ≥ ${cond.percentage || 0}% of estimated`;
+        case WorkflowCondition.EffortVarianceExceeds:
+          return `Effort variance > ${cond.value || 0}`;
+        case WorkflowCondition.PriorityEquals:
+          return `Priority = ${cond.value || ''}`;
+        case WorkflowCondition.RiskActionLogEmpty:
+          return 'Risk action log is empty';
+        case WorkflowCondition.OwnerEquals:
+          return `Owner = ${cond.value || ''}`;
+        case WorkflowCondition.AssetClassEquals:
+          return `Asset class = ${cond.value || ''}`;
+        case WorkflowCondition.And:
+          if (cond.children && cond.children.length > 0) {
+            return cond.children.map(formatSingleCondition).join(' AND ');
+          }
+          return 'All conditions';
+        case WorkflowCondition.Or:
+          if (cond.children && cond.children.length > 0) {
+            return cond.children.map(formatSingleCondition).join(' OR ');
+          }
+          return 'Any condition';
+        default:
+          return cond.type;
+      }
+    };
+    
+    return formatSingleCondition(condition);
+  };
+
+  const formatAction = (action: WorkflowActionConfig): string => {
+    switch (action.type) {
+      case WorkflowAction.SetStatus:
+        return `Set Status: ${action.value || ''}`;
+      case WorkflowAction.TransitionStatus:
+        return 'Transition Status';
+      case WorkflowAction.SetPriority:
+        return `Set Priority: ${action.value || ''}`;
+      case WorkflowAction.SetAtRisk:
+        return 'Mark At Risk';
+      case WorkflowAction.NotifyOwner:
+        return 'Notify Owner';
+      case WorkflowAction.NotifySlackChannel:
+        return `Notify Slack: ${action.channel || 'channel'}`;
+      case WorkflowAction.CreateComment:
+        return `Create Comment: ${action.message?.substring(0, 30) || ''}${action.message && action.message.length > 30 ? '...' : ''}`;
+      case WorkflowAction.UpdateEta:
+        return `Update ETA: ${action.value || ''}`;
+      case WorkflowAction.UpdateEffort:
+        return `Update Effort: ${action.value || ''}`;
+      case WorkflowAction.ExecuteMultiple:
+        return `Execute ${action.actions?.length || 0} actions`;
+      default:
+        return action.type;
     }
   };
 
-  const getActionLabel = (action: WorkflowAction): string => {
-    switch (action) {
-      case WorkflowAction.SetStatus: return 'Set Status';
-      case WorkflowAction.SetPriority: return 'Set Priority';
-      case WorkflowAction.SetAtRisk: return 'Mark At Risk';
-      case WorkflowAction.NotifyOwner: return 'Notify Owner';
-      case WorkflowAction.NotifySlackChannel: return 'Notify Slack';
-      case WorkflowAction.CreateComment: return 'Create Comment';
-      case WorkflowAction.ExecuteMultiple: return 'Multiple Actions';
-      default: return action;
+  const SortIcon = ({ column }: { column: string }) => {
+    if (!sortConfig || sortConfig.key !== column) {
+      return <span className="text-slate-400">↕</span>;
     }
+    return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
 
   return (
@@ -231,7 +405,7 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
         <div className="relative">
           <input
             type="text"
-            placeholder="Search workflows..."
+            placeholder="Search workflows and rules..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition-all text-sm"
@@ -240,12 +414,12 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
         </div>
       </div>
 
-      {filteredWorkflows.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-16 text-center">
           <div className="inline-flex p-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl mb-5">
             <Zap className="text-slate-400" size={48} />
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-2">No workflows found</h3>
+          <h3 className="text-lg font-bold text-slate-800 mb-2">No workflows or rules found</h3>
           <p className="text-slate-500 mb-6">
             {searchQuery ? 'Try a different search term' : 'Create your first workflow to automate tasks'}
           </p>
@@ -259,113 +433,201 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
           )}
         </div>
       ) : (
-        <div className="grid gap-5">
-          {filteredWorkflows.map(workflow => (
-            <div
-              key={workflow.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all hover:border-slate-300"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-lg font-bold text-slate-800">{workflow.name}</h3>
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg ${getTriggerColor(workflow.trigger)}`}>
-                      {getTriggerLabel(workflow.trigger)}
-                    </span>
-                    {workflow.enabled ? (
-                      <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
-                        <CheckCircle2 size={12} />
-                        Enabled
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1.5">
-                        <Pause size={12} />
-                        Disabled
-                      </span>
-                    )}
-                  </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 tracking-wider w-8">
+                    <button
+                      onClick={() => handleSort('type')}
+                      className="flex items-center gap-1 hover:text-slate-800"
+                    >
+                      <SortIcon column="type" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 tracking-wider">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 hover:text-slate-800"
+                    >
+                      Name
+                      <SortIcon column="name" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 tracking-wider">
+                    <button
+                      onClick={() => handleSort('trigger')}
+                      className="flex items-center gap-1 hover:text-slate-800"
+                    >
+                      Trigger
+                      <SortIcon column="trigger" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 tracking-wider">
+                    Condition
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 tracking-wider">
+                    Action
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 tracking-wider">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 hover:text-slate-800"
+                    >
+                      Status
+                      <SortIcon column="status" />
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredItems.map((item) => {
+                  const isExpanded = expandedRows.has(item.id);
+                  const isSystemRule = item.system || false;
+                  const isReadOnly = item.readOnly || false;
                   
-                  {workflow.description && (
-                    <p className="text-slate-500 text-sm mb-4">{workflow.description}</p>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 mt-4 text-sm bg-slate-50 rounded-lg p-4">
-                    <div>
-                      <span className="text-slate-500 text-xs uppercase tracking-wider font-medium">Action</span>
-                      <p className="font-semibold text-slate-700 mt-0.5">{getActionLabel(workflow.action.type)}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs uppercase tracking-wider font-medium">Runs</span>
-                      <p className="font-semibold text-slate-700 mt-0.5">{workflow.runCount}</p>
-                    </div>
-                    {workflow.lastRun && (
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase tracking-wider font-medium">Last run</span>
-                        <p className="font-semibold text-slate-700 mt-0.5">
-                          {new Date(workflow.lastRun).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )}
-                    {workflow.triggerConfig?.schedule && (
-                      <div>
-                        <span className="text-slate-500 text-xs uppercase tracking-wider font-medium">Schedule</span>
-                        <p className="font-semibold text-slate-700 mt-0.5 capitalize">
-                          {workflow.triggerConfig.schedule}
-                          {workflow.triggerConfig.time && ` at ${workflow.triggerConfig.time}`}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 ml-4">
-                  <button
-                    onClick={() => handleTestWorkflow(workflow)}
-                    className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all hover:shadow-sm"
-                    title="Test workflow"
-                  >
-                    <Play size={18} />
-                  </button>
-                  {canManage && (
-                    <>
-                      <button
-                        onClick={() => handleToggleWorkflow(workflow.id)}
-                        className={`p-2.5 rounded-xl transition-all hover:shadow-sm ${
-                          workflow.enabled
-                            ? 'text-amber-600 hover:bg-amber-50'
-                            : 'text-emerald-600 hover:bg-emerald-50'
+                  return (
+                    <React.Fragment key={item.id}>
+                      <tr
+                        className={`hover:bg-slate-50 transition-colors ${
+                          isSystemRule ? 'bg-slate-50/50' : ''
                         }`}
-                        title={workflow.enabled ? 'Disable' : 'Enable'}
                       >
-                        {workflow.enabled ? <Pause size={18} /> : <Play size={18} />}
-                      </button>
-                      <button
-                        onClick={() => handleEditWorkflow(workflow)}
-                        className="p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-all hover:shadow-sm"
-                        title="Edit workflow"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDuplicateWorkflow(workflow)}
-                        className="p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-all hover:shadow-sm"
-                        title="Duplicate workflow"
-                      >
-                        <Copy size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteWorkflow(workflow.id)}
-                        className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all hover:shadow-sm"
-                        title="Delete workflow"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {isSystemRule && (
+                              <Lock size={14} className="text-slate-400" title="System Rule" />
+                            )}
+                            {item.description && (
+                              <button
+                                onClick={() => toggleRowExpansion(item.id)}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-800">{item.name}</span>
+                              {isSystemRule && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  System Rule
+                                </span>
+                              )}
+                              {!isSystemRule && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700 border border-blue-200">
+                                  Custom Workflow
+                                </span>
+                              )}
+                            </div>
+                            {!isExpanded && item.description && (
+                              <p className="text-sm text-slate-500 mt-1 line-clamp-1">{item.description}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-slate-700">{getTriggerDisplay(item)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-slate-700">{formatCondition(item.condition)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-slate-700">{formatAction(item.action)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {systemRules.find(r => r.id === item.id) ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-500">Always Enabled</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleWorkflow(item.id)}
+                              disabled={!canManage}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                item.enabled
+                                  ? 'bg-emerald-500'
+                                  : 'bg-slate-300'
+                              } ${!canManage ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                              title={item.enabled ? 'Disable' : 'Enable'}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  item.enabled ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handleTestWorkflow(item)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Test workflow"
+                            >
+                              <Play size={16} />
+                            </button>
+                            {canManage && (
+                              <>
+                                {!isReadOnly && (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditWorkflow(item)}
+                                      className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+                                      title="Edit workflow"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDuplicateWorkflow(item)}
+                                      className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+                                      title="Duplicate workflow"
+                                    >
+                                      <Copy size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteWorkflow(item.id)}
+                                      className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                      title="Delete workflow"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && item.description && (
+                        <tr className="bg-slate-50/30">
+                          <td colSpan={7} className="px-4 py-3">
+                            <div className="text-sm text-slate-600">
+                              <p className="font-medium mb-1">Description:</p>
+                              <p>{item.description}</p>
+                              {item.lastRun && (
+                                <div className="mt-2 flex gap-4 text-xs text-slate-500">
+                                  <span>Last run: {new Date(item.lastRun).toLocaleString()}</span>
+                                  <span>Run count: {item.runCount}</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -12,9 +12,9 @@ const METRIC_TOOLTIPS: Record<string, { title: string; description: string; form
   },
   bauBufferHealth: {
     title: 'BAU Buffer Health',
-    description: 'Tracks the remaining buffer capacity reserved for unplanned/BAU work. Buffer is allocated per team lead in Admin settings.',
-    formula: 'Health % = (Buffer Remaining / Total Buffer) × 100\nBuffer Remaining = Total Buffer - Actual Unplanned Effort',
-    thresholds: 'Green: >20% remaining  |  Red: ≤20% remaining'
+    description: 'Shows planned and actual effort invested in BAU initiatives. BAU initiatives are unplanned work comprised of risk and PM items. Initiative effort already includes their tasks. Percentage shows actual effort as a share of total buffer allocated for filtered users.',
+    formula: 'Planned Effort = Sum of BAU initiatives\' estimated effort\nActual Effort = Sum of BAU initiatives\' actual effort\n% of Buffer = (Actual Effort / Total Buffer) × 100\nNote: Initiative effort includes all tasks within the initiative',
+    thresholds: 'Shows total effort invested in BAU initiatives and percentage of allocated buffer used'
   },
   capacityLoad: {
     title: 'Capacity Load',
@@ -65,13 +65,13 @@ const MetricTooltip: React.FC<{
             <p className="text-xs text-slate-300 mb-2">{tooltip.description}</p>
             {tooltip.formula && (
               <div className="bg-slate-800 rounded px-2 py-1.5 mb-2">
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Formula</p>
+                <p className="text-[10px] text-slate-400 tracking-wider mb-0.5">Formula</p>
                 <code className="text-xs text-blue-300 font-mono whitespace-pre-line">{tooltip.formula}</code>
               </div>
             )}
             {tooltip.thresholds && (
               <div className="text-[10px] text-slate-400">
-                <span className="uppercase tracking-wider">Thresholds: </span>
+                <span className="tracking-wider">Thresholds: </span>
                 <span className="text-slate-300">{tooltip.thresholds}</span>
               </div>
             )}
@@ -102,7 +102,20 @@ interface MetricsProps {
     totalCount: number;
     bauBufferTotal: number;
     unplannedActuals: number;
+    bauInitiativeActuals?: number;
+    bauInitiativeEstimated?: number;
+    bauRemaining?: number;
     bauHealth: number;
+    bauPlannedEffortPercentOfBuffer?: number;
+    bauActualEffortPercentOfBuffer?: number;
+    unplannedRiskCount?: number;
+    unplannedPMCount?: number;
+    countWP?: number;
+    countBAU?: number;
+    wpPercentage?: number;
+    bauPercentage?: number;
+    wpUnplannedPercentage?: number;
+    bauUnplannedPercentage?: number;
     statusBreakdown: { name: string; value: number; color: string }[];
     workMix: { name: string; value: number; effort: number; color: string }[];
   };
@@ -117,7 +130,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow cursor-help">
           <div className="flex justify-between items-start mb-3">
             <div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Initiatives Status</p>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Initiatives status</p>
               <h3 className="text-3xl font-black text-slate-800">{metrics.countOpen} <span className="text-sm font-normal text-slate-400">Open</span></h3>
             </div>
             <div className="p-2.5 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl text-blue-600 shadow-sm">
@@ -157,25 +170,47 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow cursor-help">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">BAU Buffer Health</p>
-              <h3 className="text-3xl font-black text-slate-800">{Math.round(metrics.bauHealth)}% <span className="text-sm font-normal text-slate-400">Rem.</span></h3>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">BAU effort</p>
+              <h3 className="text-3xl font-black text-slate-800">{(metrics.bauInitiativeActuals || 0).toFixed(1)}<span className="text-sm font-normal text-slate-400">w</span></h3>
             </div>
-            <div className={`p-2.5 rounded-xl shadow-sm ${metrics.bauHealth < 20 ? 'bg-gradient-to-br from-red-50 to-red-100 text-red-600' : 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-600'}`}>
+            <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 shadow-sm">
               <Shield size={22} />
             </div>
           </div>
           <div className="space-y-3">
-            <div className="flex justify-between text-xs text-slate-500 font-medium">
-              <span>Used: <strong className="text-slate-700">{metrics.unplannedActuals}w</strong></span>
-              <span>Allocated: <strong className="text-slate-700">{metrics.bauBufferTotal.toFixed(1)}w</strong></span>
+            <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-600">Planned Effort:</span>
+                <span className="font-bold text-slate-800">
+                  {(metrics.bauInitiativeEstimated || 0).toFixed(1)}w
+                  {metrics.bauPlannedEffortPercentOfBuffer !== undefined && metrics.bauBufferTotal > 0 && (
+                    <span className={`ml-2 ${
+                      metrics.bauPlannedEffortPercentOfBuffer > 100 ? 'text-red-600' :
+                      metrics.bauPlannedEffortPercentOfBuffer > 80 ? 'text-amber-600' :
+                      'text-slate-500'
+                    }`}>
+                      ({Math.round(metrics.bauPlannedEffortPercentOfBuffer)}%)
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-600">Actual Effort:</span>
+                <span className="font-bold text-slate-800">
+                  {(metrics.bauInitiativeActuals || 0).toFixed(1)}w
+                  {metrics.bauActualEffortPercentOfBuffer !== undefined && metrics.bauBufferTotal > 0 && (
+                    <span className={`ml-2 ${
+                      metrics.bauActualEffortPercentOfBuffer > 100 ? 'text-red-600' :
+                      metrics.bauActualEffortPercentOfBuffer > 80 ? 'text-amber-600' :
+                      'text-slate-500'
+                    }`}>
+                      ({Math.round(metrics.bauActualEffortPercentOfBuffer)}%)
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
-            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-               <div 
-                 className={`h-full rounded-full transition-all duration-1000 ${metrics.bauHealth < 20 ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-emerald-400 to-emerald-500'}`} 
-                 style={{ width: `${Math.min(metrics.bauHealth, 100)}%` }}
-               />
-            </div>
-            <p className="text-[10px] text-slate-400 italic">Decrements based on actual unplanned work.</p>
+            <p className="text-[10px] text-slate-400 italic">BAU initiatives (effort includes tasks).</p>
           </div>
         </div>
       </MetricTooltip>
@@ -185,7 +220,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow cursor-help">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Capacity Load</p>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Capacity load</p>
               <h3 className="text-3xl font-black text-slate-800">{Math.round(metrics.capacityLoad)}%</h3>
             </div>
             <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 shadow-sm">
@@ -212,15 +247,21 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow cursor-help">
           <div className="flex justify-between items-start mb-3">
             <div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Work Mix</p>
-              <h3 className="text-3xl font-black text-slate-800">{metrics.countUnplanned} <span className="text-sm font-normal text-slate-400">Unplanned</span></h3>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Work mix</p>
+              <h3 className="text-3xl font-black text-slate-800">
+                <span className="text-blue-600">{metrics.wpPercentage ?? 0}%</span>
+                <span className="text-slate-400 mx-1">/</span>
+                <span className="text-orange-800 font-black">{metrics.bauPercentage ?? 0}%</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                <span className="text-blue-600 font-medium">WP</span>
+                <span className="mx-1">•</span>
+                <span className="text-orange-800 font-bold">BAU</span>
+              </p>
             </div>
-            <div className="p-2.5 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl text-amber-600 shadow-sm">
+            <div className="p-2.5 bg-gradient-to-br from-orange-200 to-orange-300 rounded-xl text-orange-800 shadow-sm">
               <AlertTriangle size={22} />
             </div>
-          </div>
-          <div className="text-xs text-slate-500 mb-2 font-medium">
-             Unplanned Effort: <strong className="text-amber-600">{metrics.workMix[1]?.effort || 0} wks</strong>
           </div>
            <div className="h-20 w-full">
              <ResponsiveContainer width="100%" height="100%">
@@ -242,6 +283,23 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
                </BarChart>
              </ResponsiveContainer>
           </div>
+          {/* Risk/PM Breakdown for Unplanned */}
+          {((metrics.unplannedRiskCount ?? 0) > 0 || (metrics.unplannedPMCount ?? 0) > 0) && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <div className="flex gap-3 text-[10px] text-slate-500">
+                {(metrics.unplannedRiskCount ?? 0) > 0 && (
+                  <span>
+                    <span className="font-semibold text-slate-600">Risk:</span> {metrics.unplannedRiskCount}
+                  </span>
+                )}
+                {(metrics.unplannedPMCount ?? 0) > 0 && (
+                  <span>
+                    <span className="font-semibold text-slate-600">PM:</span> {metrics.unplannedPMCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </MetricTooltip>
     </div>

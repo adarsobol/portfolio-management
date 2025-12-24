@@ -1,9 +1,100 @@
 import React, { useState, useRef } from 'react';
-import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy } from 'lucide-react';
-import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey } from '../../types';
+import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield } from 'lucide-react';
+import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
 import { getOwnerName, generateId, exportToExcel } from '../../utils';
-import { useEdgeScrolling } from '../../hooks';
 import * as XLSX from 'xlsx';
+
+// BadgePermission Component for visual permission display
+interface BadgePermissionProps {
+  value: TabAccessLevel | TaskManagementScope;
+  onChange: (newValue: TabAccessLevel | TaskManagementScope) => void;
+  type: 'tab' | 'taskManagement';
+}
+
+const BadgePermission: React.FC<BadgePermissionProps> = ({ value, onChange, type }) => {
+  const tabCycle: TabAccessLevel[] = ['none', 'view', 'edit'];
+  const taskCycle: TaskManagementScope[] = ['no', 'yes', 'own'];
+  
+  const handleClick = () => {
+    if (type === 'tab') {
+      const current = value as TabAccessLevel;
+      const currentIndex = tabCycle.indexOf(current);
+      const nextIndex = (currentIndex + 1) % tabCycle.length;
+      onChange(tabCycle[nextIndex]);
+    } else {
+      const current = value as TaskManagementScope;
+      const currentIndex = taskCycle.indexOf(current);
+      const nextIndex = (currentIndex + 1) % taskCycle.length;
+      onChange(taskCycle[nextIndex]);
+    }
+  };
+
+  if (type === 'tab') {
+    const level = value as TabAccessLevel;
+    const configs = {
+      none: { label: 'None', bg: 'bg-slate-100', text: 'text-slate-400', border: 'border-slate-200', icon: XCircle },
+      view: { label: 'View', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Eye },
+      edit: { label: 'Edit', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Edit },
+    };
+    const config = configs[level];
+    const Icon = config.icon;
+    const nextLevel = tabCycle[(tabCycle.indexOf(level) + 1) % tabCycle.length];
+
+    return (
+      <button
+        onClick={handleClick}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border ${config.bg} ${config.text} ${config.border} text-xs font-medium hover:opacity-80 transition-all cursor-pointer min-w-[60px] justify-center`}
+        title={`Click to cycle: ${level} → ${nextLevel}`}
+      >
+        {Icon && <Icon size={12} />}
+        <span>{config.label}</span>
+      </button>
+    );
+  } else {
+    // Handle task management scope
+    let scope: TaskManagementScope = value as TaskManagementScope;
+    
+    // Handle legacy boolean values or unexpected values
+    if (typeof value === 'boolean') {
+      scope = value ? 'yes' : 'no';
+    } else if (value !== 'no' && value !== 'yes' && value !== 'own') {
+      // Default to 'no' if value is unexpected
+      scope = 'no';
+    }
+    
+    const configs = {
+      no: { label: 'No', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', icon: XCircle },
+      yes: { label: 'Yes', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Check },
+      own: { label: 'Only own', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Edit },
+    };
+    const config = configs[scope];
+    if (!config) {
+      // Fallback if config is still undefined
+      return (
+        <button
+          onClick={handleClick}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border bg-slate-100 text-slate-400 border-slate-200 text-xs font-medium hover:opacity-80 transition-all cursor-pointer min-w-[70px] justify-center"
+        >
+          <XCircle size={12} />
+          <span>No</span>
+        </button>
+      );
+    }
+    const Icon = config.icon;
+    const nextScope = taskCycle[(taskCycle.indexOf(scope) + 1) % taskCycle.length];
+
+    return (
+      <button
+        onClick={handleClick}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border ${config.bg} ${config.text} ${config.border} text-xs font-medium hover:opacity-80 transition-all cursor-pointer min-w-[70px] justify-center`}
+        title={`Click to cycle: ${scope} → ${nextScope}`}
+      >
+        {Icon && <Icon size={12} />}
+        <span>{config.label}</span>
+      </button>
+    );
+  }
+};
 
 interface AdminPanelProps {
   currentUser: User;
@@ -13,6 +104,8 @@ interface AdminPanelProps {
   setUsers: (users: User[]) => void;
   initiatives: Initiative[];
   changeLog: ChangeRecord[];
+  onGenerate30Initiatives?: () => Promise<void>;
+  onClearCache?: () => Promise<void>;
 }
 
 // Types for bulk import
@@ -59,7 +152,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   users,
   setUsers,
   initiatives,
-  changeLog
+  changeLog,
+  onGenerate30Initiatives,
+  onClearCache
 }) => {
   const [newUser, setNewUser] = useState<Partial<User>>({ role: Role.TeamLead });
   
@@ -75,6 +170,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [taskImportResult, setTaskImportResult] = useState<ImportResult | null>(null);
   const taskFileInputRef = useRef<HTMLInputElement>(null);
   const permissionsTableRef = useRef<HTMLDivElement>(null);
+  
+  // Permission tab state
+  const [activePermissionTab, setActivePermissionTab] = useState<'tabs' | 'tasks' | 'admin'>('tabs');
 
   const isAdminAccess = currentUser.email === 'adar.sobol@pagaya.com';
   if (!isAdminAccess) {
@@ -84,7 +182,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Valid values for validation
   const VALID_ROLES = ['Admin', 'SVP', 'VP', 'Director (Department Management)', 'Director (Group Lead)', 'Team Lead', 'Portfolio Operations'];
   const VALID_ASSET_CLASSES = ['PL', 'Auto', 'POS', 'Advisory'];
-  const VALID_STATUSES = ['Not Started', 'In Progress', 'At Risk', 'Done'];
+  const VALID_STATUSES = ['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'];
   const VALID_PRIORITIES = ['P0', 'P1', 'P2'];
   const VALID_WORK_TYPES = ['Planned Work', 'Unplanned Work'];
   
@@ -331,31 +429,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const permissionLabels: Record<PermissionKey, string> = {
-    createPlanned: 'Create Planned',
-    createUnplanned: 'Create Unplanned',
-    editOwn: 'Edit Own Tasks',
-    editAll: 'Edit All Tasks',
-    editUnplanned: 'Edit Unplanned',
-    accessAdmin: 'Access Admin',
-    accessWorkplanHealth: 'Access Workplan Health',
-    manageCapacity: 'Manage Capacity',
-    manageWorkflows: 'Manage Workflows',
-    createWorkflows: 'Create Workflows'
-  };
-  
+  // Permission column definitions organized by category
+  const tabPermissions: { key: PermissionKey; label: string }[] = [
+    { key: 'accessAllTasks', label: 'All Tasks' },
+    { key: 'accessDependencies', label: 'Dependencies' },
+    { key: 'accessTimeline', label: 'Timeline' },
+    { key: 'accessWorkflows', label: 'Workflows' },
+    { key: 'accessWorkplanHealth', label: 'Workplan Health' },
+  ];
 
-  const handlePermissionToggle = (role: Role, key: PermissionKey) => {
+  const taskManagementPermissions: { key: PermissionKey; label: string }[] = [
+    { key: 'createNewTasks', label: 'Create Tasks' },
+    { key: 'editTasks', label: 'Edit Tasks' },
+    { key: 'deleteTasks', label: 'Delete Tasks' },
+  ];
+
+  const adminPermissions: { key: PermissionKey; label: string }[] = [
+    { key: 'accessAdmin', label: 'Admin Access' },
+    { key: 'manageWorkflows', label: 'Manage Workflows' },
+  ];
+
+  const allPermissions = [...tabPermissions, ...taskManagementPermissions, ...adminPermissions];
+
+  const handlePermissionChange = (role: Role, key: PermissionKey, value: PermissionValue) => {
     setConfig((prev: AppConfig) => ({
       ...prev,
       rolePermissions: {
         ...prev.rolePermissions,
         [role]: {
           ...prev.rolePermissions[role],
-          [key]: !prev.rolePermissions[role][key]
+          [key]: value
         }
       }
     }));
+  };
+
+  const isTabPermission = (key: PermissionKey): boolean => {
+    return tabPermissions.some(p => p.key === key);
+  };
+
+  const getPermissionValue = (role: Role, key: PermissionKey): PermissionValue => {
+    const defaultValue = isTabPermission(key) ? 'none' : 'no';
+    return config.rolePermissions[role]?.[key] ?? defaultValue;
   };
 
   const handleAddUser = () => {
@@ -403,12 +518,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           Admin Configuration
         </h2>
 
-        <button 
-          onClick={() => exportToExcel(initiatives, users, 'full-data-export')}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 shadow-md hover:shadow-lg transition-all font-semibold text-sm"
-        >
-          <FileSpreadsheet size={18} /> Export All Data
-        </button>
+        <div className="flex items-center gap-3">
+          {onGenerate30Initiatives && (
+            <button
+              onClick={onGenerate30Initiatives}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg transition-all font-semibold text-sm"
+            >
+              <Plus size={18} /> Generate 30 Initiatives
+            </button>
+          )}
+          <button 
+            onClick={() => exportToExcel(initiatives, users, 'full-data-export')}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 shadow-md hover:shadow-lg transition-all font-semibold text-sm"
+          >
+            <FileSpreadsheet size={18} /> Export All Data
+          </button>
+        </div>
       </div>
 
       {/* Slack Integration */}
@@ -494,9 +619,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <table className="w-full text-left text-sm">
               <thead className="bg-gradient-to-b from-slate-50 to-white sticky top-0 shadow-sm">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Initiative</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Change</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">By</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-600 tracking-wider">Initiative</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-600 tracking-wider">Change</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-600 tracking-wider">By</th>
                 </tr>
               </thead>
               <tbody>
@@ -879,34 +1004,131 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              </div>
              Authorization Levels Management Center
            </h3>
-           <p className="text-xs text-slate-500 mt-1 ml-8">Define granular permissions for each user role.</p>
+           <p className="text-xs text-slate-500 mt-1 ml-8">Click badges to cycle through permission levels. Organized by category for easier management.</p>
          </div>
+         
+         {/* Tabs */}
+         <div className="border-b border-slate-200 bg-slate-50">
+           <div className="flex">
+             <button
+               onClick={() => setActivePermissionTab('tabs')}
+               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+                 activePermissionTab === 'tabs'
+                   ? 'border-indigo-500 text-indigo-600 bg-white'
+                   : 'border-transparent text-slate-600 hover:text-slate-800'
+               }`}
+             >
+               <div className="flex items-center gap-2">
+                 <LayoutDashboard size={16} />
+                 Tab Access
+               </div>
+             </button>
+             <button
+               onClick={() => setActivePermissionTab('tasks')}
+               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+                 activePermissionTab === 'tasks'
+                   ? 'border-blue-500 text-blue-600 bg-white'
+                   : 'border-transparent text-slate-600 hover:text-slate-800'
+               }`}
+             >
+               <div className="flex items-center gap-2">
+                 <ClipboardList size={16} />
+                 Task Management
+               </div>
+             </button>
+             <button
+               onClick={() => setActivePermissionTab('admin')}
+               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+                 activePermissionTab === 'admin'
+                   ? 'border-purple-500 text-purple-600 bg-white'
+                   : 'border-transparent text-slate-600 hover:text-slate-800'
+               }`}
+             >
+               <div className="flex items-center gap-2">
+                 <Shield size={16} />
+                 Admin & System
+               </div>
+             </button>
+           </div>
+         </div>
+
          <div ref={permissionsTableRef} className="overflow-x-auto">
            <table className="w-full text-left text-sm">
              <thead className="bg-slate-50 border-b border-slate-200">
                <tr>
-                 <th className="px-6 py-3 font-semibold text-slate-600">Role</th>
-                 {Object.keys(permissionLabels).map(key => (
-                   <th key={key} className="px-6 py-3 font-semibold text-slate-600 whitespace-nowrap">
-                     {permissionLabels[key as PermissionKey]}
+                 <th className="px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 min-w-[150px]">Role</th>
+                 {activePermissionTab === 'tabs' && tabPermissions.map(perm => (
+                   <th key={perm.key} className="px-3 py-3 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
+                     <div className="flex items-center justify-center gap-1.5">
+                       {perm.key === 'accessAllTasks' && <LayoutDashboard size={14} />}
+                       {perm.key === 'accessDependencies' && <GitBranch size={14} />}
+                       {perm.key === 'accessTimeline' && <Calendar size={14} />}
+                       {perm.key === 'accessWorkflows' && <Zap size={14} />}
+                       {perm.key === 'accessWorkplanHealth' && <Gauge size={14} />}
+                       <span>{perm.label}</span>
+                     </div>
+                   </th>
+                 ))}
+                 {activePermissionTab === 'tasks' && taskManagementPermissions.map(perm => (
+                   <th key={perm.key} className="px-3 py-3 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
+                     {perm.label}
+                   </th>
+                 ))}
+                 {activePermissionTab === 'admin' && adminPermissions.map(perm => (
+                   <th key={perm.key} className="px-3 py-3 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
+                     {perm.label}
                    </th>
                  ))}
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-100">
                {Object.values(Role).map(role => (
-                 <tr key={role} className="hover:bg-slate-50">
-                   <td className="px-6 py-3 font-medium bg-white sticky left-0">{role}</td>
-                   {Object.keys(permissionLabels).map(key => {
-                     const pKey = key as PermissionKey;
-                     const isChecked = config.rolePermissions[role][pKey];
+                 <tr key={role} className="hover:bg-slate-50/50">
+                   <td className="px-4 py-3 font-medium bg-white sticky left-0 z-10 border-r border-slate-200 shadow-sm">{role}</td>
+                   {activePermissionTab === 'tabs' && tabPermissions.map(perm => {
+                     const value = getPermissionValue(role, perm.key) as TabAccessLevel;
                      return (
-                       <td key={key} className="px-6 py-3 text-center">
-                         <input 
-                           type="checkbox" 
-                           checked={isChecked}
-                           onChange={() => handlePermissionToggle(role, pKey)}
-                           className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                       <td key={perm.key} className="px-3 py-3 text-center">
+                         <BadgePermission
+                           value={value}
+                           onChange={(newValue) => handlePermissionChange(role, perm.key, newValue)}
+                           type="tab"
+                         />
+                       </td>
+                     );
+                   })}
+                   {activePermissionTab === 'tasks' && taskManagementPermissions.map(perm => {
+                     let value = getPermissionValue(role, perm.key);
+                     // Ensure value is a valid TaskManagementScope
+                     if (typeof value === 'boolean') {
+                       value = value ? 'yes' : 'no';
+                     } else if (value !== 'no' && value !== 'yes' && value !== 'own') {
+                       value = 'no';
+                     }
+                     return (
+                       <td key={perm.key} className="px-3 py-3 text-center">
+                         <BadgePermission
+                           value={value as TaskManagementScope}
+                           onChange={(newValue) => handlePermissionChange(role, perm.key, newValue)}
+                           type="taskManagement"
+                         />
+                       </td>
+                     );
+                   })}
+                   {activePermissionTab === 'admin' && adminPermissions.map(perm => {
+                     let value = getPermissionValue(role, perm.key);
+                     // Ensure value is a valid TaskManagementScope
+                     if (typeof value === 'boolean') {
+                       value = value ? 'yes' : 'no';
+                     } else if (value !== 'no' && value !== 'yes' && value !== 'own') {
+                       value = 'no';
+                     }
+                     return (
+                       <td key={perm.key} className="px-3 py-3 text-center">
+                         <BadgePermission
+                           value={value as TaskManagementScope}
+                           onChange={(newValue) => handlePermissionChange(role, perm.key, newValue)}
+                           type="taskManagement"
                          />
                        </td>
                      );
@@ -962,7 +1184,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    <td className="px-6 py-3">
                      <input 
                        type="number" 
-                       className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                       className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                        value={capacity}
                        onChange={(e) => setConfig((prev: AppConfig) => ({...prev, teamCapacities: {...prev.teamCapacities, [user.id]: parseFloat(e.target.value)||0}}))}
                      />
@@ -970,7 +1192,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    <td className="px-6 py-3">
                      <input 
                        type="number" 
-                       className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                       className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                        value={buffer}
                        placeholder="0"
                        onChange={(e) => setConfig((prev: AppConfig) => ({

@@ -144,7 +144,7 @@ export function ExportDropdown({ initiatives, users, filters }: ExportDropdownPr
       {isOpen && (
         <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
           <div className="px-3 py-2 border-b border-slate-100">
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Export Format</p>
+            <p className="text-xs text-slate-500 font-medium tracking-wide">Export format</p>
             {hasFilters && (
               <p className="text-[10px] text-slate-400 mt-1">
                 Exporting {initiatives.length} filtered items
@@ -196,7 +196,7 @@ export function ExportDropdown({ initiatives, users, filters }: ExportDropdownPr
           {/* Notion Export Section */}
           <div className="border-t border-slate-100 mt-1 pt-1">
             <div className="px-3 py-1.5">
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Notion Export</p>
+              <p className="text-xs text-slate-500 font-medium tracking-wide">Notion export</p>
             </div>
             <button
               onClick={handleNotionExport}

@@ -7,8 +7,8 @@ interface FilterBarProps {
   setFilterAssetClass: (val: string) => void;
   filterOwners: string[];
   setFilterOwners: (val: string[]) => void;
-  filterWorkType: string;
-  setFilterWorkType: (val: string) => void;
+  filterWorkType: string[];
+  setFilterWorkType: (val: string[]) => void;
   searchQuery: string;
   resetFilters: () => void;
   currentView: string;
@@ -54,16 +54,43 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     return colors[index];
   };
 
-  const hasActiveFilters = filterAssetClass || filterOwners.length > 0 || filterWorkType || searchQuery;
+  const hasActiveFilters = filterAssetClass || filterOwners.length > 0 || filterWorkType.length > 0 || searchQuery;
 
   // Work type options including unplanned tags
   const workTypeOptions = [
-    { label: 'All', value: '' },
-    { label: 'Planned', value: 'Planned' },
-    { label: 'All Unplanned', value: 'Unplanned' },
-    { label: 'Risk', value: UnplannedTag.RiskItem },
-    { label: 'PM', value: UnplannedTag.PMItem },
+    { label: 'All', value: '', singleSelect: true },
+    { label: 'WP', value: 'WP', singleSelect: true },
+    { label: 'BAU', value: 'BAU', singleSelect: true },
+    { label: 'Unplanned', value: 'Unplanned', singleSelect: true },
+    { label: 'Risk', value: UnplannedTag.RiskItem, singleSelect: false },
+    { label: 'PM', value: UnplannedTag.PMItem, singleSelect: false },
   ];
+
+  const toggleWorkType = (value: string, singleSelect: boolean) => {
+    if (value === '') {
+      // "All" clears all filters
+      setFilterWorkType([]);
+      return;
+    }
+    
+    if (singleSelect) {
+      // Single-select options (WP, BAU, Unplanned) replace all selections
+      if (filterWorkType.includes(value)) {
+        setFilterWorkType([]);
+      } else {
+        setFilterWorkType([value]);
+      }
+    } else {
+      // Multi-select options (Risk, PM) toggle individually
+      if (filterWorkType.includes(value)) {
+        setFilterWorkType(filterWorkType.filter(v => v !== value));
+      } else {
+        // Remove single-select options when adding multi-select
+        const filtered = filterWorkType.filter(v => v !== 'WP' && v !== 'BAU' && v !== 'Unplanned' && v !== 'Planned');
+        setFilterWorkType([...filtered, value]);
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4 mb-6 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -71,7 +98,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       <div className="flex flex-wrap gap-4 items-center">
         <div className="flex items-center text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
           <Filter size={16} className="mr-2 text-blue-500" />
-          <span className="text-sm font-bold uppercase tracking-wide">Filters</span>
+          <span className="text-sm font-bold tracking-wide">Filters</span>
         </div>
         
         {/* Asset Class Filter */}
@@ -123,19 +150,24 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         
         {/* Work Type Segmented Control */}
         <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner border border-slate-200">
-          {workTypeOptions.map(opt => (
-            <button
-              key={opt.label}
-              onClick={() => setFilterWorkType(opt.value)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
-                filterWorkType === opt.value 
-                  ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {workTypeOptions.map(opt => {
+            const isSelected = opt.value === '' 
+              ? filterWorkType.length === 0
+              : filterWorkType.includes(opt.value);
+            return (
+              <button
+                key={opt.label}
+                onClick={() => toggleWorkType(opt.value, opt.singleSelect)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
 
         {hasActiveFilters && (
@@ -147,35 +179,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
         )}
 
-        {/* View Layout Toggle for All Tasks */}
-        {currentView === 'all' && (
-          <div className="ml-auto border-l-2 border-slate-200 pl-4 flex gap-1 bg-slate-50 rounded-lg p-1">
-            <button 
-              onClick={() => setViewLayout('table')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                viewLayout === 'table' 
-                  ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
-                  : 'text-slate-500 hover:bg-white hover:text-slate-700 hover:shadow-sm'
-              }`}
-              title="Flat Table View"
-            >
-              <List size={14} />
-              <span>Flat</span>
-            </button>
-            <button 
-              onClick={() => setViewLayout('tree')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                viewLayout === 'tree' 
-                  ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
-                  : 'text-slate-500 hover:bg-white hover:text-slate-700 hover:shadow-sm'
-              }`}
-              title="Grouped by Hierarchy"
-            >
-              <Layers size={14} />
-              <span>Grouped</span>
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

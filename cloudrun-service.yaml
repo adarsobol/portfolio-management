@@ -1,0 +1,106 @@
+# Cloud Run Service Configuration
+# This file can be used with: gcloud run services update portfolio-manager --config=cloudrun-service.yaml
+# Or as a reference for manual configuration in the Cloud Console
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: portfolio-manager
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+spec:
+  template:
+    metadata:
+      annotations:
+        # Autoscaling configuration
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        # Session affinity for Socket.IO
+        run.googleapis.com/session-affinity: "true"
+        # CPU allocation
+        run.googleapis.com/cpu-throttling: "false"
+        # Timeout for long-running connections (Socket.IO)
+        run.googleapis.com/timeout: "300s"
+    spec:
+      # Service account with necessary permissions
+      serviceAccountName: portfolio-manager@PROJECT_ID.iam.gserviceaccount.com
+      
+      # Container configuration
+      containers:
+      - image: gcr.io/PROJECT_ID/portfolio-manager:latest
+        ports:
+        - name: http1
+          containerPort: 8080
+        env:
+        # Application configuration
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "8080"
+        - name: SERVE_STATIC
+          value: "true"
+        
+        # Secrets from Secret Manager
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: portfolio-jwt-secret
+              key: latest
+        - name: CORS_ALLOWED_ORIGINS
+          valueFrom:
+            secretKeyRef:
+              name: portfolio-cors-origins
+              key: latest
+        
+        # Optional: Google OAuth (can also use secrets)
+        - name: GOOGLE_CLIENT_ID
+          value: "YOUR_GOOGLE_CLIENT_ID"
+        - name: VITE_GOOGLE_CLIENT_ID
+          value: "YOUR_GOOGLE_CLIENT_ID"
+        
+        # GCS Configuration (if using GCS)
+        - name: GCS_BUCKET_NAME
+          value: "portfolio-manager-data"
+        - name: GCS_PROJECT_ID
+          value: "PROJECT_ID"
+        
+        # Resource limits
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+        
+        # Health check
+        startupProbe:
+          httpGet:
+            path: /api/sheets/health
+            port: 8080
+          initialDelaySeconds: 0
+          timeoutSeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        livenessProbe:
+          httpGet:
+            path: /api/sheets/health
+            port: 8080
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 30
+          failureThreshold: 3
+      
+      # Container concurrency (requests per instance)
+      containerConcurrency: 80
+      
+      # Request timeout
+      timeoutSeconds: 300
+
+  # Traffic allocation (for gradual rollouts)
+  traffic:
+  - percent: 100
+    latestRevision: true
+

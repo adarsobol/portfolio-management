@@ -27,8 +27,22 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
+const taskSchema = z.object({
+  id: z.string().min(1, 'Task ID is required'),
+  title: z.string().optional(),
+  effort: z.number().min(0, 'Task effort must be non-negative'),
+  eta: z.string().min(1, 'Task ETA is required'),
+  ownerId: z.string().min(1, 'Task owner ID is required'),
+  status: z.enum(['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'], {
+    errorMap: () => ({ message: 'Invalid task status' }),
+  }),
+  tags: z.array(z.enum(['Unplanned', 'Risk Item', 'PM Item', 'Both'])).optional(),
+  comments: z.array(z.any()).optional(),
+});
+
 export const initiativeSchema = z.object({
   id: z.string().min(1, 'ID is required'),
+  initiativeType: z.enum(['WP', 'BAU']).optional(),
   l1_assetClass: z.enum(['PL', 'Auto', 'POS', 'Advisory'], {
     errorMap: () => ({ message: 'Invalid asset class' }),
   }),
@@ -39,28 +53,42 @@ export const initiativeSchema = z.object({
   ownerId: z.string().min(1, 'Owner ID is required'),
   secondaryOwner: z.string().optional(),
   quarter: z.string().min(1, 'Quarter is required'),
-  status: z.enum(['Not Started', 'In Progress', 'At Risk', 'Done'], {
+  status: z.enum(['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'], {
     errorMap: () => ({ message: 'Invalid status' }),
   }),
   priority: z.enum(['P0', 'P1', 'P2'], {
     errorMap: () => ({ message: 'Invalid priority' }),
   }),
-  estimatedEffort: z.number().min(0, 'Estimated effort must be non-negative').optional(),
+  estimatedEffort: z.number().min(0, 'Estimated effort must be non-negative').optional().default(0),
   originalEstimatedEffort: z.number().min(0, 'Original estimated effort must be non-negative').optional(),
-  actualEffort: z.number().min(0, 'Actual effort must be non-negative').optional(),
+  actualEffort: z.number().min(0, 'Actual effort must be non-negative').optional().default(0),
   eta: z.string().optional(),
   originalEta: z.string().optional(),
   lastUpdated: z.string().optional(),
+  lastWeeklyUpdate: z.string().optional(),
+  overlookedCount: z.number().min(0, 'Overlooked count must be non-negative').optional(),
+  lastDelayDate: z.string().optional(),
   dependencyTeams: z.array(z.string()).optional(),
   dependencyTeamNotes: z.record(z.string()).optional(),
+  dependencies: z.array(z.any()).optional(),
   workType: z.enum(['Planned Work', 'Unplanned Work'], {
     errorMap: () => ({ message: 'Invalid work type' }),
   }),
-  unplannedTags: z.array(z.enum(['Risk Item', 'PM Item', 'Both'])).optional(),
+  unplannedTags: z.array(z.enum(['Unplanned', 'Risk Item', 'PM Item', 'Both'])).optional(),
   riskActionLog: z.string().optional(),
+  definitionOfDone: z.string().optional(),
   comments: z.array(z.any()).optional(),
-  completionRate: z.number().min(0).max(100).optional(),
+  tasks: z.array(taskSchema).optional(),
   history: z.array(z.any()).optional(),
+}).refine((data) => {
+  const initiativeType = data.initiativeType || 'WP'; // Default to WP
+  // WP initiatives require definitionOfDone
+  if (initiativeType !== 'BAU' && (!data.definitionOfDone || data.definitionOfDone.trim().length === 0)) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'WP initiatives require Definition of Done',
 });
 
 export const initiativesArraySchema = z.object({

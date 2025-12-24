@@ -3,6 +3,6 @@ export type { FilterState, FilterActions } from './useFilters';
 
 export { useLocalStorage } from './useLocalStorage';
 
-export { useEdgeScrolling } from './useEdgeScrolling';
-export { useGlobalEdgeScrolling } from './useGlobalEdgeScrolling';
+export { useDebounce } from './useDebounce';
+export { useIntersectionObserver } from './useIntersectionObserver';
 

@@ -14,7 +14,7 @@ export enum DependencyTeam {
 }
 
 // Value types that can be stored in change records
-export type InitiativeFieldValue = string | number | boolean | Status | Priority | WorkType | UnplannedTag[] | DependencyTeam[] | Dependency[] | string[] | undefined;
+export type InitiativeFieldValue = string | number | boolean | Status | Priority | WorkType | InitiativeType | UnplannedTag[] | DependencyTeam[] | Dependency[] | Task[] | string[] | undefined | null;
 
 export enum Role {
   Admin = 'Admin',
@@ -31,11 +31,17 @@ export enum WorkType {
   Unplanned = 'Unplanned Work'
 }
 
+export enum InitiativeType {
+  WP = 'WP',
+  BAU = 'BAU'
+}
+
 export enum Status {
   NotStarted = 'Not Started',
   InProgress = 'In Progress',
   AtRisk = 'At Risk',
-  Done = 'Done'
+  Done = 'Done',
+  Obsolete = 'Obsolete'
 }
 
 export enum Priority {
@@ -45,6 +51,7 @@ export enum Priority {
 }
 
 export enum UnplannedTag {
+  Unplanned = 'Unplanned',
   RiskItem = 'Risk Item',
   PMItem = 'PM Item',
   Both = 'Both'
@@ -74,6 +81,18 @@ export interface Comment {
   mentionedUserIds?: string[]; // Array of user IDs mentioned in the comment
 }
 
+export interface Task {
+  id: string;
+  title?: string; // Optional title for display
+  estimatedEffort?: number; // Planned effort in weeks (defaults to 0)
+  actualEffort?: number; // Actual effort consumed in weeks (defaults to 0)
+  eta: string; // ISO date string
+  ownerId: string; // Team Lead ID
+  status: Status; // NotStarted/InProgress/Done
+  tags?: UnplannedTag[]; // PM Item, Risk Item, Both
+  comments?: Comment[];
+}
+
 export interface Dependency {
   team: DependencyTeam;
   deliverable: string; // What deliverable is required from the team
@@ -101,6 +120,9 @@ export interface TradeOffAction {
 // The Flattened Initiative Model (Contains L1-L4 references)
 export interface Initiative {
   id: string;
+  // Initiative Type (required, defaults to WP)
+  initiativeType: InitiativeType; // WP or BAU
+  
   // L1-L4 Hierarchy
   l1_assetClass: AssetClass;
   l2_pillar: string;
@@ -115,15 +137,16 @@ export interface Initiative {
   status: Status;
   priority: Priority;
   
-  // Effort Metrics
-  estimatedEffort: number; // Current Plan (Staff Weeks)
-  originalEstimatedEffort: number; // Baseline Plan (Staff Weeks)
-  actualEffort: number; // Consumed (Staff Weeks)
+  // Effort Metrics (optional, default to 0)
+  estimatedEffort?: number; // Current Plan (Staff Weeks), defaults to 0
+  actualEffort?: number; // Consumed (Staff Weeks), defaults to 0
+  originalEstimatedEffort?: number; // Baseline Plan (Staff Weeks), only tracked when changed
   
   // Time Metrics
-  eta: string; // Current ETA (ISO Date String)
-  originalEta: string; // Baseline ETA (ISO Date String)
+  eta?: string; // Current ETA (ISO Date String)
+  originalEta?: string; // Baseline ETA (ISO Date String), only tracked when changed
   lastUpdated: string; // ISO Date String
+  lastWeeklyUpdate?: string; // Last Thursday EoD update (ISO Date String) for weekly routine tracking
   
   // External Team Dependencies
   dependencies?: Dependency[]; // External team dependencies with deliverable and ETA
@@ -132,16 +155,24 @@ export interface Initiative {
   workType: WorkType;
   unplannedTags?: UnplannedTag[]; // Only for Unplanned
   riskActionLog?: string; // Mandatory if Delayed or At Risk
+  definitionOfDone?: string; // Definition of Done criteria (required for WP)
   comments?: Comment[];
   
-  // Completion tracking
-  completionRate?: number; // Percentage (0-100)
+  // BAU-specific: Tasks (only for BAU initiatives, required for BAU)
+  tasks?: Task[];
   
   // Audit Trail (Local history, though global log exists too)
   history?: ChangeRecord[];
+  
+  // Overlooked Items Tracking
+  overlookedCount?: number; // Number of times ETA has been pushed back
+  lastDelayDate?: string; // Date of last ETA delay (ISO Date String)
+  
+  // Removed: completionRate - calculate from actualEffort / estimatedEffort when needed
 }
 
-export type PermissionKey = 
+// Legacy permission keys (for backward compatibility)
+export type LegacyPermissionKey = 
   | 'createPlanned'
   | 'createUnplanned'
   | 'editOwn'
@@ -153,11 +184,39 @@ export type PermissionKey =
   | 'manageWorkflows'
   | 'createWorkflows';
 
+// Tab/View access levels (edit includes full access)
+export type TabAccessLevel = 'none' | 'view' | 'edit';
+
+// Task management scope levels
+export type TaskManagementScope = 'no' | 'yes' | 'own';
+
+// New permission structure
+export type PermissionKey = 
+  // Tab/View access permissions (dropdown: none, view, edit, full)
+  | 'accessAllTasks'           // All Tasks tab access
+  | 'accessDependencies'      // Dependencies tab access
+  | 'accessTimeline'          // Timeline tab access
+  | 'accessWorkflows'         // Workflows tab access
+  | 'accessWorkplanHealth'    // Workplan Health tab access
+  // Task management permissions
+  | 'createNewTasks'          // Create new tasks scope: no | yes | own
+  | 'editTasks'               // Edit tasks scope: no | yes | own
+  | 'deleteTasks'             // Delete tasks scope: no | yes | own
+  // Admin and workflows (boolean: yes/no)
+  | 'accessAdmin'             // Admin access
+  | 'manageWorkflows';        // Manage workflows (add/edit/delete)
+
+// Permission value can be TabAccessLevel for tab permissions or TaskManagementScope for task management
+export type PermissionValue = TabAccessLevel | TaskManagementScope;
+
 export interface AppConfig {
   bauBufferSuggestion: number; // Percentage
   teamCapacities: Record<string, number>; // ownerId -> capacity (weeks)
   teamBuffers: Record<string, number>; // ownerId -> buffer weeks (reserved for BAU/unplanned)
-  rolePermissions: Record<Role, Record<PermissionKey, boolean>>;
+  // Support both old and new permission structures for migration
+  rolePermissions: Record<Role, Record<PermissionKey, PermissionValue>>;
+  // Legacy permissions for backward compatibility (will be migrated)
+  legacyRolePermissions?: Record<Role, Record<LegacyPermissionKey, boolean>>;
   slack?: {
     webhookUrl?: string;
     enabled: boolean;
@@ -274,6 +333,8 @@ export interface Workflow {
   lastRun?: string;
   runCount: number;
   executionLog?: WorkflowExecutionLog[];
+  system?: boolean; // True for system rules, false/undefined for custom workflows
+  readOnly?: boolean; // True for system rules that cannot be edited/deleted
 }
 
 export interface WorkflowExecutionLog {
@@ -295,6 +356,8 @@ export enum NotificationType {
   EtaChange = 'eta_change',
   EffortChange = 'effort_change',
   NewComment = 'new_comment',
+  WeeklyUpdateReminder = 'weekly_update_reminder',
+  OverlookedItem = 'overlooked_item',
 }
 
 export interface Notification {

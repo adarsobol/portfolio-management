@@ -165,7 +165,8 @@ class SheetsSyncManager {
     this.onlineHandler = SheetsSyncManager.sharedHandlers.online;
     this.offlineHandler = SheetsSyncManager.sharedHandlers.offline;
 
-    this.loadPersistedQueue();
+    // Don't load persisted queue on initialization - this was causing duplicates
+    // this.loadPersistedQueue();
   }
 
   destroy(): void {
@@ -229,23 +230,81 @@ class SheetsSyncManager {
       if (this.status.isOnline && authService.isAuthenticated()) {
         const data = await this.pullFromSheets();
         if (data && data.initiatives.length > 0) {
-          // Cache to localStorage for offline access
-          cacheToLocalStorage(data.initiatives);
+          // Deduplicate initiatives by ID (keep first occurrence) before caching
+          const seenIds = new Set<string>();
+          const deduplicated = data.initiatives.filter((init: Initiative) => {
+            if (seenIds.has(init.id)) {
+              logger.warn('Found duplicate initiative ID', { context: 'SheetsSyncManager.loadInitiatives', metadata: { id: init.id } });
+              return false;
+            }
+            seenIds.add(init.id);
+            return true;
+          });
+
+          if (data.initiatives.length !== deduplicated.length) {
+            logger.info('Deduplicated initiatives from Sheets', { 
+              context: 'SheetsSyncManager.loadInitiatives', 
+              metadata: { before: data.initiatives.length, after: deduplicated.length, removed: data.initiatives.length - deduplicated.length } 
+            });
+          }
+
+          // Cache deduplicated initiatives to localStorage for offline access
+          cacheToLocalStorage(deduplicated);
           this.status.isLoading = false;
           this.status.lastSync = new Date().toISOString();
           this.notify();
-          return data.initiatives;
+          return deduplicated;
         }
       }
 
-      // Fall back to localStorage cache
+      // Fall back to localStorage cache - but check for corruption first
       const cached = loadFromLocalStorageCache();
       if (cached && cached.length > 0) {
-        logger.info('Loaded initiatives from localStorage cache', { context: 'SheetsSyncManager.loadInitiatives', metadata: { count: cached.length } });
+        // Deduplicate cached initiatives as well (in case cache was corrupted)
+        const seenIds = new Set<string>();
+        const deduplicatedCached = cached.filter((init: Initiative) => {
+          if (seenIds.has(init.id)) {
+            logger.warn('Found duplicate initiative ID in cache', { context: 'SheetsSyncManager.loadInitiatives', metadata: { id: init.id } });
+            return false;
+          }
+          seenIds.add(init.id);
+          return true;
+        });
+
+        // If cache has excessive duplicates (more than 50% duplicates), clear it completely
+        const duplicateRatio = (cached.length - deduplicatedCached.length) / cached.length;
+        if (duplicateRatio > 0.5 || cached.length > 100) {
+          logger.warn('Cache appears corrupted (too many duplicates or too many items), clearing cache', { 
+            context: 'SheetsSyncManager.loadInitiatives', 
+            metadata: { cachedCount: cached.length, deduplicatedCount: deduplicatedCached.length, duplicateRatio } 
+          });
+          // Clear corrupted cache
+          try {
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+          } catch {
+            // Ignore storage errors
+          }
+          this.status.isLoading = false;
+          this.status.error = 'Cache corrupted - cleared. Please refresh from Google Sheets.';
+          this.notify();
+          return [];
+        }
+
+        if (cached.length !== deduplicatedCached.length) {
+          logger.info('Deduplicated initiatives from cache', { 
+            context: 'SheetsSyncManager.loadInitiatives', 
+            metadata: { before: cached.length, after: deduplicatedCached.length, removed: cached.length - deduplicatedCached.length } 
+          });
+          // Update cache with deduplicated data
+          cacheToLocalStorage(deduplicatedCached);
+        }
+
+        logger.info('Loaded initiatives from localStorage cache', { context: 'SheetsSyncManager.loadInitiatives', metadata: { count: deduplicatedCached.length } });
         this.status.isLoading = false;
         this.status.error = this.status.isOnline ? 'Using cached data - Sheets empty or unavailable' : 'Offline - using cached data';
         this.notify();
-        return cached;
+        return deduplicatedCached;
       }
 
       // Return empty if nothing available
@@ -258,9 +317,35 @@ class SheetsSyncManager {
       this.status.error = error instanceof Error ? error.message : 'Failed to load data';
       this.notify();
 
-      // Try localStorage as last resort
+      // Try localStorage as last resort - but don't use if corrupted
       const cached = loadFromLocalStorageCache();
-      return cached || [];
+      if (cached && cached.length > 0) {
+        // Deduplicate cached initiatives as well (in case cache was corrupted)
+        const seenIds = new Set<string>();
+        const deduplicatedCached = cached.filter((init: Initiative) => {
+          if (seenIds.has(init.id)) {
+            return false;
+          }
+          seenIds.add(init.id);
+          return true;
+        });
+        
+        // If cache is severely corrupted, don't use it
+        const duplicateRatio = (cached.length - deduplicatedCached.length) / cached.length;
+        if (duplicateRatio > 0.5 || cached.length > 100) {
+          // Clear corrupted cache
+          try {
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+          } catch {
+            // Ignore storage errors
+          }
+          return [];
+        }
+        
+        return deduplicatedCached;
+      }
+      return [];
     }
   }
 
@@ -282,7 +367,25 @@ class SheetsSyncManager {
   queueInitiativesSync(initiatives: Initiative[]): void {
     if (!this.enabled) return;
 
-    initiatives.forEach(i => {
+    // Deduplicate initiatives before queuing (keep first occurrence)
+    const seenIds = new Set<string>();
+    const deduplicated = initiatives.filter(init => {
+      if (seenIds.has(init.id)) {
+        logger.warn('Found duplicate initiative ID in queue', { context: 'SheetsSyncManager.queueInitiativesSync', metadata: { id: init.id } });
+        return false;
+      }
+      seenIds.add(init.id);
+      return true;
+    });
+
+    if (initiatives.length !== deduplicated.length) {
+      logger.info('Deduplicated initiatives before queuing', { 
+        context: 'SheetsSyncManager.queueInitiativesSync', 
+        metadata: { before: initiatives.length, after: deduplicated.length, removed: initiatives.length - deduplicated.length } 
+      });
+    }
+
+    deduplicated.forEach(i => {
       this.queue.initiatives.set(i.id, i);
       this.updateLocalStorageCache(i);
     });
@@ -295,13 +398,23 @@ class SheetsSyncManager {
   private updateLocalStorageCache(initiative: Initiative): void {
     try {
       const cached = loadFromLocalStorageCache() || [];
-      const index = cached.findIndex(i => i.id === initiative.id);
+      // Deduplicate cache first
+      const seenIds = new Set<string>();
+      const deduplicatedCached = cached.filter((init: Initiative) => {
+        if (seenIds.has(init.id)) {
+          return false;
+        }
+        seenIds.add(init.id);
+        return true;
+      });
+
+      const index = deduplicatedCached.findIndex(i => i.id === initiative.id);
       if (index >= 0) {
-        cached[index] = initiative;
+        deduplicatedCached[index] = initiative;
       } else {
-        cached.push(initiative);
+        deduplicatedCached.push(initiative);
       }
-      cacheToLocalStorage(cached);
+      cacheToLocalStorage(deduplicatedCached);
     } catch {
       // Ignore cache errors
     }
@@ -371,6 +484,56 @@ class SheetsSyncManager {
     }
   }
 
+  /** Delete an initiative from Sheets */
+  async deleteInitiative(id: string): Promise<boolean> {
+    if (!this.status.isOnline) {
+      this.status.error = 'Offline - cannot delete from Sheets';
+      this.notify();
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives/${id}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        this.status.error = 'Authentication required';
+        this.notify();
+        return false;
+      }
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || `Delete failed: ${response.statusText}`);
+      }
+
+      // Remove from localStorage cache
+      try {
+        const cached = loadFromLocalStorageCache() || [];
+        const filtered = cached.filter((init: Initiative) => init.id !== id);
+        cacheToLocalStorage(filtered);
+      } catch {
+        // Ignore cache errors
+      }
+
+      // Remove from queue if it was queued
+      this.queue.initiatives.delete(id);
+      this.updatePendingCount();
+      this.persistQueue();
+
+      this.status.error = null;
+      this.notify();
+      return true;
+    } catch (error) {
+      logger.error('Failed to delete initiative', { context: 'SheetsSyncManager.deleteInitiative', error: error instanceof Error ? error : new Error(String(error)) });
+      this.status.error = error instanceof Error ? error.message : 'Delete failed';
+      this.notify();
+      return false;
+    }
+  }
+
   /** Push full data to Sheets (overwrite) */
   async pushFullData(data: {
     initiatives: Initiative[];
@@ -384,11 +547,29 @@ class SheetsSyncManager {
     }
 
     try {
+      // Deduplicate initiatives before pushing
+      const seenIds = new Set<string>();
+      const deduplicated = data.initiatives.filter(init => {
+        if (seenIds.has(init.id)) {
+          logger.warn('Found duplicate initiative ID before push', { context: 'SheetsSyncManager.pushFullData', metadata: { id: init.id } });
+          return false;
+        }
+        seenIds.add(init.id);
+        return true;
+      });
+
+      if (data.initiatives.length !== deduplicated.length) {
+        logger.info('Deduplicated initiatives before push', { 
+          context: 'SheetsSyncManager.pushFullData', 
+          metadata: { before: data.initiatives.length, after: deduplicated.length, removed: data.initiatives.length - deduplicated.length } 
+        });
+      }
+
       const response = await fetch(`${API_ENDPOINT}/api/sheets/push`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({
-          initiatives: data.initiatives.map(flattenInitiative)
+          initiatives: deduplicated.map(flattenInitiative)
         })
       });
 
@@ -396,8 +577,8 @@ class SheetsSyncManager {
         throw new Error(`Push failed: ${response.statusText}`);
       }
 
-      // Update local cache
-      cacheToLocalStorage(data.initiatives);
+      // Update local cache with deduplicated data
+      cacheToLocalStorage(deduplicated);
 
       this.status.lastSync = new Date().toISOString();
       this.status.error = null;
@@ -420,6 +601,17 @@ class SheetsSyncManager {
     this.queue = { initiatives: new Map(), changes: [], snapshots: [] };
     this.updatePendingCount();
     this.persistQueue();
+  }
+
+  /** Clear corrupted localStorage cache */
+  clearCache(): void {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+      logger.info('Cleared localStorage cache', { context: 'SheetsSyncManager.clearCache' });
+    } catch {
+      // Ignore storage errors
+    }
   }
 
   // ============================================
@@ -618,20 +810,19 @@ class SheetsSyncManager {
   }
 
   private loadPersistedQueue(): void {
+    // Don't load persisted queue - this was causing duplicates on refresh
+    // Clear any existing persisted queue to prevent old items from syncing
     try {
-      const stored = sessionStorage.getItem('sheets-sync-queue');
-      if (stored) {
-        const data = JSON.parse(stored);
-        this.queue = {
-          initiatives: new Map(data.initiatives || []),
-          changes: data.changes || [],
-          snapshots: data.snapshots || []
-        };
-        this.updatePendingCount();
-      }
+      sessionStorage.removeItem('sheets-sync-queue');
     } catch {
-      // Ignore parse errors
+      // Ignore storage errors
     }
+    // Start with empty queue
+    this.queue = {
+      initiatives: new Map(),
+      changes: [],
+      snapshots: []
+    };
   }
 }
 

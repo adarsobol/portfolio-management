@@ -1,4 +1,4 @@
-import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, Workflow, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, Dependency } from '../types';
+import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, Workflow, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, Dependency, InitiativeType, TabAccessLevel, TaskManagementScope, PermissionKey, LegacyPermissionKey, PermissionValue } from '../types';
 import { generateId } from '../utils';
 
 // Dependency team options for external dependencies
@@ -199,7 +199,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: NEXT_WEEK,
     lastUpdated: TODAY,
     workType: WorkType.Planned,
-    completionRate: 33,
+    initiativeType: InitiativeType.WP,
     dependencies: [
       {
         team: DependencyTeam.RMData,
@@ -234,7 +234,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: TWO_WEEKS_AGO, // Changed from ago
     lastUpdated: TWO_WEEKS_AGO,
     workType: WorkType.Planned,
-    completionRate: 75,
+    initiativeType: InitiativeType.WP,
     riskActionLog: 'Vendor delivery delayed. Mitigating by using fallback servers.',
     comments: [
       { id: 'c1', text: 'Vendor says they will ship by Friday.', authorId: 'u_rg', timestamp: TWO_WEEKS_AGO }
@@ -282,7 +282,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: TOMORROW,
     lastUpdated: TODAY,
     workType: WorkType.Unplanned,
-    completionRate: 50,
+    initiativeType: InitiativeType.WP,
     unplannedTags: [UnplannedTag.RiskItem, UnplannedTag.PMItem],
     comments: [],
     history: []
@@ -305,7 +305,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: NEXT_MONTH,
     lastUpdated: TODAY,
     workType: WorkType.Planned,
-    completionRate: 0,
+    initiativeType: InitiativeType.WP,
     comments: [],
     history: []
   },
@@ -328,7 +328,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: TOMORROW,
     lastUpdated: YESTERDAY,
     workType: WorkType.Unplanned,
-    completionRate: 67,
+    initiativeType: InitiativeType.WP,
     unplannedTags: [UnplannedTag.RiskItem],
     comments: [],
     history: []
@@ -351,7 +351,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: YESTERDAY,
     lastUpdated: TODAY,
     workType: WorkType.Planned,
-    completionRate: 100,
+    initiativeType: InitiativeType.WP,
     comments: [],
     history: []
   },
@@ -374,7 +374,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: TWO_WEEKS_FUTURE,
     lastUpdated: YESTERDAY,
     workType: WorkType.Planned,
-    completionRate: 0,
+    initiativeType: InitiativeType.WP,
     comments: [],
     history: []
   },
@@ -396,7 +396,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: TODAY,
     lastUpdated: TODAY,
     workType: WorkType.Unplanned,
-    completionRate: 100,
+    initiativeType: InitiativeType.WP,
     unplannedTags: [UnplannedTag.PMItem],
     comments: [],
     history: []
@@ -419,7 +419,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: NEXT_WEEK,
     lastUpdated: YESTERDAY,
     workType: WorkType.Planned,
-    completionRate: 67,
+    initiativeType: InitiativeType.WP,
     riskActionLog: 'Data sets are incomplete. Pending Data Science team review.',
     dependencies: [
       {
@@ -450,7 +450,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: NEXT_WEEK,
     lastUpdated: TODAY,
     workType: WorkType.Unplanned,
-    completionRate: 20,
+    initiativeType: InitiativeType.WP,
     unplannedTags: [UnplannedTag.RiskItem, UnplannedTag.PMItem],
     riskActionLog: 'Volatility exceeded thresholds. Immediate investigation required.',
     comments: [],
@@ -474,11 +474,170 @@ export const INITIAL_INITIATIVES: Initiative[] = [
     originalEta: TWO_WEEKS_FUTURE,
     lastUpdated: YESTERDAY,
     workType: WorkType.Planned,
-    completionRate: 0,
+    initiativeType: InitiativeType.WP,
+    comments: [],
+    history: []
+  },
+  // BAU Initiative Example
+  {
+    id: 'i_bau_example',
+    initiativeType: InitiativeType.BAU,
+    title: 'BAU Support & Maintenance',
+    ownerId: 'u_ah',
+    quarter: 'Q4 2025',
+    status: Status.InProgress,
+    priority: Priority.P1,
+    estimatedEffort: 4.5,
+    actualEffort: 2.0,
+    eta: NEXT_WEEK,
+    originalEta: NEXT_WEEK,
+    lastUpdated: TODAY,
+    workType: WorkType.Planned,
+    l1_assetClass: AssetClass.PL,
+    l2_pillar: 'Data Infrastructure',
+    l3_responsibility: 'Data Quality',
+    l4_target: 'Maintain data pipelines',
+    tasks: [
+      {
+        id: 'task_bau_1',
+        title: 'Fix data pipeline errors',
+        effort: 1.5,
+        eta: TOMORROW,
+        ownerId: 'u_ah',
+        status: Status.InProgress,
+        tags: [UnplannedTag.RiskItem],
+        comments: []
+      },
+      {
+        id: 'task_bau_2',
+        title: 'Update documentation',
+        effort: 1.0,
+        eta: NEXT_WEEK,
+        ownerId: 'u_ah',
+        status: Status.NotStarted,
+        tags: [UnplannedTag.PMItem],
+        comments: []
+      },
+      {
+        id: 'task_bau_3',
+        title: 'Monitor system health',
+        effort: 2.0,
+        eta: NEXT_WEEK,
+        ownerId: 'u_ah',
+        status: Status.InProgress,
+        tags: [],
+        comments: []
+      }
+    ],
+    comments: [],
+    history: []
+  },
+  // Simulated BAU Initiative
+  {
+    id: 'i_bau_simulated',
+    initiativeType: InitiativeType.BAU,
+    title: 'Ongoing Portfolio Operations & Monitoring',
+    ownerId: 'u_tm',
+    secondaryOwner: 'Nofar Elis',
+    quarter: 'Q4 2025',
+    status: Status.InProgress,
+    priority: Priority.P1,
+    estimatedEffort: 6.0,
+    originalEstimatedEffort: 6.0,
+    actualEffort: 3.5,
+    eta: TWO_WEEKS_FUTURE,
+    originalEta: TWO_WEEKS_FUTURE,
+    lastUpdated: TODAY,
+    workType: WorkType.Planned,
+    l1_assetClass: AssetClass.PL,
+    l2_pillar: 'Portfolio Monitoring & Analytics',
+    l3_responsibility: 'Monitoring KPIs (Constrains, Volume, Flow quality, Early DQs, IRR/Profit prediction)',
+    l4_target: 'Maintain operational excellence',
+    tasks: [
+      {
+        id: 'task_bau_sim_1',
+        title: 'Daily KPI monitoring and reporting',
+        effort: 1.5,
+        eta: NEXT_WEEK,
+        ownerId: 'u_tm',
+        status: Status.InProgress,
+        tags: [],
+        comments: []
+      },
+      {
+        id: 'task_bau_sim_2',
+        title: 'Weekly portfolio health review',
+        effort: 1.0,
+        eta: NEXT_WEEK,
+        ownerId: 'u_tm',
+        status: Status.InProgress,
+        tags: [UnplannedTag.PMItem],
+        comments: []
+      },
+      {
+        id: 'task_bau_sim_3',
+        title: 'Monthly constraint analysis',
+        effort: 2.0,
+        eta: TWO_WEEKS_FUTURE,
+        ownerId: 'u_tm',
+        status: Status.NotStarted,
+        tags: [],
+        comments: []
+      },
+      {
+        id: 'task_bau_sim_4',
+        title: 'Quarterly risk assessment review',
+        effort: 1.5,
+        eta: TWO_WEEKS_FUTURE,
+        ownerId: 'u_tm',
+        status: Status.NotStarted,
+        tags: [UnplannedTag.RiskItem],
+        comments: []
+      }
+    ],
     comments: [],
     history: []
   },
 ];
+
+/**
+ * Migrates legacy permission structure to new permission structure
+ * Converts old boolean-based permissions to new tab-based and task-based permissions
+ */
+export function migratePermissions(
+  legacyPermissions: Record<Role, Record<LegacyPermissionKey, boolean>>
+): Record<Role, Record<PermissionKey, PermissionValue>> {
+  const newPermissions: Record<Role, Record<PermissionKey, PermissionValue>> = {} as any;
+
+  for (const role of Object.values(Role)) {
+    const legacy = legacyPermissions[role] || {};
+    const newPerms: Record<PermissionKey, PermissionValue> = {
+      // Tab/View access - map from legacy permissions (edit = full access)
+      accessAllTasks: (legacy.createPlanned || legacy.createUnplanned || legacy.editOwn || legacy.editAll) 
+        ? (legacy.editAll || legacy.editOwn ? 'edit' : 'view')
+        : 'none',
+      accessDependencies: (legacy.editAll || legacy.editOwn) ? 'edit' : 'view',
+      accessTimeline: (legacy.editAll || legacy.editOwn) ? 'edit' : 'view',
+      accessWorkflows: legacy.createWorkflows 
+        ? (legacy.manageWorkflows ? 'edit' : 'view')
+        : 'none',
+      accessWorkplanHealth: legacy.accessWorkplanHealth ? 'edit' : 'none',
+      
+      // Task management
+      createNewTasks: (legacy.createPlanned || legacy.createUnplanned) ? 'yes' : 'no' as TaskManagementScope,
+      editTasks: legacy.editAll ? 'yes' : (legacy.editOwn ? 'own' : 'no') as TaskManagementScope,
+      deleteTasks: 'no' as TaskManagementScope, // Legacy didn't have explicit delete permission
+      
+      // Admin and workflows
+      accessAdmin: legacy.accessAdmin ? 'yes' : 'no' as TaskManagementScope,
+      manageWorkflows: legacy.manageWorkflows ? 'yes' : 'no' as TaskManagementScope
+    };
+
+    newPermissions[role] = newPerms;
+  }
+
+  return newPermissions;
+}
 
 export const INITIAL_CONFIG: AppConfig = {
   bauBufferSuggestion: 15,
@@ -519,88 +678,88 @@ export const INITIAL_CONFIG: AppConfig = {
   },
   rolePermissions: {
     [Role.Admin]: {
-      createPlanned: true,
-      createUnplanned: true,
-      editOwn: true,
-      editAll: true,
-      editUnplanned: true,
-      accessAdmin: true,
-      accessWorkplanHealth: true,
-      manageCapacity: true,
-      manageWorkflows: true,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'edit',
+      accessTimeline: 'edit',
+      accessWorkflows: 'edit',
+      accessWorkplanHealth: 'edit',
+      createNewTasks: 'yes',
+      editTasks: 'yes',
+      deleteTasks: 'yes',
+      accessAdmin: 'yes',
+      manageWorkflows: 'yes'
     },
     [Role.SVP]: {
-      createPlanned: true,
-      createUnplanned: true,
-      editOwn: true,
-      editAll: true,
-      editUnplanned: true,
-      accessAdmin: true,
-      accessWorkplanHealth: true,
-      manageCapacity: true,
-      manageWorkflows: true,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'edit',
+      accessTimeline: 'edit',
+      accessWorkflows: 'edit',
+      accessWorkplanHealth: 'edit',
+      createNewTasks: 'yes',
+      editTasks: 'yes',
+      deleteTasks: 'yes',
+      accessAdmin: 'yes',
+      manageWorkflows: 'yes'
     },
     [Role.VP]: {
-      createPlanned: true,
-      createUnplanned: true,
-      editOwn: true,
-      editAll: true,
-      editUnplanned: false,
-      accessAdmin: false,
-      accessWorkplanHealth: true,
-      manageCapacity: true,
-      manageWorkflows: true,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'edit',
+      accessTimeline: 'edit',
+      accessWorkflows: 'edit',
+      accessWorkplanHealth: 'edit',
+      createNewTasks: 'yes',
+      editTasks: 'yes',
+      deleteTasks: 'no',
+      accessAdmin: 'no',
+      manageWorkflows: 'yes'
     },
     [Role.DirectorDepartment]: {
-      createPlanned: true,
-      createUnplanned: true,
-      editOwn: true,
-      editAll: true,
-      editUnplanned: true,
-      accessAdmin: false,
-      accessWorkplanHealth: true,
-      manageCapacity: true,
-      manageWorkflows: true,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'edit',
+      accessTimeline: 'edit',
+      accessWorkflows: 'edit',
+      accessWorkplanHealth: 'edit',
+      createNewTasks: 'yes',
+      editTasks: 'yes',
+      deleteTasks: 'no',
+      accessAdmin: 'no',
+      manageWorkflows: 'yes'
     },
     [Role.DirectorGroup]: {
-      createPlanned: true,
-      createUnplanned: false,
-      editOwn: true,
-      editAll: false,
-      editUnplanned: false,
-      accessAdmin: false,
-      accessWorkplanHealth: true,
-      manageCapacity: false,
-      manageWorkflows: false,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'edit',
+      accessTimeline: 'edit',
+      accessWorkflows: 'view',
+      accessWorkplanHealth: 'edit',
+      createNewTasks: 'yes',
+      editTasks: 'own',
+      deleteTasks: 'yes',
+      accessAdmin: 'no',
+      manageWorkflows: 'no'
     },
     [Role.TeamLead]: {
-      createPlanned: true,
-      createUnplanned: false,
-      editOwn: true,
-      editAll: false,
-      editUnplanned: false,
-      accessAdmin: false,
-      accessWorkplanHealth: false,
-      manageCapacity: false,
-      manageWorkflows: false,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'view',
+      accessTimeline: 'view',
+      accessWorkflows: 'view',
+      accessWorkplanHealth: 'none',
+      createNewTasks: 'yes',
+      editTasks: 'own',
+      deleteTasks: 'no',
+      accessAdmin: 'no',
+      manageWorkflows: 'no'
     },
     [Role.PortfolioOps]: {
-      createPlanned: false,
-      createUnplanned: true,
-      editOwn: true,
-      editAll: false,
-      editUnplanned: true,
-      accessAdmin: false,
-      accessWorkplanHealth: true,
-      manageCapacity: false,
-      manageWorkflows: true,
-      createWorkflows: true
+      accessAllTasks: 'edit',
+      accessDependencies: 'view',
+      accessTimeline: 'view',
+      accessWorkflows: 'edit',
+      accessWorkplanHealth: 'edit',
+      createNewTasks: 'yes',
+      editTasks: 'own',
+      deleteTasks: 'no',
+      accessAdmin: 'no',
+      manageWorkflows: 'yes'
     },
   },
   workflows: [
@@ -627,6 +786,8 @@ export const INITIAL_CONFIG: AppConfig = {
       createdAt: new Date().toISOString(),
       runCount: 0,
       executionLog: [],
+      system: true,
+      readOnly: true,
     },
     {
       id: generateId(),
@@ -649,6 +810,33 @@ export const INITIAL_CONFIG: AppConfig = {
       createdAt: new Date().toISOString(),
       runCount: 0,
       executionLog: [],
+      system: true,
+      readOnly: true,
+    },
+    {
+      id: generateId(),
+      name: 'Weekly Update Reminder',
+      description: 'Remind team leads to update their initiatives by Thursday EoD',
+      enabled: true,
+      trigger: WorkflowTrigger.OnSchedule,
+      triggerConfig: { schedule: 'weekly', time: '17:00' }, // Thursday 5 PM
+      condition: {
+        type: WorkflowCondition.And,
+        children: [
+          { type: WorkflowCondition.LastUpdatedOlderThan, days: 7 },
+          { type: WorkflowCondition.StatusNotEquals, value: Status.Done },
+        ],
+      },
+      action: {
+        type: WorkflowAction.NotifyOwner,
+        message: 'Please update your initiative status, effort, and ETA by Thursday EoD as part of the weekly update routine.',
+      },
+      createdBy: 'system',
+      createdAt: new Date().toISOString(),
+      runCount: 0,
+      executionLog: [],
+      system: true,
+      readOnly: true,
     },
   ]
 };

@@ -1,0 +1,77 @@
+# Cloud Build configuration for automated CI/CD
+# This builds and deploys the application to Cloud Run
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/portfolio-manager:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/portfolio-manager:latest'
+      - '-f'
+      - 'Dockerfile'
+      - '.'
+
+  # Step 2: Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/portfolio-manager:$SHORT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/portfolio-manager:latest'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'portfolio-manager'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/portfolio-manager:$SHORT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--timeout'
+      - '300'
+      - '--session-affinity'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,PORT=8080,SERVE_STATIC=true'
+      - '--set-secrets'
+      - 'JWT_SECRET=portfolio-jwt-secret:latest,CORS_ALLOWED_ORIGINS=portfolio-cors-origins:latest'
+      - '--service-account'
+      - '${_SERVICE_ACCOUNT}'
+
+# Substitution variables (set in Cloud Build triggers or via command line)
+substitutions:
+  _REGION: us-central1
+  _SERVICE_ACCOUNT: portfolio-manager@${PROJECT_ID}.iam.gserviceaccount.com
+
+# Images to be pushed to the registry
+images:
+  - 'gcr.io/$PROJECT_ID/portfolio-manager:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/portfolio-manager:latest'
+
+# Build options
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+# Timeout for the entire build
+timeout: '1200s'
+

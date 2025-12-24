@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  Initiative, User, Role, Status, Priority, WorkType, UnplannedTag, AssetClass, PermissionKey, TradeOffAction, Dependency, DependencyTeam
+  Initiative, User, Role, Status, Priority, WorkType, UnplannedTag, AssetClass, PermissionKey, PermissionValue, TradeOffAction, Dependency, DependencyTeam, InitiativeType, Task, AppConfig
 } from '../../types';
 import { HIERARCHY, QUARTERS, DEPENDENCY_TEAM_CATEGORIES } from '../../constants';
 import { 
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
-  ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers
+  ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getOwnerName, generateId, parseMentions, getMentionedUsers } from '../../utils';
+import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks } from '../../utils';
 import { slackService } from '../../services';
 
 // ============================================================================
@@ -40,19 +40,19 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-all ${
+        className={`w-full flex items-center justify-between px-4 py-3.5 text-left transition-all cursor-pointer ${
           isExpanded 
             ? 'bg-gradient-to-r from-slate-50 to-white' 
             : 'bg-white hover:bg-slate-50'
         }`}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pointer-events-none">
           <div className={`w-1 h-5 rounded-full bg-gradient-to-b ${gradientMap[accentColor]}`} />
           <span className="text-slate-500">{icon}</span>
           <span className="font-semibold text-slate-800">{title}</span>
           {badge}
         </div>
-        <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+        <div className={`transform transition-transform duration-200 pointer-events-none ${isExpanded ? 'rotate-180' : ''}`}>
           <ChevronDown size={18} className="text-slate-400" />
         </div>
       </button>
@@ -100,13 +100,15 @@ interface InitiativeModalProps {
   onSave: (initiative: Initiative, tradeOff?: TradeOffAction) => void;
   currentUser: User;
   initiativeToEdit?: Initiative | null;
-  rolePermissions: Record<Role, Record<PermissionKey, boolean>>;
+  rolePermissions: Record<Role, Record<PermissionKey, PermissionValue>>;
+  config: AppConfig;
   users: User[];
   allInitiatives: Initiative[];
+  onDelete?: (id: string) => void;
 }
 
 const InitiativeModal: React.FC<InitiativeModalProps> = ({
-  isOpen, onClose, onSave, currentUser, initiativeToEdit, rolePermissions, users, allInitiatives
+  isOpen, onClose, onSave, currentUser, initiativeToEdit, rolePermissions, config, users, allInitiatives, onDelete
 }) => {
   const isEditMode = !!initiativeToEdit;
   const permissions = rolePermissions[currentUser.role];
@@ -130,6 +132,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const [mentionStartIndex, setMentionStartIndex] = useState(-1);
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   // Accordion State
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -146,8 +149,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const [bulkRows, setBulkRows] = useState<BulkEntryRow[]>([]);
   const [bulkSharedSettings, setBulkSharedSettings] = useState({
     quarter: 'Q4 2025',
-    l1_assetClass: AssetClass.PL,
-    workType: WorkType.Planned
+    l1_assetClass: AssetClass.PL
   });
   const [bulkErrors, setBulkErrors] = useState<Record<string, Record<string, string>>>({});
 
@@ -157,37 +159,41 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   // Share/Export State
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<'slack' | 'notion' | null>(null);
+
+  // BAU Task Management State
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [effortOverride, setEffortOverride] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
   // ============================================================================
   // INITIALIZATION
   // ============================================================================
   
   const getDefaultFormData = useCallback(() => {
-    const canCreatePlanned = permissions.createPlanned;
-    const canCreateUnplanned = permissions.createUnplanned;
+    const canCreate = canCreateTasks(config, currentUser.role);
     
-    const defaultWorkType = (canCreateUnplanned && !canCreatePlanned) 
-      ? WorkType.Unplanned 
-      : WorkType.Planned;
+    const defaultWorkType = WorkType.Planned;
     
     const defaultAsset = AssetClass.PL;
     const defaultPillar = HIERARCHY[defaultAsset][0].name;
     const defaultResp = HIERARCHY[defaultAsset][0].responsibilities[0];
 
     return {
+      initiativeType: InitiativeType.WP, // Default to WP
       status: Status.NotStarted,
       priority: Priority.P1,
       workType: defaultWorkType,
       l1_assetClass: defaultAsset,
       l2_pillar: defaultPillar,
       l3_responsibility: defaultResp,
-      actualEffort: 0,
-      estimatedEffort: 0,
-      completionRate: 0,
+      // Effort fields optional, defaults handled in calculations
       unplannedTags: [],
       quarter: 'Q4 2025',
-      comments: []
+      definitionOfDone: '',
+      comments: [],
+      tasks: []
     };
   }, [permissions]);
 
@@ -219,25 +225,51 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (initiativeToEdit) {
-        setFormData({ ...initiativeToEdit });
+        setFormData({ 
+          ...initiativeToEdit,
+          // Ensure initiativeType is set (required field)
+          initiativeType: initiativeToEdit.initiativeType || InitiativeType.WP
+        });
         setMode('single'); // Always single mode when editing
+        setTasks(initiativeToEdit.tasks || []);
+        setEffortOverride(false); // Reset override when editing
       } else {
-        setFormData(getDefaultFormData());
+        const defaultData = getDefaultFormData();
+        setFormData(defaultData);
+        setTasks([]);
+        setEffortOverride(false);
       }
       setErrors({});
       setActiveTab('details');
       setNewComment('');
       setShowShareMenu(false);
+      setShowActionsMenu(false);
       setCopyFeedback(null);
       setEnableTradeOff(false);
       setTradeOffData({ field: 'eta' });
-      setExpandedSections({ core: true, hierarchy: false, dependencies: false, effort: false, risk: false, tradeoff: false });
+      setExpandedSections({ core: true, hierarchy: false, dependencies: false, effort: false, risk: false, tradeoff: false, tasks: false });
       
       // Initialize bulk mode with 2 empty rows
       setBulkRows([createEmptyBulkRow(), createEmptyBulkRow()]);
       setBulkErrors({});
     }
   }, [isOpen, initiativeToEdit, getDefaultFormData, createEmptyBulkRow]);
+
+  // Close actions menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target as Node)) {
+        setShowActionsMenu(false);
+      }
+    };
+
+    if (showActionsMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showActionsMenu]);
 
   // ============================================================================
   // DERIVED DATA
@@ -248,32 +280,68 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   );
 
   const canEdit = (): boolean => {
-    if (permissions.editAll) return true;
     if (isEditMode) {
-      if (formData.workType === WorkType.Unplanned && permissions.editUnplanned) return true;
-      if (formData.ownerId === currentUser.id && permissions.editOwn) return true;
+      // Check if user can edit all tasks
+      if (canEditAllTasks(config, currentUser.role)) return true;
+      // Check if user can edit own tasks and this is their task
+      if (formData.ownerId === currentUser.id && canEditOwnTasks(config, currentUser.role)) return true;
       return false;
     } else {
-      if (formData.workType === WorkType.Planned && permissions.createPlanned) return true;
-      if (formData.workType === WorkType.Unplanned && permissions.createUnplanned) return true;
-      return false;
+      // Creating new task - check if user can create tasks
+      return canCreateTasks(config, currentUser.role);
     }
   };
 
   const isReadOnly = !canEdit();
 
+  const canDelete = (): boolean => {
+    // Only Admin or Director (Group Lead) can delete
+    return currentUser.role === Role.Admin || currentUser.role === Role.DirectorGroup;
+  };
+
+  const handleDelete = () => {
+    if (!initiativeToEdit || !onDelete) return;
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${initiativeToEdit.title}"?\n\nThis action cannot be undone.`
+    );
+
+    if (confirmed) {
+      onDelete(initiativeToEdit.id);
+      onClose();
+    }
+    setShowActionsMenu(false);
+  };
+
   const availablePillars = formData.l1_assetClass ? HIERARCHY[formData.l1_assetClass] : [];
   const selectedPillarNode = availablePillars.find(p => p.name === formData.l2_pillar);
   const availableResponsibilities = selectedPillarNode ? selectedPillarNode.responsibilities : [];
 
+  // BAU Initiative: Calculate effort from tasks
+  const isBAU = formData.initiativeType === InitiativeType.BAU;
+  const taskEstimatedEffortSum = tasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
+  const taskActualEffortSum = tasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
+  
+  // Update formData.estimatedEffort and actualEffort when tasks change (if not overridden)
+  useEffect(() => {
+    if (isBAU && !effortOverride && tasks.length > 0) {
+      setFormData(prev => ({ 
+        ...prev, 
+        estimatedEffort: taskEstimatedEffortSum,
+        actualEffort: taskActualEffortSum
+      }));
+    }
+  }, [tasks, taskEstimatedEffortSum, taskActualEffortSum, isBAU, effortOverride]);
+
   // Progress indicator for required fields
-  const requiredFieldsCount = 5; // title, owner, eta, quarter, effort
+  const requiredFieldsCount = isBAU ? 5 : 6; // BAU doesn't require definitionOfDone
   const filledRequiredFields = [
     formData.title,
     formData.ownerId,
     formData.eta,
     formData.quarter,
-    formData.estimatedEffort !== undefined && formData.estimatedEffort >= 0
+    formData.estimatedEffort !== undefined && formData.estimatedEffort >= 0,
+    !isBAU && formData.definitionOfDone && formData.definitionOfDone.trim()
   ].filter(Boolean).length;
   const progressPercent = (filledRequiredFields / requiredFieldsCount) * 100;
 
@@ -286,7 +354,25 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   };
 
   const handleChange = (field: keyof Initiative, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // When switching initiative type, handle tasks
+      if (field === 'initiativeType') {
+        if (value === InitiativeType.WP) {
+          // Converting BAU to WP: remove tasks, keep effort
+          updated.tasks = undefined;
+          setTasks([]);
+        } else if (value === InitiativeType.BAU) {
+          // Converting WP to BAU: initialize empty tasks array
+          updated.tasks = [];
+          setTasks([]);
+          setEffortOverride(false);
+        }
+      }
+      
+      return updated;
+    });
     if (errors[field]) {
       setErrors(prev => {
         const newErr = { ...prev };
@@ -324,12 +410,24 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
+    const isBAU = formData.initiativeType === InitiativeType.BAU;
 
     if (!formData.title) newErrors.title = "Title is required";
     if (!formData.ownerId) newErrors.ownerId = "Primary Owner is required";
     if (!formData.eta) newErrors.eta = "ETA is required";
     if (!formData.quarter) newErrors.quarter = "Quarter is required";
-    if (formData.estimatedEffort === undefined || formData.estimatedEffort < 0) newErrors.estimatedEffort = "Valid effort required";
+    // For BAU, effort comes from tasks; for WP, effort is required
+    if (!isBAU && (formData.estimatedEffort === undefined || formData.estimatedEffort < 0)) {
+      newErrors.estimatedEffort = "Valid effort required";
+    }
+    if (formData.estimatedEffort !== undefined && formData.estimatedEffort < 0) {
+      newErrors.estimatedEffort = "Effort must be non-negative";
+    }
+    
+    // Definition of Done only required for WP initiatives
+    if (!isBAU && (!formData.definitionOfDone || !formData.definitionOfDone.trim())) {
+      newErrors.definitionOfDone = "Definition of Done is required";
+    }
     
     if (formData.workType === WorkType.Unplanned) {
       if (!formData.unplannedTags || formData.unplannedTags.length === 0) {
@@ -342,6 +440,25 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       newErrors.riskActionLog = "Risk/Action documentation is MANDATORY for At Risk items.";
     }
 
+    // BAU initiative validation: validate tasks if they exist
+    if (isBAU && tasks && tasks.length > 0) {
+      // Validate each task
+      tasks.forEach((task, index) => {
+        if (task.estimatedEffort === undefined || task.estimatedEffort < 0) {
+          newErrors[`task_${task.id}_estimatedEffort`] = `Task ${index + 1}: Planned effort is required`;
+        }
+        if (task.actualEffort === undefined || task.actualEffort < 0) {
+          newErrors[`task_${task.id}_actualEffort`] = `Task ${index + 1}: Actual effort must be non-negative`;
+        }
+        if (!task.eta) {
+          newErrors[`task_${task.id}_eta`] = `Task ${index + 1}: ETA is required`;
+        }
+        if (!task.ownerId) {
+          newErrors[`task_${task.id}_owner`] = `Task ${index + 1}: Owner is required`;
+        }
+      });
+    }
+
     if (enableTradeOff) {
       if (!tradeOffData.targetInitiativeId) newErrors.tradeOffTarget = "Select an initiative to trade-off";
       if (!tradeOffData.newValue) newErrors.tradeOffValue = "Define the new value";
@@ -350,7 +467,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     setErrors(newErrors);
     
     // Auto-expand sections with errors
-    if (newErrors.title || newErrors.ownerId || newErrors.quarter) {
+    if (newErrors.title || newErrors.ownerId || newErrors.quarter || newErrors.definitionOfDone) {
       setExpandedSections(prev => ({ ...prev, core: true }));
     }
     if (newErrors.estimatedEffort || newErrors.eta) {
@@ -358,6 +475,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     }
     if (newErrors.riskActionLog) {
       setExpandedSections(prev => ({ ...prev, risk: true }));
+    }
+    if (newErrors.tasks || Object.keys(newErrors).some(k => k.startsWith('task_'))) {
+      setExpandedSections(prev => ({ ...prev, tasks: true }));
+    }
+    if (newErrors.estimatedEffort || newErrors.actualEffort) {
+      setExpandedSections(prev => ({ ...prev, effort: true }));
     }
     
     return Object.keys(newErrors).length === 0;
@@ -368,13 +491,22 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (validate()) {
       const now = new Date().toISOString().split('T')[0];
       const isNew = !formData.id;
+      const isBAU = formData.initiativeType === InitiativeType.BAU;
       
       const payload = {
         ...formData,
         lastUpdated: now,
-        id: formData.id || generateId(),
-        originalEstimatedEffort: isNew ? formData.estimatedEffort : formData.originalEstimatedEffort,
-        originalEta: isNew ? formData.eta : formData.originalEta,
+        id: formData.id || generateInitiativeId(formData.quarter, allInitiatives),
+        // Set originalEstimatedEffort only when creating new or when it changes
+        originalEstimatedEffort: isNew ? (formData.estimatedEffort || 0) : formData.originalEstimatedEffort,
+        originalEta: isNew ? (formData.eta || '') : formData.originalEta,
+        // Include tasks for BAU initiatives
+        tasks: isBAU ? tasks : undefined,
+        // Ensure initiativeType is set (required field)
+        initiativeType: formData.initiativeType || InitiativeType.WP,
+        // Ensure effort fields have defaults
+        estimatedEffort: formData.estimatedEffort || 0,
+        actualEffort: formData.actualEffort || 0,
       } as Initiative;
       
       const tradeOffAction = enableTradeOff && tradeOffData.targetInitiativeId && tradeOffData.newValue
@@ -469,10 +601,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (!validateBulkRows()) return;
 
     const now = new Date().toISOString().split('T')[0];
+    
+    // Track generated initiatives to ensure unique sequential IDs
+    const generatedInitiatives: Initiative[] = [...allInitiatives];
 
     bulkRows.forEach(row => {
       const initiative: Initiative = {
-        id: generateId(),
+        id: generateInitiativeId(bulkSharedSettings.quarter, generatedInitiatives),
         title: row.title,
         ownerId: row.ownerId,
         secondaryOwner: row.secondaryOwner || undefined,
@@ -482,18 +617,20 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         originalEta: row.eta,
         estimatedEffort: row.estimatedEffort,
         originalEstimatedEffort: row.estimatedEffort,
-        actualEffort: 0,
-        completionRate: 0,
+        initiativeType: InitiativeType.WP, // Bulk mode defaults to WP
         quarter: bulkSharedSettings.quarter,
         l1_assetClass: bulkSharedSettings.l1_assetClass,
         l2_pillar: row.l2_pillar,
         l3_responsibility: row.l3_responsibility,
         l4_target: row.l4_target,
-        workType: bulkSharedSettings.workType,
+        workType: WorkType.Planned, // Default to Planned
         lastUpdated: now,
         comments: [],
         history: []
       };
+
+      // Add to generated list for next iteration
+      generatedInitiatives.push(initiative);
 
       // Build trade-off action if enabled for this row
       const tradeOffAction: TradeOffAction | undefined = 
@@ -522,6 +659,50 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       l3_responsibility: defaultResp
     })));
   }, [bulkSharedSettings.l1_assetClass]);
+
+  // ============================================================================
+  // HANDLERS - TASK MANAGEMENT (BAU)
+  // ============================================================================
+
+  const createEmptyTask = useCallback((): Task => {
+    return {
+      id: generateId(),
+      estimatedEffort: 0,
+      actualEffort: 0,
+      eta: '',
+      ownerId: formData.ownerId || '',
+      status: Status.NotStarted,
+      tags: [],
+      comments: []
+    };
+  }, [formData.ownerId]);
+
+  const addTask = () => {
+    setTasks(prev => [...prev, createEmptyTask()]);
+    setExpandedSections(prev => ({ ...prev, tasks: true }));
+  };
+
+  const updateTask = (taskId: string, field: keyof Task, value: any) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, [field]: value } : task
+    ));
+  };
+
+  const deleteTask = (taskId: string) => {
+    setTasks(prev => prev.filter(task => task.id !== taskId));
+  };
+
+  const duplicateTask = (taskId: string) => {
+    const taskToDuplicate = tasks.find(t => t.id === taskId);
+    if (taskToDuplicate) {
+      const newTask: Task = {
+        ...taskToDuplicate,
+        id: generateId(),
+        title: taskToDuplicate.title ? `${taskToDuplicate.title} (copy)` : undefined
+      };
+      setTasks(prev => [...prev, newTask]);
+    }
+  };
 
   // ============================================================================
   // HANDLERS - COMMENTS
@@ -672,7 +853,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       setCopyFeedback(platform);
       setTimeout(() => {
         setCopyFeedback(null);
-        setShowShareMenu(false);
+        setShowActionsMenu(false);
       }, 1500);
     } catch (err) {
       console.error('Failed to copy', err);
@@ -712,9 +893,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
             <div>
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 {isEditMode ? 'Edit Initiative' : 'New Initiative'}
+                {isEditMode && formData.id && (
+                  <span className="px-2 py-1 bg-slate-700 text-slate-200 text-xs font-mono font-semibold rounded">
+                    {formData.id}
+                  </span>
+                )}
               </h2>
               {isReadOnly && (
-                <span className="text-xs font-bold text-red-400 uppercase tracking-wider">Read Only</span>
+                <span className="text-xs font-bold text-red-400 tracking-wider">Read only</span>
               )}
             </div>
             
@@ -749,36 +935,63 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
           
           <div className="flex items-center gap-2">
             {mode === 'single' && (
-              <div className="relative">
+              <div className="relative" ref={actionsMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setShowShareMenu(!showShareMenu)}
+                  onClick={() => setShowActionsMenu(!showActionsMenu)}
                   className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-                  title="Share / Export"
+                  title="Actions"
                 >
-                  <Share2 size={18} />
+                  <MoreVertical size={18} />
                 </button>
 
-                {showShareMenu && (
+                {showActionsMenu && (
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
-                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase">
-                      Export To Clipboard
+                    {/* Share/Export Section */}
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
+                      Export to clipboard
                     </div>
                     <button
-                      onClick={() => handleCopy('slack')}
+                      onClick={() => {
+                        handleCopy('slack');
+                        setShowActionsMenu(false);
+                      }}
                       className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between group"
                     >
-                      <span>Copy for Slack</span>
+                      <div className="flex items-center gap-2">
+                        <Share2 size={16} className="text-slate-400" />
+                        <span>Copy for Slack</span>
+                      </div>
                       {copyFeedback === 'slack' ? <Check size={16} className="text-emerald-600"/> : <Copy size={16} className="text-slate-400 group-hover:text-slate-600"/>}
                     </button>
                     <div className="border-t border-slate-100"></div>
                     <button
-                      onClick={() => handleCopy('notion')}
+                      onClick={() => {
+                        handleCopy('notion');
+                        setShowActionsMenu(false);
+                      }}
                       className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between group"
                     >
-                      <span>Copy for Notion</span>
+                      <div className="flex items-center gap-2">
+                        <Share2 size={16} className="text-slate-400" />
+                        <span>Copy for Notion</span>
+                      </div>
                       {copyFeedback === 'notion' ? <Check size={16} className="text-emerald-600"/> : <Copy size={16} className="text-slate-400 group-hover:text-slate-600"/>}
                     </button>
+                    
+                    {/* Delete Section - Only show if user can delete and in edit mode */}
+                    {isEditMode && canDelete() && onDelete && (
+                      <>
+                        <div className="border-t border-slate-200 my-1"></div>
+                        <button
+                          onClick={handleDelete}
+                          className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 group"
+                        >
+                          <Trash2 size={16} className="text-red-600" />
+                          <span>Delete Initiative</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -876,7 +1089,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 onToggle={() => toggleSection('core')}
                 accentColor="blue"
                 badge={
-                  (errors.title || errors.ownerId || errors.quarter) && (
+                  (errors.title || errors.ownerId || errors.quarter || errors.definitionOfDone) && (
                     <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-bold rounded-full">
                       Required
                     </span>
@@ -902,6 +1115,36 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       />
                     </div>
                   </div>
+
+                  {/* Row 1.5: Initiative Type (only when creating new) */}
+                  {!isEditMode && (
+                    <div className="grid grid-cols-[120px_1fr] border-b border-slate-200">
+                      <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center">
+                        Type
+                      </div>
+                      <div className="bg-white">
+                        <select 
+                          disabled={isReadOnly}
+                          value={formData.initiativeType || InitiativeType.WP} 
+                          onChange={(e) => handleChange('initiativeType', e.target.value as InitiativeType)}
+                          className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
+                        >
+                          <option value={InitiativeType.WP}>WP (Work Plan)</option>
+                          <option value={InitiativeType.BAU}>BAU (Business As Usual)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* BAU Buffer Notice */}
+                  {isBAU && (
+                    <div className="bg-purple-50 border-b border-purple-200 px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm text-purple-800">
+                        <AlertTriangle size={14} />
+                        <span className="font-medium">All effort allocated to buffer</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Row 2: Owner | Secondary Owner */}
                   <div className="grid grid-cols-[120px_1fr_120px_1fr] border-b border-slate-200">
@@ -968,12 +1211,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Row 4: Quarter | Work Type */}
-                  <div className={`grid grid-cols-[120px_1fr_120px_1fr] ${formData.workType === WorkType.Unplanned ? 'border-b border-slate-200' : ''}`}>
+                  {/* Row 4: Quarter */}
+                  <div className="grid grid-cols-[120px_1fr] border-b border-slate-200">
                     <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center">
                       Quarter <span className="text-red-500 ml-0.5">*</span>
                     </div>
-                    <div className="bg-white border-r border-slate-200">
+                    <div className="bg-white">
                       <select 
                         disabled={isReadOnly}
                         value={formData.quarter || ''} 
@@ -986,20 +1229,28 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
                       </select>
                     </div>
-                    <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center">
-                      Work Type
-                    </div>
-                    <div className="bg-white">
-                      <select 
-                        disabled={isReadOnly} 
-                        value={formData.workType} 
-                        onChange={(e) => handleChange('workType', e.target.value)}
-                        className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
-                      >
-                        {Object.values(WorkType).map(w => <option key={w} value={w}>{w}</option>)}
-                      </select>
-                    </div>
                   </div>
+
+                  {/* Row 5: Definition of Done (not required for BAU) */}
+                  {!isBAU && (
+                    <div className={`grid grid-cols-[120px_1fr] ${formData.workType === WorkType.Unplanned ? 'border-b border-slate-200' : ''}`}>
+                      <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-start pt-3">
+                        Definition of Done <span className="text-red-500 ml-0.5">*</span>
+                      </div>
+                      <div className="bg-white">
+                        <textarea
+                          disabled={isReadOnly}
+                          value={formData.definitionOfDone || ''}
+                          onChange={(e) => handleChange('definitionOfDone', e.target.value)}
+                          placeholder="Enter the definition of done criteria..."
+                          rows={3}
+                          className={`w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50 resize-none ${
+                            errors.definitionOfDone ? 'bg-red-50' : ''
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Conditional: Unplanned Tags */}
                   {formData.workType === WorkType.Unplanned && (
@@ -1008,7 +1259,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         Tags <span className="text-red-500 ml-0.5">*</span>
                       </div>
                       <div className="px-3 py-2 flex items-center gap-4">
-                        {[UnplannedTag.RiskItem, UnplannedTag.PMItem].map(tag => (
+                        {[UnplannedTag.Unplanned, UnplannedTag.RiskItem, UnplannedTag.PMItem].map(tag => (
                           <label key={tag} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                             <input 
                               type="checkbox"
@@ -1232,78 +1483,176 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   )
                 }
               >
-                <div className="border border-slate-300 rounded-md overflow-hidden text-sm">
-                  {/* Single Row: Planned | Actual | Complete | ETA | (Original if edit) */}
-                  <div className={`grid ${isEditMode && formData.originalEstimatedEffort !== undefined ? 'grid-cols-[80px_1fr_80px_1fr_80px_80px_80px_1fr_80px_1fr]' : 'grid-cols-[80px_1fr_80px_1fr_80px_80px_80px_1fr]'}`}>
-                    <div className="bg-slate-100 px-2 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center text-xs">
-                      Planned<span className="text-red-500 ml-0.5">*</span>
+                <div className="space-y-4">
+                  {/* BAU: Effort calculation info */}
+                  {isBAU && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-purple-700 font-medium">
+                          Planned from tasks: <span className="font-mono font-bold">{taskEstimatedEffortSum.toFixed(1)}w</span>
+                        </span>
+                        <label className="flex items-center gap-2 text-sm text-purple-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={effortOverride}
+                            onChange={(e) => {
+                              setEffortOverride(e.target.checked);
+                              if (!e.target.checked) {
+                                setFormData(prev => ({ 
+                                  ...prev, 
+                                  estimatedEffort: taskEstimatedEffortSum,
+                                  actualEffort: taskActualEffortSum
+                                }));
+                              }
+                            }}
+                            className="rounded text-purple-600 focus:ring-purple-500"
+                          />
+                          <span>Override</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-purple-700 font-medium">
+                          Actual from tasks: <span className="font-mono font-bold">{taskActualEffortSum.toFixed(1)}w</span>
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-white border-r border-slate-200">
-                      <input 
-                        disabled={isReadOnly}
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={formData.estimatedEffort}
-                        onChange={(e) => handleChange('estimatedEffort', parseFloat(e.target.value))}
-                        className={`w-full px-2 py-2 text-sm focus:outline-none focus:bg-blue-50 font-mono ${
-                          errors.estimatedEffort ? 'bg-red-50' : ''
-                        }`}
-                      />
+                  )}
+                  
+                  {/* Effort Fields - 2 Column Layout */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Planned Effort */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Planned Effort (weeks) <span className="text-red-500">*</span>
+                      </label>
+                      {isBAU && !effortOverride ? (
+                        <div className="px-4 py-2.5 text-base font-mono text-slate-700 bg-slate-100 border border-slate-300 rounded-lg">
+                          {taskEstimatedEffortSum.toFixed(1)}w
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleChange('estimatedEffort', Math.max(0, (formData.estimatedEffort || 0) - 0.25))}
+                            disabled={isReadOnly || (isBAU && !effortOverride)}
+                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Decrease by 0.25"
+                          >
+                            <ArrowDown size={16} />
+                          </button>
+                          <input 
+                            disabled={isReadOnly || (isBAU && !effortOverride)}
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={formData.estimatedEffort || 0}
+                            onChange={(e) => handleChange('estimatedEffort', parseFloat(e.target.value) || 0)}
+                            className={`flex-1 px-4 py-2.5 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                              errors.estimatedEffort ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
+                            }`}
+                            placeholder="0.0"
+                          />
+                          <button
+                            onClick={() => handleChange('estimatedEffort', (formData.estimatedEffort || 0) + 0.25)}
+                            disabled={isReadOnly || (isBAU && !effortOverride)}
+                            className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Increase by 0.25"
+                          >
+                            <ArrowUp size={16} />
+                          </button>
+                        </div>
+                      )}
+                      {errors.estimatedEffort && (
+                        <p className="text-red-600 text-xs mt-1">{errors.estimatedEffort}</p>
+                      )}
                     </div>
-                    <div className="bg-slate-100 px-2 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center text-xs">
-                      Actual
+
+                    {/* Actual Effort */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Actual Effort (weeks)
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleChange('actualEffort', Math.max(0, (formData.actualEffort || 0) - 0.25))}
+                          disabled={isReadOnly}
+                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Decrease by 0.25"
+                        >
+                          <ArrowDown size={16} />
+                        </button>
+                        <input 
+                          disabled={isReadOnly}
+                          type="number"
+                          min="0"
+                          step="0.25"
+                          value={formData.actualEffort || 0}
+                          onChange={(e) => handleChange('actualEffort', parseFloat(e.target.value) || 0)}
+                          className="flex-1 px-4 py-2.5 text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0.0"
+                        />
+                        <button
+                          onClick={() => handleChange('actualEffort', (formData.actualEffort || 0) + 0.25)}
+                          disabled={isReadOnly}
+                          className="p-1.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Increase by 0.25"
+                        >
+                          <ArrowUp size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="bg-white border-r border-slate-200">
-                      <input 
-                        disabled={isReadOnly}
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={formData.actualEffort}
-                        onChange={(e) => handleChange('actualEffort', parseFloat(e.target.value))}
-                        className="w-full px-2 py-2 text-sm focus:outline-none focus:bg-blue-50 font-mono"
-                      />
+                  </div>
+
+                  {/* Completion & ETA - 2 Column Layout */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Completion Rate */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        Completion Rate
+                      </label>
+                      <div className="px-4 py-2.5 text-base font-mono text-slate-700 bg-slate-50 border border-slate-300 rounded-lg">
+                        {(() => {
+                          const actual = formData.actualEffort || 0;
+                          const estimated = formData.estimatedEffort || 0;
+                          return estimated > 0 ? Math.min(100, Math.round((actual / estimated) * 100)) : 0;
+                        })()}%
+                      </div>
                     </div>
-                    <div className="bg-slate-100 px-2 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center text-xs">
-                      Done %
-                    </div>
-                    <div className="bg-white border-r border-slate-200 flex items-center px-2">
-                      <input 
-                        disabled={isReadOnly}
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formData.completionRate ?? 0}
-                        onChange={(e) => handleChange('completionRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                        className="w-full px-1 py-1 text-sm focus:outline-none focus:bg-blue-50 font-mono text-center"
-                      />
-                    </div>
-                    <div className="bg-slate-100 px-2 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center text-xs">
-                      ETA<span className="text-red-500 ml-0.5">*</span>
-                    </div>
-                    <div className={`bg-white ${isEditMode && formData.originalEstimatedEffort !== undefined ? 'border-r border-slate-200' : ''}`}>
+
+                    {/* ETA */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        ETA <span className="text-red-500">*</span>
+                      </label>
                       <input 
                         disabled={isReadOnly}
                         type="date"
-                        value={formData.eta}
+                        value={formData.eta || ''}
                         onChange={(e) => handleChange('eta', e.target.value)}
-                        className={`w-full px-2 py-2 text-sm focus:outline-none focus:bg-blue-50 font-mono ${
-                          errors.eta ? 'bg-red-50' : ''
+                        className={`w-full px-4 py-2.5 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.eta ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
                         }`}
                       />
+                      {errors.eta && (
+                        <p className="text-red-600 text-xs mt-1">{errors.eta}</p>
+                      )}
                     </div>
-                    {isEditMode && formData.originalEstimatedEffort !== undefined && (
-                      <>
-                        <div className="bg-slate-100 px-2 py-2 font-medium text-slate-500 border-r border-slate-200 flex items-center text-xs">
-                          Original
-                        </div>
-                        <div className="bg-slate-50 px-2 py-2 text-slate-600 font-mono text-sm flex items-center">
-                          {formData.originalEstimatedEffort}w
-                        </div>
-                      </>
-                    )}
                   </div>
+
+                  {/* Original Values (if editing) */}
+                  {isEditMode && formData.originalEstimatedEffort !== undefined && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <div className="flex items-center gap-4 text-sm text-slate-500">
+                        <span>
+                          <span className="font-medium">Original Effort:</span> <span className="font-mono">{formData.originalEstimatedEffort}w</span>
+                        </span>
+                        {formData.originalEta && (
+                          <span>
+                            <span className="font-medium">Original ETA:</span> <span className="font-mono">{new Date(formData.originalEta).toLocaleDateString()}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </AccordionSection>
 
@@ -1454,6 +1803,323 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   {errors.tradeOffValue && <p className="text-red-500 text-xs mt-1">{errors.tradeOffValue}</p>}
                 </AccordionSection>
               )}
+
+              {/* ============================================ */}
+              {/* TASKS SECTION - BAU ONLY */}
+              {/* ============================================ */}
+              {isBAU && (
+                <AccordionSection
+                  title="Tasks"
+                  icon={<Layers size={16} />}
+                  isExpanded={expandedSections.tasks}
+                  onToggle={() => toggleSection('tasks')}
+                  accentColor="purple"
+                  badge={
+                    tasks.length > 0 && (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-600 text-xs font-bold rounded-full">
+                        {tasks.length}
+                      </span>
+                    )
+                  }
+                >
+                  <div className="space-y-3">
+                    {errors.tasks && (
+                      <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 text-sm text-red-600">
+                        {errors.tasks}
+                      </div>
+                    )}
+                    
+                    {/* Task List */}
+                    <div className="space-y-2">
+                      {tasks.map((task, index) => (
+                        <div key={task.id} className="border border-slate-300 rounded-lg overflow-hidden">
+                          {/* Task Header - Collapsible */}
+                          <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExpandedTasks(prev => {
+                                    const newSet = new Set(prev);
+                                    if (newSet.has(task.id)) {
+                                      newSet.delete(task.id);
+                                    } else {
+                                      newSet.add(task.id);
+                                    }
+                                    return newSet;
+                                  });
+                                }}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                {expandedTasks.has(task.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                              </button>
+                              <span className="text-sm font-medium text-slate-700">
+                                {task.title || `Task ${index + 1}`}
+                              </span>
+                              <span className="text-xs text-slate-500 font-mono">
+                                {task.estimatedEffort || 0}w / {task.actualEffort || 0}w
+                              </span>
+                              {task.tags && task.tags.length > 0 && (
+                                <div className="flex gap-1">
+                                  {task.tags.map(tag => (
+                                    <span key={tag} className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => duplicateTask(task.id)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+                                title="Duplicate task"
+                              >
+                                <Copy size={16} />
+                              </button>
+                              {tasks.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteTask(task.id)}
+                                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete task"
+                                >
+                                  <X size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Task Details */}
+                          {expandedTasks.has(task.id) && (
+                            <div className="bg-white p-4 space-y-4">
+                              {/* Delete button at top of expanded section */}
+                              {tasks.length > 1 && (
+                                <div className="flex justify-end pb-3 border-b border-slate-200">
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteTask(task.id)}
+                                    className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-md transition-colors flex items-center gap-1.5"
+                                  >
+                                    <X size={14} />
+                                    Delete Task
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {/* Task Title */}
+                              <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Task Title (optional)</label>
+                                <input
+                                  type="text"
+                                  value={task.title || ''}
+                                  onChange={(e) => updateTask(task.id, 'title', e.target.value || undefined)}
+                                  placeholder={`Task ${index + 1}`}
+                                  className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                />
+                              </div>
+                              
+                              {/* Effort (Actual/Planned) | ETA | Owner | Status */}
+                              <div className="grid grid-cols-4 gap-2">
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                                    Effort (Actual/Planned) <span className="text-red-500">*</span>
+                                  </label>
+                                  <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-0.5">
+                                      <button
+                                        onClick={() => updateTask(task.id, 'actualEffort', Math.max(0, (task.actualEffort || 0) - 0.25))}
+                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                        title="Decrease by 0.25"
+                                      >
+                                        <ArrowDown size={12} />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.25"
+                                        value={task.actualEffort || 0}
+                                        onChange={(e) => updateTask(task.id, 'actualEffort', parseFloat(e.target.value) || 0)}
+                                        className={`w-16 px-2 py-1.5 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                          errors[`task_${task.id}_actualEffort`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                                        }`}
+                                        placeholder="0"
+                                      />
+                                      <button
+                                        onClick={() => updateTask(task.id, 'actualEffort', (task.actualEffort || 0) + 0.25)}
+                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                        title="Increase by 0.25"
+                                      >
+                                        <ArrowUp size={12} />
+                                      </button>
+                                    </div>
+                                    <span className="text-slate-300 text-sm font-medium">/</span>
+                                    <div className="flex items-center gap-0.5">
+                                      <button
+                                        onClick={() => updateTask(task.id, 'estimatedEffort', Math.max(0, (task.estimatedEffort || 0) - 0.25))}
+                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                        title="Decrease by 0.25"
+                                      >
+                                        <ArrowDown size={12} />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.25"
+                                        value={task.estimatedEffort || 0}
+                                        onChange={(e) => updateTask(task.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                                        className={`w-16 px-2 py-1.5 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                          errors[`task_${task.id}_estimatedEffort`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                                        }`}
+                                        placeholder="0"
+                                      />
+                                      <button
+                                        onClick={() => updateTask(task.id, 'estimatedEffort', (task.estimatedEffort || 0) + 0.25)}
+                                        className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                        title="Increase by 0.25"
+                                      >
+                                        <ArrowUp size={12} />
+                                      </button>
+                                    </div>
+                                    <span className="text-xs text-slate-400">w</span>
+                                  </div>
+                                  {(errors[`task_${task.id}_estimatedEffort`] || errors[`task_${task.id}_actualEffort`]) && (
+                                    <p className="text-red-500 text-xs mt-0.5">
+                                      {errors[`task_${task.id}_estimatedEffort`] || errors[`task_${task.id}_actualEffort`]}
+                                    </p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                                    ETA <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="date"
+                                    value={task.eta || ''}
+                                    onChange={(e) => updateTask(task.id, 'eta', e.target.value)}
+                                    className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 ${
+                                      errors[`task_${task.id}_eta`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                                    }`}
+                                  />
+                                  {errors[`task_${task.id}_eta`] && (
+                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_eta`]}</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                                    Owner <span className="text-red-500">*</span>
+                                  </label>
+                                  <select
+                                    value={task.ownerId}
+                                    onChange={(e) => updateTask(task.id, 'ownerId', e.target.value)}
+                                    className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 ${
+                                      errors[`task_${task.id}_owner`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                                    }`}
+                                  >
+                                    <option value="">Select...</option>
+                                    {users.filter(u => u.role === Role.TeamLead).map(u => (
+                                      <option key={u.id} value={u.id}>{u.name}</option>
+                                    ))}
+                                  </select>
+                                  {errors[`task_${task.id}_owner`] && (
+                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_owner`]}</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                                    Status
+                                  </label>
+                                  <select
+                                    value={task.status}
+                                    onChange={(e) => updateTask(task.id, 'status', e.target.value)}
+                                    className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                  >
+                                    {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              
+                              {/* Tags */}
+                              <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Tags</label>
+                                <div className="flex gap-3">
+                                  {[UnplannedTag.Unplanned, UnplannedTag.RiskItem, UnplannedTag.PMItem].map(tag => (
+                                    <label key={tag} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={task.tags?.includes(tag) || false}
+                                        onChange={(e) => {
+                                          const currentTags = task.tags || [];
+                                          const newTags = e.target.checked
+                                            ? [...currentTags, tag]
+                                            : currentTags.filter(t => t !== tag);
+                                          updateTask(task.id, 'tags', newTags);
+                                        }}
+                                        className="rounded text-purple-600 focus:ring-purple-500"
+                                      />
+                                      <span>{tag}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              {/* Task Comments */}
+                              <div>
+                                <label className="block text-xs font-medium text-slate-600 mb-1">Comments</label>
+                                <div className="space-y-2 max-h-32 overflow-y-auto">
+                                  {(task.comments || []).map(comment => {
+                                    const author = users.find(u => u.id === comment.authorId);
+                                    return (
+                                      <div key={comment.id} className="bg-slate-50 p-2 rounded text-xs">
+                                        <div className="flex justify-between mb-1">
+                                          <span className="font-medium text-slate-700">{author?.name || 'Unknown'}</span>
+                                          <span className="text-slate-400">{new Date(comment.timestamp).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-slate-600">{comment.text}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div className="mt-2 flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Add comment..."
+                                    className="flex-1 px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                        const newComment = {
+                                          id: generateId(),
+                                          text: e.currentTarget.value,
+                                          authorId: currentUser.id,
+                                          timestamp: new Date().toISOString()
+                                        };
+                                        const updatedComments = [...(task.comments || []), newComment];
+                                        updateTask(task.id, 'comments', updatedComments);
+                                        e.currentTarget.value = '';
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Add Task Button */}
+                    <button
+                      type="button"
+                      onClick={addTask}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                    >
+                      <Plus size={16} />
+                      Add Task
+                    </button>
+                  </div>
+                </AccordionSection>
+              )}
             </form>
           </div>
         )}
@@ -1556,7 +2222,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   {showMentionDropdown && filteredMentionUsers.length > 0 && (
                     <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
                       <div className="px-3 py-2 bg-slate-50 border-b border-slate-100">
-                        <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Mention someone</span>
+                        <span className="text-xs text-slate-500 font-medium tracking-wider">Mention someone</span>
                       </div>
                       {filteredMentionUsers.map((user, index) => (
                         <button
@@ -1645,7 +2311,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <Users size={16} className="text-slate-500" />
                 <span className="text-sm font-semibold text-slate-700">Shared Settings (applies to all)</span>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Quarter</label>
                   <select
@@ -1666,16 +2332,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {Object.values(AssetClass).map(ac => <option key={ac} value={ac}>{ac}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Work Type</label>
-                  <select
-                    value={bulkSharedSettings.workType}
-                    onChange={(e) => setBulkSharedSettings(prev => ({ ...prev, workType: e.target.value as WorkType }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Object.values(WorkType).map(w => <option key={w} value={w}>{w}</option>)}
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -1684,7 +2340,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 {/* Table Header */}
                 <div className="bg-slate-100 border-b border-slate-200">
-                  <div className="grid grid-cols-[2fr_120px_70px_90px_110px_70px_50px] gap-2 px-3 py-2 text-xs font-semibold text-slate-600 uppercase">
+                  <div className="grid grid-cols-[2fr_120px_70px_90px_110px_70px_50px] gap-2 px-3 py-2 text-xs font-semibold text-slate-600">
                     <div>Title *</div>
                     <div>Owner *</div>
                     <div>Priority</div>
@@ -1747,7 +2403,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         <div>
                           <input
                             type="date"
-                            value={row.eta}
+                            value={row.eta || ''}
                             onChange={(e) => handleBulkRowChange(row.id, 'eta', e.target.value)}
                             className={`w-full rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                               bulkErrors[row.id]?.eta ? 'border-red-500 bg-red-50' : 'border-slate-200'
@@ -1755,16 +2411,32 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           />
                         </div>
                         <div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={row.estimatedEffort}
-                            onChange={(e) => handleBulkRowChange(row.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
-                            className={`w-full rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              bulkErrors[row.id]?.estimatedEffort ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                            }`}
-                          />
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleBulkRowChange(row.id, 'estimatedEffort', Math.max(0, row.estimatedEffort - 0.25))}
+                              className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
+                              title="Decrease by 0.25"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.25"
+                              value={row.estimatedEffort}
+                              onChange={(e) => handleBulkRowChange(row.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                              className={`flex-1 rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                bulkErrors[row.id]?.estimatedEffort ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                              }`}
+                            />
+                            <button
+                              onClick={() => handleBulkRowChange(row.id, 'estimatedEffort', row.estimatedEffort + 0.25)}
+                              className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
+                              title="Increase by 0.25"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                          </div>
                         </div>
                         <div className="flex items-center gap-1">
                           {/* Trade-off indicator badge */}
@@ -1919,7 +2591,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                   {row.tradeOffField === 'eta' ? (
                                     <input
                                       type="date"
-                                      value={row.tradeOffValue}
+                                      value={row.tradeOffValue || ''}
                                       onChange={(e) => handleBulkRowChange(row.id, 'tradeOffValue', e.target.value)}
                                       className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     />

@@ -1,14 +1,13 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Layers } from 'lucide-react';
-import { Initiative, User, Status, Priority, WorkType, AppConfig, AssetClass, Comment, UserCommentReadState } from '../../types';
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Layers, Plus, X, Trash2 } from 'lucide-react';
+import { Initiative, User, Status, Priority, WorkType, AppConfig, AssetClass, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
-import { getOwnerName, checkOutdated } from '../../utils';
-import { QUARTERS } from '../../constants';
-import { useEdgeScrolling } from '../../hooks';
+import { getOwnerName, checkOutdated, calculateCompletionRate, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
+  allInitiatives?: Initiative[]; // All initiatives for trade-off dropdown (unfiltered)
   handleInlineUpdate: (id: string, field: keyof Initiative, value: any) => void;
   setEditingItem: (item: Initiative) => void;
   setIsModalOpen: (isOpen: boolean) => void;
@@ -17,11 +16,14 @@ interface TaskTableProps {
   users: User[];
   currentUser: User;
   config: AppConfig;
-  viewMode?: 'flat' | 'grouped';
+  viewMode?: 'flat';
   // Comment popover props
   commentReadState?: UserCommentReadState;
   onAddComment?: (initiativeId: string, comment: Comment) => void;
   onMarkCommentRead?: (initiativeId: string) => void;
+  onDeleteInitiative?: (id: string) => void;
+  // At Risk reason modal props
+  onOpenAtRiskModal?: (initiative: Initiative) => void;
 }
 
 interface GroupedInitiatives {
@@ -32,6 +34,7 @@ interface GroupedInitiatives {
 
 export const TaskTable: React.FC<TaskTableProps> = ({
   filteredInitiatives,
+  allInitiatives,
   handleInlineUpdate,
   setEditingItem,
   setIsModalOpen,
@@ -43,21 +46,49 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   viewMode = 'flat',
   commentReadState = {},
   onAddComment,
-  onMarkCommentRead
+  onMarkCommentRead,
+  onDeleteInitiative,
+  onOpenAtRiskModal
 }) => {
+  // Use allInitiatives if provided, otherwise fall back to filteredInitiatives
+  const allInitiativesList = allInitiatives || filteredInitiatives;
   // Ref for scrollable container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Enable edge scrolling for horizontal and vertical scrolling
-  useEdgeScrolling(scrollContainerRef, {
-    threshold: 50,
-    maxSpeed: 10,
-    horizontal: true,
-    vertical: true,
-  });
 
   // Track collapsed groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  
+  // Track expanded tasks for BAU initiatives
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  
+  // Track which initiatives are in "add task" mode
+  const [addingTaskFor, setAddingTaskFor] = useState<string | null>(null);
+  
+  // State for hover tooltip
+  const [hoveredAtRiskDot, setHoveredAtRiskDot] = useState<string | null>(null);
+  const [tooltipPositions, setTooltipPositions] = useState<Map<string, 'above' | 'below'>>(new Map());
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const atRiskButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  
+  // New task form state
+  const [newTaskForm, setNewTaskForm] = useState<Partial<Task> & { 
+    initiativeId?: string; 
+    tradeOffInitiativeId?: string;
+    tradeOffTaskId?: string;
+    tradeOffEta?: string;
+  }>({
+    title: '',
+    estimatedEffort: 1,
+    actualEffort: 0,
+    eta: '',
+    ownerId: '',
+    status: Status.NotStarted,
+    tags: [],
+    initiativeId: undefined,
+    tradeOffInitiativeId: undefined,
+    tradeOffTaskId: undefined,
+    tradeOffEta: undefined
+  });
 
   const toggleGroup = (groupKey: string) => {
     setCollapsedGroups(prev => {
@@ -70,15 +101,182 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       return newSet;
     });
   };
+  
+  const toggleTasks = (initiativeId: string) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(initiativeId)) {
+        newSet.delete(initiativeId);
+        setAddingTaskFor(null);
+      } else {
+        newSet.add(initiativeId);
+      }
+      return newSet;
+    });
+  };
+  
+  const handleAddTask = (defaultInitiativeId?: string) => {
+    // Use selected initiative or default to the one passed in
+    const targetInitiativeId = newTaskForm.initiativeId || defaultInitiativeId;
+    if (!targetInitiativeId) {
+      alert('Please select an initiative');
+      return;
+    }
+    
+    const initiative = filteredInitiatives.find(i => i.id === targetInitiativeId);
+    if (!initiative || initiative.initiativeType !== InitiativeType.BAU) {
+      alert('Selected initiative must be a BAU initiative');
+      return;
+    }
+    
+    if (!newTaskForm.eta || !newTaskForm.ownerId) {
+      alert('Please fill in all required fields (ETA and Owner)');
+      return;
+    }
+    
+    const newTask: Task = {
+      id: generateId(),
+      title: newTaskForm.title || undefined,
+      estimatedEffort: newTaskForm.estimatedEffort || 1,
+      actualEffort: newTaskForm.actualEffort || 0,
+      eta: newTaskForm.eta,
+      ownerId: newTaskForm.ownerId,
+      status: newTaskForm.status || Status.NotStarted,
+      tags: newTaskForm.tags || [],
+      comments: []
+    };
+    
+    const updatedTasks = [...(initiative.tasks || []), newTask];
+    const totalEstimatedEffort = updatedTasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
+    const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
+    
+    // Update both tasks and effort totals
+    handleInlineUpdate(targetInitiativeId, 'tasks', updatedTasks);
+    handleInlineUpdate(targetInitiativeId, 'estimatedEffort', totalEstimatedEffort);
+    handleInlineUpdate(targetInitiativeId, 'actualEffort', totalActualEffort);
+    
+    // Handle trade-off if specified
+    if (newTaskForm.tradeOffInitiativeId && newTaskForm.tradeOffEta) {
+      const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
+      if (tradeOffInitiative) {
+        // If task ID is provided, update task ETA
+        if (newTaskForm.tradeOffTaskId) {
+          if (tradeOffInitiative.initiativeType === InitiativeType.BAU && tradeOffInitiative.tasks && tradeOffInitiative.tasks.length > 0) {
+            const taskExists = tradeOffInitiative.tasks.some(t => t.id === newTaskForm.tradeOffTaskId);
+            if (taskExists) {
+              const updatedTradeOffTasks = tradeOffInitiative.tasks.map(task =>
+                task.id === newTaskForm.tradeOffTaskId
+                  ? { ...task, eta: newTaskForm.tradeOffEta! }
+                  : task
+              );
+              handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'tasks', updatedTradeOffTasks);
+            } else {
+              console.warn('Trade-off task not found:', newTaskForm.tradeOffTaskId);
+            }
+          } else {
+            console.warn('Trade-off initiative is not BAU or has no tasks:', newTaskForm.tradeOffInitiativeId);
+          }
+        } else {
+          // No task ID provided, update initiative ETA
+          handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'eta', newTaskForm.tradeOffEta);
+        }
+      } else {
+        console.warn('Trade-off initiative not found:', newTaskForm.tradeOffInitiativeId);
+      }
+    }
+    
+    // Reset form and close add mode
+    setNewTaskForm({
+      title: '',
+      estimatedEffort: 1,
+      actualEffort: 0,
+      eta: '',
+      ownerId: '',
+      status: Status.NotStarted,
+      tags: [],
+      initiativeId: undefined,
+      tradeOffInitiativeId: undefined,
+      tradeOffTaskId: undefined,
+      tradeOffEta: undefined
+    });
+    setAddingTaskFor(null);
+  };
+  
+  const handleUpdateTask = (initiativeId: string, taskId: string, field: keyof Task, value: any) => {
+    console.log('handleUpdateTask called', { initiativeId, taskId, field, value });
+    
+    // Use allInitiatives if available (full list), otherwise fall back to filteredInitiatives
+    const sourceInitiatives = allInitiatives || filteredInitiatives;
+    const initiative = sourceInitiatives.find(i => i.id === initiativeId);
+    if (!initiative || !initiative.tasks) {
+      console.warn(`Initiative ${initiativeId} not found or has no tasks`);
+      return;
+    }
+    
+    console.log('Current initiative tasks:', initiative.tasks);
+    
+    // Find the task to update
+    const taskToUpdate = initiative.tasks.find(t => t.id === taskId);
+    if (!taskToUpdate) {
+      console.warn(`Task ${taskId} not found in initiative ${initiativeId}`);
+      return;
+    }
+    
+    console.log('Task to update:', taskToUpdate, 'new value:', value);
+    
+    // Create a new array with updated task - ensure we create a completely new object
+    const updatedTasks = initiative.tasks.map(task =>
+      task.id === taskId ? { ...task, [field]: value } : task
+    );
+    
+    console.log('Updated tasks:', updatedTasks);
+    
+    // Recalculate effort totals if effort fields changed
+    if (field === 'estimatedEffort' || field === 'actualEffort') {
+      const totalEstimatedEffort = updatedTasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
+      const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
+      
+      console.log('Updating effort totals:', { totalEstimatedEffort, totalActualEffort });
+      
+      // Update tasks array first, then effort totals
+      // React 18+ will batch these automatically
+      handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
+      handleInlineUpdate(initiativeId, 'estimatedEffort', totalEstimatedEffort);
+      handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort);
+    } else {
+      // For non-effort fields, just update tasks
+      console.log('Updating tasks only');
+      handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
+    }
+  };
+  
+  const handleDeleteTask = (initiativeId: string, taskId: string) => {
+    const initiative = filteredInitiatives.find(i => i.id === initiativeId);
+    if (!initiative || !initiative.tasks) return;
+    
+    const updatedTasks = initiative.tasks.filter(task => task.id !== taskId);
+    const totalEstimatedEffort = updatedTasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
+    const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
+    
+    // Update both tasks and effort totals
+    handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
+    handleInlineUpdate(initiativeId, 'estimatedEffort', totalEstimatedEffort);
+    handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort);
+  };
 
   const getOwnerNameById = (id?: string) => getOwnerName(users, id);
 
   const canInlineEdit = (item: Initiative): boolean => {
-    const perms = config.rolePermissions[currentUser.role];
-    if (perms.editAll) return true;
-    if (item.workType === WorkType.Unplanned && perms.editUnplanned) return true;
-    if (item.ownerId === currentUser.id && perms.editOwn) return true;
+    // Check if user can edit all tasks
+    if (canEditAllTasks(config, currentUser.role)) return true;
+    // Check if user can edit own tasks and this is their task
+    if (item.ownerId === currentUser.id && canEditOwnTasks(config, currentUser.role)) return true;
     return false;
+  };
+
+  const canDelete = (): boolean => {
+    // Only Admin or Director (Group Lead) can delete
+    return currentUser.role === Role.Admin || currentUser.role === Role.DirectorGroup;
   };
 
   const getPreviousValue = (item: Initiative, fieldName: string) => {
@@ -89,7 +287,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return lastRecord.oldValue;
   };
 
-  // Group initiatives by asset class and pillar
+  // Group initiatives by asset class and pillar (for flat/table view)
   const groupedInitiatives = useMemo((): GroupedInitiatives => {
     const groups: GroupedInitiatives = {};
     
@@ -106,13 +304,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return groups;
   }, [filteredInitiatives]);
 
+
   const SortableHeader = ({ label, sortKey, alignRight = false }: { label: string, sortKey: string, alignRight?: boolean }) => {
     const isActive = sortConfig?.key === sortKey;
     const isAsc = sortConfig?.direction === 'asc';
 
     return (
       <th 
-        className={`px-4 py-3 text-left font-bold text-slate-700 cursor-pointer bg-gradient-to-b from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 transition-all border-r border-slate-200 select-none whitespace-nowrap text-xs uppercase tracking-wider ${alignRight ? 'text-right' : ''}`}
+        className={`px-3 py-2.5 text-left font-bold text-slate-700 cursor-pointer bg-gradient-to-b from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 transition-all border-r border-slate-200 select-none whitespace-nowrap text-xs tracking-wider ${alignRight ? 'text-right' : ''}`}
         onClick={() => handleSort(sortKey)}
       >
         <div className={`flex items-center gap-1.5 ${alignRight ? 'justify-end' : ''}`}>
@@ -155,37 +354,75 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
   };
 
+
   const renderRow = (item: Initiative, index: number, editable: boolean) => {
     const isOutdated = checkOutdated(item.lastUpdated);
     const prevEffort = getPreviousValue(item, 'Effort');
     const prevEta = getPreviousValue(item, 'ETA');
+    const isBAU = item.initiativeType === InitiativeType.BAU;
+    const tasksExpanded = expandedTasks.has(item.id);
+    const isAddingTask = addingTaskFor === item.id;
+    const tasks = item.tasks || [];
+    const isAtRisk = item.status === Status.AtRisk;
+    const showTooltip = hoveredAtRiskDot === item.id && isAtRisk;
 
     return (
-      <tr key={item.id} className="group hover:bg-blue-50/60 transition-colors border-b border-slate-100">
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
-          {index + 1}
-        </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 min-w-[280px] relative">
-          <button
-            onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
-            className="font-semibold text-slate-900 text-sm leading-snug truncate text-left w-full hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer block"
-            title={item.title}
-          >
-            {item.title}
-          </button>
-          {/* Improved metadata styling with distinct colors */}
-          <div className="text-[10px] mt-1.5 flex gap-1.5 items-center flex-wrap">
+      <>
+        <tr key={item.id} className="group hover:bg-blue-50/60 transition-colors border-b border-slate-100">
+          <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
+            {index + 1}
+          </td>
+          <td className="px-3 py-2 border-r border-b border-slate-200 min-w-[320px] relative">
+            <div className="flex items-start gap-2">
+              {isBAU && (
+                <button
+                  onClick={() => toggleTasks(item.id)}
+                  className="p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5"
+                  title={tasksExpanded ? "Collapse tasks" : "View tasks"}
+                >
+                  {tasksExpanded ? (
+                    <ChevronDown size={14} className="text-purple-600" />
+                  ) : (
+                    <ChevronRight size={14} className="text-purple-600" />
+                  )}
+                </button>
+              )}
+              <button
+                onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                className="font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer"
+                title={item.title}
+              >
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="break-words flex-1 min-w-0">{item.title}</span>
+                  {isBAU && (
+                    <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded flex-shrink-0">
+                      BAU
+                    </span>
+                  )}
+                  {isBAU && tasks.length > 0 && (
+                    <span className="px-1 py-0.5 bg-purple-50 text-purple-600 text-[8px] font-semibold rounded flex-shrink-0">
+                      {tasks.length}t
+                    </span>
+                  )}
+                </div>
+              </button>
+            </div>
+          {/* Compact metadata styling */}
+          <div className="text-[9px] mt-1 flex gap-1 items-center flex-wrap">
+             <span className="px-1 py-0.5 bg-slate-100 text-slate-600 font-mono font-semibold rounded flex-shrink-0">
+               {item.id}
+             </span>
              {viewMode === 'flat' && (
                <>
-                 <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{item.l1_assetClass}</span>
-                 <span className="text-slate-300">•</span>
-                 <span className="text-slate-500 truncate max-w-[140px] italic" title={item.l2_pillar}>{item.l2_pillar}</span>
+                 <span className="font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{item.l1_assetClass}</span>
+                 <span className="text-slate-400">•</span>
+                 <span className="text-slate-500 truncate max-w-[100px] italic" title={item.l2_pillar}>{item.l2_pillar}</span>
                </>
              )}
              {item.workType === WorkType.Unplanned && (
-               <span className="text-amber-600 font-bold ml-1 flex items-center gap-0.5 bg-amber-50 px-1.5 py-0.5 rounded">
-                 <AlertTriangle size={9} />
-                 <span className="text-[9px]">Unplanned</span>
+               <span className="text-amber-600 font-bold flex items-center gap-0.5 bg-amber-50 px-1 py-0.5 rounded">
+                 <AlertTriangle size={8} />
+                 <span className="text-[8px]">Unplanned</span>
                </span>
              )}
              {onAddComment && onMarkCommentRead && (
@@ -199,13 +436,96 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                />
              )}
           </div>
-          {item.status === Status.AtRisk && (
+          {isAtRisk && (
              <div className="absolute top-2 right-2">
-                <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-sm" title={`Risk: ${item.riskActionLog}`}></div>
+                <div className="relative group">
+                  <button
+                    ref={(el) => {
+                      if (el) {
+                        atRiskButtonRefs.current.set(item.id, el);
+                      } else {
+                        atRiskButtonRefs.current.delete(item.id);
+                      }
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenAtRiskModal) {
+                        onOpenAtRiskModal(item);
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      // Check if we're near the top of the viewport
+                      const button = e.currentTarget;
+                      const buttonRect = button.getBoundingClientRect();
+                      const tooltipHeight = 150; // Approximate tooltip height
+                      const spaceAbove = buttonRect.top;
+                      const shouldShowBelow = spaceAbove < tooltipHeight + 20;
+                      
+                      setTooltipPositions(prev => {
+                        const next = new Map(prev);
+                        next.set(item.id, shouldShowBelow ? 'below' : 'above');
+                        return next;
+                      });
+                      
+                      hoverTimeoutRef.current = setTimeout(() => {
+                        setHoveredAtRiskDot(item.id);
+                      }, 300);
+                    }}
+                    onMouseLeave={() => {
+                      if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
+                      }
+                      setHoveredAtRiskDot(null);
+                    }}
+                    className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-sm hover:bg-amber-600 transition-colors cursor-pointer"
+                    title="Click to edit risk reason"
+                  />
+                  {/* Hover Tooltip */}
+                  {showTooltip && item.riskActionLog && (() => {
+                    const button = atRiskButtonRefs.current.get(item.id);
+                    const position = tooltipPositions.get(item.id) || 'above';
+                    const buttonRect = button?.getBoundingClientRect();
+                    
+                    if (!buttonRect) return null;
+                    
+                    const tooltipStyle = position === 'below'
+                      ? {
+                          position: 'fixed' as const,
+                          top: `${buttonRect.bottom + 8}px`,
+                          right: `${window.innerWidth - buttonRect.right}px`,
+                          zIndex: 9999
+                        }
+                      : {
+                          position: 'fixed' as const,
+                          top: `${buttonRect.top - 8}px`,
+                          right: `${window.innerWidth - buttonRect.right}px`,
+                          transform: 'translateY(-100%)',
+                          zIndex: 9999
+                        };
+                    
+                    return (
+                      <div
+                        className="w-64 bg-white rounded-lg shadow-xl border border-slate-200 p-3 pointer-events-none"
+                        style={tooltipStyle}
+                      >
+                      <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                        <AlertTriangle size={12} className="text-amber-600" />
+                        At Risk Reason
+                      </div>
+                      <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">
+                        {item.riskActionLog}
+                      </p>
+                      <div className="mt-2 pt-2 border-t border-slate-100 text-center">
+                        <span className="text-[10px] text-blue-600 font-medium">Click to edit →</span>
+                      </div>
+                    </div>
+                    );
+                  })()}
+                </div>
              </div>
           )}
         </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 whitespace-nowrap">
+        <td className="px-2.5 py-2 border-r border-b border-slate-200 whitespace-nowrap">
           <div className="flex items-center gap-2.5" title="Primary Owner">
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-300 shadow-sm">
               {getOwnerNameById(item.ownerId)?.charAt(0)}
@@ -218,7 +538,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
           </div>
         </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 text-center">
+        <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center">
           {editable ? (
              <select 
                value={item.status}
@@ -231,7 +551,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              <StatusBadge status={item.status} />
           )}
         </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 text-center">
+        <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center">
           {editable ? (
             <select 
               value={item.priority}
@@ -244,42 +564,81 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             <PriorityBadge priority={item.priority} />
           )}
         </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 text-xs text-slate-600 whitespace-nowrap">
-          {editable ? (
-            <select 
-              value={item.quarter}
-              onChange={(e) => handleInlineUpdate(item.id, 'quarter', e.target.value)}
-              className="w-full bg-white text-xs border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md cursor-pointer"
-            >
-              {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
-            </select>
-          ) : (
-            <span className="bg-slate-50 px-2 py-1 rounded text-slate-600 font-medium">{item.quarter}</span>
-          )}
-        </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200">
+        <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[150px]">
           {editable ? (
             <div className="flex items-center gap-1.5">
-              <input 
-                type="number"
-                min="0"
-                step="0.5"
-                value={item.actualEffort}
-                onChange={(e) => handleInlineUpdate(item.id, 'actualEffort', parseFloat(e.target.value) || 0)}
-                className="w-14 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right"
-                title="Actual Effort"
-              />
-              <span className="text-slate-300 text-xs font-medium">/</span>
-              <input 
-                type="number"
-                min="0"
-                step="0.5"
-                value={item.estimatedEffort}
-                onChange={(e) => handleInlineUpdate(item.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
-                className="w-14 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right"
-                title="Planned Effort"
-              />
-              <span className="text-slate-400 text-xs font-medium">w</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleInlineUpdate(item.id, 'actualEffort', Math.max(0, (item.actualEffort || 0) - 0.25));
+                  }}
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  title="Decrease by 0.25"
+                >
+                  <ArrowDown size={12} />
+                </button>
+                <input 
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={item.actualEffort}
+                  onChange={(e) => handleInlineUpdate(item.id, 'actualEffort', parseFloat(e.target.value) || 0)}
+                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  title="Actual Effort"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleInlineUpdate(item.id, 'actualEffort', (item.actualEffort || 0) + 0.25);
+                  }}
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  title="Increase by 0.25"
+                >
+                  <ArrowUp size={12} />
+                </button>
+              </div>
+              <span className="text-slate-300 text-xs font-medium flex-shrink-0">/</span>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleInlineUpdate(item.id, 'estimatedEffort', Math.max(0, (item.estimatedEffort || 0) - 0.25));
+                  }}
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  title="Decrease by 0.25"
+                >
+                  <ArrowDown size={12} />
+                </button>
+                <input 
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={item.estimatedEffort}
+                  onChange={(e) => handleInlineUpdate(item.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  title="Planned Effort"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleInlineUpdate(item.id, 'estimatedEffort', (item.estimatedEffort || 0) + 0.25);
+                  }}
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  title="Increase by 0.25"
+                >
+                  <ArrowUp size={12} />
+                </button>
+              </div>
+              <span className="text-slate-400 text-xs font-medium flex-shrink-0">w</span>
             </div>
           ) : (
             <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-slate-50 px-2 py-1 rounded">{item.actualEffort}/{item.estimatedEffort}w</div>
@@ -288,7 +647,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              <div className="text-[9px] text-slate-400 italic text-right mt-1">Orig: {item.originalEstimatedEffort}w</div>
           )}
         </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 min-w-[90px]">
+        <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[90px]">
           <div className="flex flex-col items-center gap-1.5">
             {editable ? (
               <div className="flex items-center gap-1">
@@ -299,7 +658,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   step="1"
                   value={item.completionRate ?? 0}
                   onChange={(e) => handleInlineUpdate(item.id, 'completionRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                  className="w-12 bg-white text-xs font-semibold text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right"
+                  className="w-14 bg-white text-xs font-semibold text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   title="Completion %"
                 />
                 <span className="text-xs text-slate-400 font-medium">%</span>
@@ -319,17 +678,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
           </div>
         </td>
-        <td className="px-3 py-2.5 border-r border-b border-slate-200 min-w-[110px]">
+        <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[110px]">
           <div className="flex flex-col gap-1">
              {editable ? (
                <input 
                   type="date"
-                  value={item.eta}
+                  value={item.eta || ''}
                   onChange={(e) => handleInlineUpdate(item.id, 'eta', e.target.value)}
                   className="w-full bg-white text-xs border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md"
                />
              ) : (
-               <span className="text-xs font-semibold text-slate-700">{item.eta}</span>
+               <span className="text-xs font-semibold text-slate-700">{item.eta || 'N/A'}</span>
              )}
              
              {prevEta !== null && (
@@ -344,73 +703,687 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </div>
         </td>
       </tr>
+      
+      {/* Tasks dropdown row for BAU initiatives */}
+      {isBAU && tasksExpanded && (
+        <tr className="bg-purple-50/30">
+          <td colSpan={8} className="px-3 py-2 border-b border-slate-200">
+            <div className="space-y-1.5">
+              {/* Tasks List */}
+              {tasks.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.length})</div>
+                  {tasks.map((task, taskIndex) => (
+                    <div key={task.id} className="bg-white border border-purple-200 rounded-md p-2 shadow-sm hover:shadow transition-shadow relative">
+                      <div className="grid grid-cols-12 gap-2 items-center pr-6">
+                        {/* Task Title */}
+                        <div className="col-span-4">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {editable ? (
+                              <input
+                                type="text"
+                                value={task.title || ''}
+                                onChange={(e) => handleUpdateTask(item.id, task.id, 'title', e.target.value || undefined)}
+                                placeholder={`Task ${taskIndex + 1}`}
+                                className="flex-1 min-w-[120px] text-xs font-medium text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                              />
+                            ) : (
+                              <span className="text-xs font-medium text-slate-700">
+                                {task.title || `Task ${taskIndex + 1}`}
+                              </span>
+                            )}
+                            {!editable && task.tags && task.tags.length > 0 && (
+                              <div className="flex gap-0.5">
+                                {task.tags.map(tag => (
+                                  <span key={tag} className="px-1 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-medium rounded">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {editable && (
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={task.tags?.includes(UnplannedTag.Unplanned) || false}
+                                    onChange={(e) => {
+                                      const currentTags = task.tags || [];
+                                      const newTags = e.target.checked
+                                        ? [...currentTags.filter(t => t !== UnplannedTag.Unplanned), UnplannedTag.Unplanned]
+                                        : currentTags.filter(t => t !== UnplannedTag.Unplanned);
+                                      handleUpdateTask(item.id, task.id, 'tags', newTags);
+                                    }}
+                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                                  />
+                                  <span className="text-[10px] text-slate-600">Unplanned</span>
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={task.tags?.includes(UnplannedTag.PMItem) || false}
+                                    onChange={(e) => {
+                                      const currentTags = task.tags || [];
+                                      const newTags = e.target.checked
+                                        ? [...currentTags.filter(t => t !== UnplannedTag.PMItem), UnplannedTag.PMItem]
+                                        : currentTags.filter(t => t !== UnplannedTag.PMItem);
+                                      handleUpdateTask(item.id, task.id, 'tags', newTags);
+                                    }}
+                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                                  />
+                                  <span className="text-[10px] text-slate-600">PM Item</span>
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={task.tags?.includes(UnplannedTag.RiskItem) || false}
+                                    onChange={(e) => {
+                                      const currentTags = task.tags || [];
+                                      const newTags = e.target.checked
+                                        ? [...currentTags.filter(t => t !== UnplannedTag.RiskItem), UnplannedTag.RiskItem]
+                                        : currentTags.filter(t => t !== UnplannedTag.RiskItem);
+                                      handleUpdateTask(item.id, task.id, 'tags', newTags);
+                                    }}
+                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                                  />
+                                  <span className="text-[10px] text-slate-600">Risk Item</span>
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Effort (Actual/Planned) */}
+                        <div className="col-span-2">
+                          {editable ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Effort:</span>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const newEffort = Math.max(0, (task.actualEffort || 0) - 0.25);
+                                    handleUpdateTask(item.id, task.id, 'actualEffort', newEffort);
+                                  }}
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  title="Decrease by 0.25"
+                                >
+                                  <ArrowDown size={10} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.25"
+                                  value={task.actualEffort ?? 0}
+                                  onChange={(e) => {
+                                    const inputValue = e.target.value;
+                                    const newEffort = inputValue === '' ? 0 : parseFloat(inputValue);
+                                    if (!isNaN(newEffort) && newEffort >= 0) {
+                                      handleUpdateTask(item.id, task.id, 'actualEffort', newEffort);
+                                    }
+                                  }}
+                                  className="w-14 text-xs font-mono text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  title="Actual Effort"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const newEffort = (task.actualEffort || 0) + 0.25;
+                                    handleUpdateTask(item.id, task.id, 'actualEffort', newEffort);
+                                  }}
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  title="Increase by 0.25"
+                                >
+                                  <ArrowUp size={10} />
+                                </button>
+                              </div>
+                              <span className="text-slate-300 text-xs font-medium">/</span>
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const newEffort = Math.max(0, (task.estimatedEffort || 0) - 0.25);
+                                    handleUpdateTask(item.id, task.id, 'estimatedEffort', newEffort);
+                                  }}
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  title="Decrease by 0.25"
+                                >
+                                  <ArrowDown size={10} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.25"
+                                  value={task.estimatedEffort ?? 0}
+                                  onChange={(e) => {
+                                    const inputValue = e.target.value;
+                                    const newEffort = inputValue === '' ? 0 : parseFloat(inputValue);
+                                    if (!isNaN(newEffort) && newEffort >= 0) {
+                                      handleUpdateTask(item.id, task.id, 'estimatedEffort', newEffort);
+                                    }
+                                  }}
+                                  className="w-14 text-xs font-mono text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  title="Planned Effort"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const newEffort = (task.estimatedEffort || 0) + 0.25;
+                                    handleUpdateTask(item.id, task.id, 'estimatedEffort', newEffort);
+                                  }}
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  title="Increase by 0.25"
+                                >
+                                  <ArrowUp size={10} />
+                                </button>
+                              </div>
+                              <span className="text-[10px] text-slate-400">w</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Effort:</span>
+                              <span className="text-xs text-slate-600 font-mono">
+                                {task.actualEffort || 0}/{task.estimatedEffort || 0}w
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {/* ETA */}
+                        <div className="col-span-2">
+                          {editable ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">ETA:</span>
+                              <input
+                                type="date"
+                                value={task.eta || ''}
+                                onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
+                                className="flex-1 text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">ETA:</span>
+                              <span className="text-xs text-slate-600">{task.eta || 'N/A'}</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Owner */}
+                        <div className="col-span-2">
+                          {editable ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Owner:</span>
+                              <select
+                                value={task.ownerId}
+                                onChange={(e) => handleUpdateTask(item.id, task.id, 'ownerId', e.target.value)}
+                                className="flex-1 text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                              >
+                                {users.filter(u => u.role === Role.TeamLead).map(u => (
+                                  <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Owner:</span>
+                              <span className="text-xs text-slate-600">{getOwnerNameById(task.ownerId)}</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Status */}
+                        <div className="col-span-1.5">
+                          {editable ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Status:</span>
+                              <select
+                                value={task.status}
+                                onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
+                                className={`flex-1 text-[10px] font-bold border px-1 py-0.5 rounded cursor-pointer ${getStatusSelectStyle(task.status)}`}
+                              >
+                                {Object.values(Status).map(s => (
+                                  <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Status:</span>
+                              <StatusBadge status={task.status} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Delete Button - positioned absolutely on the right */}
+                      {editable && (
+                        <button
+                          onClick={() => handleDeleteTask(item.id, task.id)}
+                          className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          title="Delete task"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Add Task Button / Form */}
+              {editable && (
+                <div className="border-t border-slate-200 pt-3 mt-3">
+                  {!isAddingTask ? (
+                    <button
+                      onClick={() => {
+                        setAddingTaskFor(item.id);
+                        const defaultEta = new Date().toISOString().split('T')[0];
+                        setNewTaskForm({
+                          title: '',
+                          estimatedEffort: 1,
+                          actualEffort: 0,
+                          eta: defaultEta,
+                          ownerId: item.ownerId,
+                          status: Status.NotStarted,
+                          tags: [],
+                          initiativeId: item.id,
+                          tradeOffInitiativeId: undefined,
+                          tradeOffTaskId: undefined,
+                          tradeOffEta: undefined
+                        });
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                    >
+                      <Plus size={16} />
+                      Add New Task
+                    </button>
+                  ) : (
+                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2.5 space-y-2.5">
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                        <h3 className="text-xs font-semibold text-slate-800">New Task</h3>
+                        <button
+                          onClick={() => {
+                            setAddingTaskFor(null);
+                            setNewTaskForm({
+                              title: '',
+                              estimatedEffort: 1,
+                              actualEffort: 0,
+                              eta: '',
+                              ownerId: '',
+                              status: Status.NotStarted,
+                              tags: [],
+                              initiativeId: item.id,
+                              tradeOffInitiativeId: undefined,
+                              tradeOffTaskId: undefined,
+                              tradeOffEta: undefined
+                            });
+                          }}
+                          className="p-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+                          aria-label="Close"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      {/* Form Fields */}
+                      <div className="space-y-2.5">
+                        {/* Task Title */}
+                        <div>
+                          <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                            Task Title <span className="text-slate-400 font-normal">(optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={newTaskForm.title || ''}
+                            onChange={(e) => setNewTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                            placeholder="Enter task title..."
+                            className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                          />
+                        </div>
+
+                        {/* Effort, ETA, Owner, Status, Tags in one row */}
+                        <div className="grid grid-cols-5 gap-2">
+                          {/* Effort */}
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                              Effort <span className="text-red-500">*</span>
+                              <span className="text-[9px] text-slate-500 font-normal ml-0.5">(A/P)</span>
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-300 rounded-md px-0.5 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, actualEffort: Math.max(0, (prev.actualEffort || 0) - 0.25) }));
+                                  }}
+                                  className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
+                                  title="Decrease actual"
+                                >
+                                  <ArrowDown size={9} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.25"
+                                  value={newTaskForm.actualEffort || 0}
+                                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, actualEffort: parseFloat(e.target.value) || 0 }))}
+                                  className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, actualEffort: (prev.actualEffort || 0) + 0.25 }));
+                                  }}
+                                  className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
+                                  title="Increase actual"
+                                >
+                                  <ArrowUp size={9} />
+                                </button>
+                              </div>
+                              <span className="text-slate-400 text-[10px]">/</span>
+                              <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-300 rounded-md px-0.5 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Math.max(0, (prev.estimatedEffort || 1) - 0.25) }));
+                                  }}
+                                  className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
+                                  title="Decrease planned"
+                                >
+                                  <ArrowDown size={9} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.25"
+                                  value={newTaskForm.estimatedEffort || 1}
+                                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, estimatedEffort: parseFloat(e.target.value) || 1 }))}
+                                  className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: (prev.estimatedEffort || 1) + 0.25 }));
+                                  }}
+                                  className="p-0.5 hover:bg-slate-200 rounded text-slate-600 hover:text-slate-800 transition-colors"
+                                  title="Increase planned"
+                                >
+                                  <ArrowUp size={9} />
+                                </button>
+                              </div>
+                              <span className="text-[9px] text-slate-500 font-medium">w</span>
+                            </div>
+                          </div>
+
+                          {/* ETA */}
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                              ETA <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={newTaskForm.eta || ''}
+                              onChange={(e) => setNewTaskForm(prev => ({ ...prev, eta: e.target.value }))}
+                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            />
+                          </div>
+
+                          {/* Owner */}
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                              Owner <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={newTaskForm.ownerId || item.ownerId}
+                              onChange={(e) => setNewTaskForm(prev => ({ ...prev, ownerId: e.target.value }))}
+                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              <option value="">Select...</option>
+                              {users.filter(u => u.role === Role.TeamLead).map(u => (
+                                <option key={u.id} value={u.id}>{u.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Status */}
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                              Status
+                            </label>
+                            <select
+                              value={newTaskForm.status || Status.NotStarted}
+                              onChange={(e) => setNewTaskForm(prev => ({ ...prev, status: e.target.value as Status }))}
+                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                              {Object.values(Status).map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Tags */}
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                              Tags <span className="text-slate-400 font-normal">(opt)</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <label className="flex items-center gap-0.5 text-[10px] text-slate-700 cursor-pointer hover:text-slate-900 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={newTaskForm.tags?.includes(UnplannedTag.Unplanned) || false}
+                                  onChange={(e) => {
+                                    const currentTags = newTaskForm.tags || [];
+                                    const newTags = e.target.checked
+                                      ? [...currentTags.filter(t => t !== UnplannedTag.Unplanned), UnplannedTag.Unplanned]
+                                      : currentTags.filter(t => t !== UnplannedTag.Unplanned);
+                                    setNewTaskForm(prev => ({ ...prev, tags: newTags }));
+                                  }}
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>Unplanned</span>
+                              </label>
+                              <label className="flex items-center gap-0.5 text-[10px] text-slate-700 cursor-pointer hover:text-slate-900 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={newTaskForm.tags?.includes(UnplannedTag.PMItem) || false}
+                                  onChange={(e) => {
+                                    const currentTags = newTaskForm.tags || [];
+                                    const newTags = e.target.checked
+                                      ? [...currentTags.filter(t => t !== UnplannedTag.PMItem), UnplannedTag.PMItem]
+                                      : currentTags.filter(t => t !== UnplannedTag.PMItem);
+                                    setNewTaskForm(prev => ({ ...prev, tags: newTags }));
+                                  }}
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>PM</span>
+                              </label>
+                              <label className="flex items-center gap-0.5 text-[10px] text-slate-700 cursor-pointer hover:text-slate-900 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={newTaskForm.tags?.includes(UnplannedTag.RiskItem) || false}
+                                  onChange={(e) => {
+                                    const currentTags = newTaskForm.tags || [];
+                                    const newTags = e.target.checked
+                                      ? [...currentTags.filter(t => t !== UnplannedTag.RiskItem), UnplannedTag.RiskItem]
+                                      : currentTags.filter(t => t !== UnplannedTag.RiskItem);
+                                    setNewTaskForm(prev => ({ ...prev, tags: newTags }));
+                                  }}
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>Risk</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Trade-off Section */}
+                        <div className="pt-1.5 border-t border-slate-200">
+                          <label className="block text-[10px] font-medium text-slate-700 mb-1.5">
+                            Trade-off <span className="text-slate-400 font-normal">(optional)</span>
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-600 mb-1">
+                                Initiative
+                              </label>
+                              <select
+                                value={newTaskForm.tradeOffInitiativeId || ''}
+                                onChange={(e) => {
+                                  const selectedInitiativeId = e.target.value || undefined;
+                                  const selectedInitiative = selectedInitiativeId ? allInitiativesList.find(i => i.id === selectedInitiativeId) : undefined;
+                                  setNewTaskForm(prev => ({ 
+                                    ...prev, 
+                                    tradeOffInitiativeId: selectedInitiativeId,
+                                    tradeOffTaskId: undefined,
+                                    tradeOffEta: selectedInitiative?.eta || prev.tradeOffEta
+                                  }));
+                                }}
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              >
+                                <option value="">Select...</option>
+                                {allInitiativesList
+                                  .filter(i => i.ownerId === item.ownerId)
+                                  .map(i => (
+                                    <option key={i.id} value={i.id}>
+                                      {i.title} ({i.l1_assetClass}) {i.initiativeType === InitiativeType.BAU ? '[BAU]' : '[WP]'}
+                                    </option>
+                                  ))}
+                                {allInitiativesList
+                                  .filter(i => i.ownerId === item.ownerId).length === 0 && (
+                                    <option value="" disabled>No initiatives found</option>
+                                  )}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-600 mb-1">
+                                Task <span className="text-slate-400 font-normal">(opt)</span>
+                              </label>
+                              <select
+                                value={newTaskForm.tradeOffTaskId || ''}
+                                onChange={(e) => {
+                                  const selectedTaskId = e.target.value || undefined;
+                                  const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
+                                  const selectedTask = tradeOffInitiative?.tasks?.find(t => t.id === selectedTaskId);
+                                  setNewTaskForm(prev => ({ 
+                                    ...prev, 
+                                    tradeOffTaskId: selectedTaskId,
+                                    tradeOffEta: selectedTask?.eta || tradeOffInitiative?.eta || prev.tradeOffEta
+                                  }));
+                                }}
+                                disabled={!newTaskForm.tradeOffInitiativeId || (() => {
+                                  const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
+                                  return !tradeOffInitiative || tradeOffInitiative.initiativeType !== InitiativeType.BAU || !tradeOffInitiative.tasks || tradeOffInitiative.tasks.length === 0;
+                                })()}
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                              >
+                                <option value="">Select task...</option>
+                                {newTaskForm.tradeOffInitiativeId && (() => {
+                                  const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
+                                  if (tradeOffInitiative?.initiativeType === InitiativeType.BAU && tradeOffInitiative.tasks) {
+                                    return tradeOffInitiative.tasks.map(task => (
+                                      <option key={task.id} value={task.id}>
+                                        {task.title || `Task ${task.id.slice(-4)}`} ({task.eta || 'No ETA'})
+                                      </option>
+                                    ));
+                                  }
+                                  return <option value="" disabled>No tasks available</option>;
+                                })()}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-600 mb-1">
+                                ETA
+                              </label>
+                              <input
+                                type="date"
+                                value={newTaskForm.tradeOffEta || ''}
+                                onChange={(e) => setNewTaskForm(prev => ({ ...prev, tradeOffEta: e.target.value || undefined }))}
+                                disabled={!newTaskForm.tradeOffInitiativeId}
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                              />
+                              {newTaskForm.tradeOffInitiativeId && !newTaskForm.tradeOffEta && (() => {
+                                const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
+                                if (newTaskForm.tradeOffTaskId) {
+                                  const task = tradeOffInitiative?.tasks?.find(t => t.id === newTaskForm.tradeOffTaskId);
+                                  if (task?.eta) {
+                                    return (
+                                      <div className="text-[9px] text-slate-500 mt-0.5">
+                                        Current: {task.eta}
+                                      </div>
+                                    );
+                                  }
+                                } else if (tradeOffInitiative?.eta) {
+                                  return (
+                                    <div className="text-[9px] text-slate-500 mt-0.5">
+                                      Current: {tradeOffInitiative.eta}
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                        <button
+                          onClick={() => {
+                            setAddingTaskFor(null);
+                            setNewTaskForm({
+                              title: '',
+                              estimatedEffort: 1,
+                              actualEffort: 0,
+                              eta: '',
+                              ownerId: '',
+                              status: Status.NotStarted,
+                              tags: [],
+                              initiativeId: item.id,
+                              tradeOffInitiativeId: undefined,
+                              tradeOffTaskId: undefined,
+                              tradeOffEta: undefined
+                            });
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleAddTask(item.id)}
+                          disabled={!newTaskForm.eta || !newTaskForm.ownerId}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                        >
+                          Add Task
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+      </>
     );
   };
 
-  const renderGroupedView = () => {
-    const assetClasses = Object.keys(groupedInitiatives).sort();
-    let globalIndex = 0;
-
-    return assetClasses.map(assetClass => {
-      const pillars = Object.keys(groupedInitiatives[assetClass]).sort();
-      const assetKey = `asset-${assetClass}`;
-      const isAssetCollapsed = collapsedGroups.has(assetKey);
-      const assetCount = pillars.reduce((sum, p) => sum + groupedInitiatives[assetClass][p].length, 0);
-
-      return (
-        <React.Fragment key={assetClass}>
-          {/* Asset Class Header Row */}
-          <tr 
-            className="bg-slate-800 text-white cursor-pointer hover:bg-slate-700 transition-colors"
-            onClick={() => toggleGroup(assetKey)}
-          >
-            <td colSpan={9} className="px-3 py-2">
-              <div className="flex items-center gap-2">
-                {isAssetCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                <Layers size={16} />
-                <span className="font-bold">{assetClass}</span>
-                <span className="text-slate-400 text-xs ml-2">
-                  {assetCount} {assetCount === 1 ? 'initiative' : 'initiatives'}
-                </span>
-              </div>
-            </td>
-          </tr>
-
-          {!isAssetCollapsed && pillars.map(pillar => {
-            const pillarKey = `pillar-${assetClass}-${pillar}`;
-            const isPillarCollapsed = collapsedGroups.has(pillarKey);
-            const items = groupedInitiatives[assetClass][pillar];
-
-            return (
-              <React.Fragment key={pillarKey}>
-                {/* Pillar Header Row */}
-                <tr 
-                  className="bg-slate-100 cursor-pointer hover:bg-slate-200 transition-colors"
-                  onClick={() => toggleGroup(pillarKey)}
-                >
-                  <td colSpan={9} className="px-4 py-1.5 border-b border-slate-200">
-                    <div className="flex items-center gap-2 pl-4">
-                      {isPillarCollapsed ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                      <span className="font-semibold text-slate-700 text-sm">{pillar}</span>
-                      <span className="text-slate-400 text-xs">
-                        ({items.length})
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-
-                {!isPillarCollapsed && items.map(item => {
-                  globalIndex++;
-                  const editable = canInlineEdit(item);
-                  return renderRow(item, globalIndex, editable);
-                })}
-              </React.Fragment>
-            );
-          })}
-        </React.Fragment>
-      );
-    });
-  };
 
   const renderFlatView = () => {
     return filteredInitiatives.map((item, index) => {
@@ -419,48 +1392,31 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     });
   };
 
+  // Render table view (flat)
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px]">
-      {/* Excel-style formula bar with visual separation */}
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-slate-50 to-white border-b border-slate-200 text-xs text-slate-600 font-mono">
-        <div className="w-8 text-center text-slate-400 font-bold italic select-none bg-slate-100 rounded py-0.5">fx</div>
-        <div className="h-5 w-px bg-slate-200"></div>
-        <div className="flex-1 truncate italic text-slate-500">
-          {viewMode === 'grouped' ? 'Grouped by Asset Class → Pillar' : 'Task View — Portfolio Initiatives'}
-        </div>
-      </div>
-
       <div ref={scrollContainerRef} className="overflow-auto custom-scrollbar flex-1">
         <table className="w-full text-left border-collapse">
           <thead className="sticky top-0 z-20 shadow-md">
             <tr className="bg-gradient-to-b from-slate-100 to-slate-50 border-b-2 border-slate-300">
-              <th className="w-12 px-3 py-3 text-center font-bold text-slate-500 text-xs border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
+              <th className="w-12 px-3 py-2.5 text-center font-bold text-slate-500 text-xs border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
                 #
               </th>
               <SortableHeader label="Initiative" sortKey="title" />
               <SortableHeader label="Owner" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
-              <th className="px-4 py-3 text-left font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs uppercase tracking-wider whitespace-nowrap select-none">Quarter</th>
-              <th className="px-4 py-3 text-right font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs uppercase tracking-wider whitespace-nowrap select-none">Effort (Act/Plan)</th>
-              <th className="px-4 py-3 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs uppercase tracking-wider whitespace-nowrap select-none">Progress</th>
+              <th className="px-3 py-2.5 text-right font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">Effort (act/plan)</th>
+              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
               <SortableHeader label="ETA / Update" sortKey="eta" />
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-100">
             {filteredInitiatives.length === 0 ? (
-               <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-500 text-sm">No initiatives found matching your filters.</td></tr>
-            ) : viewMode === 'grouped' ? renderGroupedView() : renderFlatView()}
+               <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-500 text-sm">No initiatives found matching your filters.</td></tr>
+            ) : renderFlatView()}
           </tbody>
         </table>
-      </div>
-      {/* Footer with stats */}
-      <div className="bg-gradient-to-r from-slate-50 to-white border-t border-slate-200 px-4 py-2.5 text-[11px] text-slate-600 flex justify-between items-center font-mono">
-         <span className="font-semibold">{filteredInitiatives.length} initiatives loaded</span>
-         <div className="flex gap-6">
-            <span className="bg-slate-100 px-2.5 py-1 rounded-md">SUM Effort: <strong>{filteredInitiatives.reduce((acc, curr) => acc + curr.estimatedEffort, 0)}w</strong></span>
-            <span className="bg-slate-100 px-2.5 py-1 rounded-md">AVG Effort: <strong>{(filteredInitiatives.reduce((acc, curr) => acc + curr.estimatedEffort, 0) / (filteredInitiatives.length || 1)).toFixed(1)}w</strong></span>
-         </div>
       </div>
     </div>
   );

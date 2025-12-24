@@ -51,8 +51,8 @@ export function PresenceIndicator({ currentUserId }: PresenceIndicatorProps) {
       {isExpanded && (
         <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="px-3 py-2 border-b border-slate-100">
-            <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-              Online Team Members
+            <h3 className="text-xs font-bold text-slate-600 tracking-wide">
+              Online team members
             </h3>
           </div>
           

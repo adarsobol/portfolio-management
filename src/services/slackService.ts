@@ -188,11 +188,16 @@ class SlackService {
         ? `<mailto:${changedByUser.email}|${changedByUser.name}>`
         : change.changedBy;
 
+      // Create initiative link (using app URL with initiative ID)
+      const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.portfolio-manager.com';
+      const initiativeLink = `${appUrl}#initiative=${initiative.id}`;
+      const initiativeIdLink = `<${initiativeLink}|${initiative.id}>`;
+
       // Slack Block Kit message
       // Note: Incoming webhooks post to the channel configured in the webhook URL
       // The channel field is not supported for incoming webhooks
       const message = {
-        text: `ETA Changed: ${initiative.title} - ${ownerMention}`,
+        text: `ETA Changed: ${initiative.title} (${initiative.id}) - ${ownerMention}`,
         blocks: [
           {
             type: 'header',
@@ -206,7 +211,7 @@ class SlackService {
             fields: [
               {
                 type: 'mrkdwn',
-                text: `*Initiative:*\n${initiative.title}`
+                text: `*Initiative:*\n${initiative.title}\n${initiativeIdLink}`
               },
               {
                 type: 'mrkdwn',
@@ -274,10 +279,15 @@ class SlackService {
         .map(user => `<mailto:${user.email}|${user.name}>`)
         .join(' ');
 
+      // Create initiative link (using app URL with initiative ID)
+      const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.portfolio-manager.com';
+      const initiativeLink = `${appUrl}#initiative=${initiative.id}`;
+      const initiativeIdLink = `<${initiativeLink}|${initiative.id}>`;
+
       // Note: Incoming webhooks post to the channel configured in the webhook URL
       // The channel field is not supported for incoming webhooks
       const message = {
-        text: `${mentionedUsers.map(u => u.name).join(', ')} mentioned in comment on ${initiative.title}`,
+        text: `${mentionedUsers.map(u => u.name).join(', ')} mentioned in comment on ${initiative.title} (${initiative.id})`,
         blocks: [
           {
             type: 'header',
@@ -298,7 +308,7 @@ class SlackService {
             fields: [
               {
                 type: 'mrkdwn',
-                text: `*Initiative:*\n${initiative.title}`
+                text: `*Initiative:*\n${initiative.title}\n${initiativeIdLink}`
               },
               {
                 type: 'mrkdwn',
