@@ -1006,6 +1006,8 @@ export default function App() {
         if (changes.length > 0) {
           setChangeLog(prevLog => [...changes, ...prevLog]);
           item.history = [...(existing.history || []), ...changes];
+          // Sync change records to Google Sheets
+          changes.forEach(change => sheetsSync.queueChangeLog(change));
         } else {
           item.history = existing.history;
         }
@@ -1107,6 +1109,11 @@ export default function App() {
       
       // Sync to Google Sheets
       sheetsSync.queueInitiativeSync(item);
+      
+      // Force immediate sync for new initiatives to prevent data loss on refresh
+      if (existingIndex === -1) {
+        sheetsSync.forceSyncNow();
+      }
 
       if (tradeOffAction) {
         const targetIndex = nextInitiatives.findIndex(i => i.id === tradeOffAction.targetInitiativeId);
@@ -1125,6 +1132,8 @@ export default function App() {
           const changeRecord = recordChange(target, fieldLabel, oldValue, tradeOffAction.newValue);
           updatedTarget.history = [...(target.history || []), changeRecord];
           setChangeLog(prevLog => [changeRecord, ...prevLog]);
+          // Sync trade-off change record to Google Sheets
+          sheetsSync.queueChangeLog(changeRecord);
           nextInitiatives[targetIndex] = updatedTarget;
           
           // Update localStorage cache
@@ -1175,6 +1184,9 @@ export default function App() {
         // Update the initiative in state if it was modified
         setInitiatives(prev => prev.map(i => i.id === initiative.id ? initiativeCopy : i));
         
+        // Sync workflow-modified initiative to Google Sheets
+        sheetsSync.queueInitiativeSync(initiativeCopy);
+        
         setConfig(prev => ({
           ...prev,
           workflows: (prev.workflows || []).map(w => 
@@ -1216,6 +1228,8 @@ export default function App() {
            const change = recordChange(i, fieldName, oldValue, value);
            setChangeLog(prevLog => [change, ...prevLog]);
            i.history = [...(i.history || []), change];
+           // Sync change record to Google Sheets
+           sheetsSync.queueChangeLog(change);
         }
         
         const updated = { ...i, [field]: value, lastUpdated: today };
@@ -1276,6 +1290,9 @@ export default function App() {
         // Broadcast to other users in real-time
         realtimeService.broadcastUpdate(updated);
         
+        // Sync to Google Sheets
+        sheetsSync.queueInitiativeSync(updated);
+        
         return updated;
       }
       return i;
@@ -1301,12 +1318,16 @@ export default function App() {
         const change = recordChange(i, 'Status', oldStatus, Status.AtRisk);
         setChangeLog(prevLog => [change, ...prevLog]);
         updated.history = [...(i.history || []), change];
+        // Sync status change to Google Sheets
+        sheetsSync.queueChangeLog(change);
         
         // Record riskActionLog change if it's new
         if (!i.riskActionLog || i.riskActionLog !== reason) {
           const riskChange = recordChange(i, 'Risk Action Log', i.riskActionLog || '', reason);
           setChangeLog(prevLog => [riskChange, ...prevLog]);
           updated.history = [...(updated.history || []), riskChange];
+          // Sync risk action log change to Google Sheets
+          sheetsSync.queueChangeLog(riskChange);
         }
         
         // Track weekly update
@@ -1336,6 +1357,9 @@ export default function App() {
         
         // Broadcast update
         realtimeService.broadcastUpdate(updated);
+        
+        // Sync to Google Sheets
+        sheetsSync.queueInitiativeSync(updated);
         
         // Check for "At Risk" status changes notification
         if (oldStatus !== Status.AtRisk) {
@@ -1662,6 +1686,9 @@ export default function App() {
             ));
           }
         });
+        
+        // Sync comment to Google Sheets
+        sheetsSync.queueInitiativeSync(updatedInitiative);
         
         return updatedInitiative;
       }
