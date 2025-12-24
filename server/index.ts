@@ -198,7 +198,43 @@ setInterval(() => {
 // ============================================
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 const SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const SERVICE_ACCOUNT_PRIVATE_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+// Handle various private key formats from environment variables
+function parsePrivateKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  
+  // Try multiple formats:
+  // 1. Already has real newlines - use as-is
+  if (key.includes('-----BEGIN') && key.includes('\n')) {
+    return key;
+  }
+  
+  // 2. Has escaped newlines like \\n (from JSON)
+  if (key.includes('\\n')) {
+    return key.replace(/\\n/g, '\n');
+  }
+  
+  // 3. Has literal \n text (two characters)
+  if (key.includes('\\') && key.includes('n')) {
+    return key.split('\\n').join('\n');
+  }
+  
+  // 4. Base64 encoded
+  if (!key.includes('-----BEGIN')) {
+    try {
+      const decoded = Buffer.from(key, 'base64').toString('utf-8');
+      if (decoded.includes('-----BEGIN')) {
+        return decoded;
+      }
+    } catch {
+      // Not base64, continue
+    }
+  }
+  
+  return key;
+}
+
+const SERVICE_ACCOUNT_PRIVATE_KEY = parsePrivateKey(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
 const JWT_EXPIRES_IN = '7d';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -1143,11 +1179,20 @@ app.get('/api/sheets/health', async (req, res) => {
           sheets: doc.sheetsByIndex.map(s => s.title)
         });
       } else {
+        const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '';
         res.json({
           status: 'error',
           configured,
           connected: false,
-          error: getLastConnectionError() || 'Unknown error - getDoc returned null'
+          error: getLastConnectionError() || 'Unknown error - getDoc returned null',
+          keyDebug: {
+            rawLength: rawKey.length,
+            hasBeginMarker: rawKey.includes('-----BEGIN'),
+            hasRealNewlines: rawKey.includes('\n'),
+            hasEscapedNewlines: rawKey.includes('\\n'),
+            first50: rawKey.substring(0, 50),
+            parsedFirst50: SERVICE_ACCOUNT_PRIVATE_KEY?.substring(0, 50)
+          }
         });
       }
     } catch (error) {
