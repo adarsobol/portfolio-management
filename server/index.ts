@@ -1113,10 +1113,44 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
 // ============================================
 
 // Health check (public)
-app.get('/api/sheets/health', (req, res) => {
+app.get('/api/sheets/health', async (req, res) => {
+  const configured = !!(SPREADSHEET_ID && SERVICE_ACCOUNT_EMAIL && SERVICE_ACCOUNT_PRIVATE_KEY);
+  
+  // If debug query param, try actual connection
+  if (req.query.debug === 'true') {
+    try {
+      const doc = await getDoc();
+      if (doc) {
+        res.json({
+          status: 'ok',
+          configured,
+          connected: true,
+          spreadsheetTitle: doc.title,
+          sheetCount: doc.sheetCount,
+          sheets: doc.sheetsByIndex.map(s => s.title)
+        });
+      } else {
+        res.json({
+          status: 'error',
+          configured,
+          connected: false,
+          error: 'getDoc returned null - check server logs'
+        });
+      }
+    } catch (error) {
+      res.json({
+        status: 'error',
+        configured,
+        connected: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+    return;
+  }
+  
   res.json({
     status: 'ok',
-    configured: !!(SPREADSHEET_ID && SERVICE_ACCOUNT_EMAIL && SERVICE_ACCOUNT_PRIVATE_KEY)
+    configured
   });
 });
 
