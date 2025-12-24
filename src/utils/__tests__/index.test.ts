@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { generateId, formatDate, getRelativeDate, checkOutdated, getOwnerName } from '../index';
-import { User } from '@/types';
+import { User, Role } from '@/types';
 
 describe('Utils', () => {
   describe('generateId', () => {
@@ -83,8 +83,8 @@ describe('Utils', () => {
 
   describe('getOwnerName', () => {
     const mockUsers: User[] = [
-      { id: 'u1', email: 'user1@example.com', name: 'User One', role: 'Admin' },
-      { id: 'u2', email: 'user2@example.com', name: 'User Two', role: 'Team Lead' },
+      { id: 'u1', email: 'user1@example.com', name: 'User One', role: Role.Admin },
+      { id: 'u2', email: 'user2@example.com', name: 'User Two', role: Role.TeamLead },
     ];
 
     it('should return owner name when user exists', () => {

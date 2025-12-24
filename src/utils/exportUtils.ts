@@ -14,7 +14,7 @@ function getOwnerName(users: User[], ownerId: string): string {
 /**
  * Format date for export
  */
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return '';
   try {
     return new Date(dateStr).toLocaleDateString();
@@ -26,7 +26,7 @@ function formatDate(dateStr: string): string {
 /**
  * Calculate days between two dates
  */
-function calculateDaysDelayed(currentEta: string, originalEta: string): number {
+function calculateDaysDelayed(currentEta: string | undefined, originalEta: string | undefined): number {
   if (!currentEta || !originalEta) return 0;
   try {
     const current = new Date(currentEta);
