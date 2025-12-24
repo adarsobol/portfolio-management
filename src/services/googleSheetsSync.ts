@@ -125,8 +125,6 @@ class SheetsSyncManager {
   private enabled: boolean = true;
   private debounceMs: number = 1000; // Reduced for more responsive syncing
 
-  private _onlineHandler?: () => void;
-  private _offlineHandler?: () => void;
   private static listenersRegistered = false;
   private static sharedHandlers: { online?: () => void; offline?: () => void } = {};
 
@@ -162,8 +160,6 @@ class SheetsSyncManager {
 
     // Store reference to this instance globally for event handlers
     (globalThis as any).__sheetsSyncInstance = this;
-    this.onlineHandler = SheetsSyncManager.sharedHandlers.online;
-    this.offlineHandler = SheetsSyncManager.sharedHandlers.offline;
 
     // Don't load persisted queue on initialization - this was causing duplicates
     // this.loadPersistedQueue();
@@ -181,8 +177,6 @@ class SheetsSyncManager {
       SheetsSyncManager.listenersRegistered = false;
       SheetsSyncManager.sharedHandlers = {};
     }
-    this.onlineHandler = undefined;
-    this.offlineHandler = undefined;
     if ((globalThis as any).__sheetsSyncInstance === this) {
       (globalThis as any).__sheetsSyncInstance = null;
     }
@@ -809,21 +803,6 @@ class SheetsSyncManager {
     }
   }
 
-  private _loadPersistedQueue(): void {
-    // Don't load persisted queue - this was causing duplicates on refresh
-    // Clear any existing persisted queue to prevent old items from syncing
-    try {
-      sessionStorage.removeItem('sheets-sync-queue');
-    } catch {
-      // Ignore storage errors
-    }
-    // Start with empty queue
-    this.queue = {
-      initiatives: new Map(),
-      changes: [],
-      snapshots: []
-    };
-  }
 }
 
 // Singleton instance
