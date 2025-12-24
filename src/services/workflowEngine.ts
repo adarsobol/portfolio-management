@@ -82,14 +82,15 @@ export class WorkflowEngine {
 
     switch (condition.type) {
       case 'due_date_passed':
-        return initiative.eta < today;
+        return (initiative.eta ?? '') < today;
 
       case 'due_date_within_days':
         if (!condition.days) return false;
         const targetDate = new Date();
         targetDate.setDate(targetDate.getDate() + condition.days);
         const targetDateStr = targetDate.toISOString().split('T')[0];
-        return initiative.eta <= targetDateStr && initiative.eta >= today;
+        const eta = initiative.eta ?? '';
+        return eta <= targetDateStr && eta >= today;
 
       case 'last_updated_older_than':
         if (!condition.days) return false;
@@ -225,7 +226,7 @@ export class WorkflowEngine {
 
       case 'update_eta':
         if (action.value && initiative.eta !== action.value) {
-          recordChange(initiative, 'ETA', initiative.eta, action.value);
+          recordChange(initiative, 'ETA', initiative.eta ?? '', action.value);
           initiative.eta = action.value;
         }
         break;

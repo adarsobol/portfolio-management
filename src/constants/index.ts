@@ -501,7 +501,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_1',
         title: 'Fix data pipeline errors',
-        effort: 1.5,
+        estimatedEffort: 1.5,
         eta: TOMORROW,
         ownerId: 'u_ah',
         status: Status.InProgress,
@@ -511,7 +511,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_2',
         title: 'Update documentation',
-        effort: 1.0,
+        estimatedEffort: 1.0,
         eta: NEXT_WEEK,
         ownerId: 'u_ah',
         status: Status.NotStarted,
@@ -521,7 +521,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_3',
         title: 'Monitor system health',
-        effort: 2.0,
+        estimatedEffort: 2.0,
         eta: NEXT_WEEK,
         ownerId: 'u_ah',
         status: Status.InProgress,
@@ -557,7 +557,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_sim_1',
         title: 'Daily KPI monitoring and reporting',
-        effort: 1.5,
+        estimatedEffort: 1.5,
         eta: NEXT_WEEK,
         ownerId: 'u_tm',
         status: Status.InProgress,
@@ -567,7 +567,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_sim_2',
         title: 'Weekly portfolio health review',
-        effort: 1.0,
+        estimatedEffort: 1.0,
         eta: NEXT_WEEK,
         ownerId: 'u_tm',
         status: Status.InProgress,
@@ -577,7 +577,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_sim_3',
         title: 'Monthly constraint analysis',
-        effort: 2.0,
+        estimatedEffort: 2.0,
         eta: TWO_WEEKS_FUTURE,
         ownerId: 'u_tm',
         status: Status.NotStarted,
@@ -587,7 +587,7 @@ export const INITIAL_INITIATIVES: Initiative[] = [
       {
         id: 'task_bau_sim_4',
         title: 'Quarterly risk assessment review',
-        effort: 1.5,
+        estimatedEffort: 1.5,
         eta: TWO_WEEKS_FUTURE,
         ownerId: 'u_tm',
         status: Status.NotStarted,

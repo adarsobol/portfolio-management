@@ -464,7 +464,7 @@ export async function exportFilteredData(
   
   if (filters.assetClass) filterParts.push(filters.assetClass);
   if (filters.pillar) filterParts.push(filters.pillar.slice(0, 20));
-  if (filters.owners && filters.owners.length === 1) {
+  if (filters.owners && filters.owners.length === 1 && filters.owners[0]) {
     const ownerName = getOwnerName(users, filters.owners[0]);
     filterParts.push(ownerName.split(' ')[0]);
   }
