@@ -495,26 +495,8 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     let userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
 
     if (!userRow) {
-      // Auto-register user
-      const userId = `u_${Date.now()}`;
-      // Determine role based on email or default to Team Lead
-      // Simple logic: if first user (unlikely here since admin exists), make admin. 
-      // Otherwise default to Team Lead (Viewer/Editor)
-      const role = 'Team Lead'; 
-      
-      await usersSheet.addRow({
-        id: userId,
-        email,
-        passwordHash: '', // No password for Google users
-        name: name || email.split('@')[0],
-        role,
-        avatar: picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}`,
-        lastLogin: new Date().toISOString()
-      });
-      
-      // Re-fetch to get the row object
-      const updatedRows = await usersSheet.getRows();
-      userRow = updatedRows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+      res.status(403).json({ error: "this user doesn't have access to this app" });
+      return;
     } else {
       // Update metadata
       if (picture && userRow.get('avatar') !== picture) userRow.set('avatar', picture);
