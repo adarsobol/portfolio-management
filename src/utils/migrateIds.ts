@@ -1,5 +1,5 @@
 import { Initiative } from '../types';
-import { generateInitiativeId, isJiraStyleId, parseQuarter } from './idGenerator';
+import { generateInitiativeId, isJiraStyleId } from './idGenerator';
 import { logger } from './logger';
 
 /**

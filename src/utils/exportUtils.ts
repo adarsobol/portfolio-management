@@ -406,7 +406,7 @@ export async function exportToExcel(initiatives: Initiative[], users: User[], fi
 /**
  * Create summary data for the summary sheet
  */
-function createSummaryData(initiatives: Initiative[], users: User[]): Record<string, string | number>[] {
+function createSummaryData(initiatives: Initiative[], _users: User[]): Record<string, string | number>[] {
   const totalEffort = initiatives.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
   const actualEffort = initiatives.reduce((sum, i) => sum + (i.actualEffort || 0), 0);
   const byStatus = initiatives.reduce((acc, i) => {
@@ -569,7 +569,7 @@ function isWithinCurrentWeek(dateStr: string): boolean {
  */
 function transformInitiativeForNotionExport(initiative: Initiative, users: User[]): Record<string, string> {
   const ownerName = getOwnerName(users, initiative.ownerId);
-  const mustHaveThisWeek = isWithinCurrentWeek(initiative.eta);
+  const _mustHaveThisWeek = isWithinCurrentWeek(initiative.eta);
   const progressCondition = initiative.riskActionLog || 'On Track';
   
   return {

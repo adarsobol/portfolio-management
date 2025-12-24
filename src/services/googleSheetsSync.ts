@@ -49,12 +49,12 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     quarter: i.quarter,
     status: i.status,
     priority: i.priority,
-    estimatedEffort: i.estimatedEffort,
-    originalEstimatedEffort: i.originalEstimatedEffort,
-    actualEffort: i.actualEffort,
-    eta: i.eta,
-    originalEta: i.originalEta,
-    lastUpdated: i.lastUpdated,
+    estimatedEffort: i.estimatedEffort ?? 0,
+    originalEstimatedEffort: i.originalEstimatedEffort ?? 0,
+    actualEffort: i.actualEffort ?? 0,
+    eta: i.eta ?? '',
+    originalEta: i.originalEta ?? '',
+    lastUpdated: i.lastUpdated ?? '',
     dependencies: i.dependencies?.map(d => `${d.team} (${d.deliverable || 'N/A'}, ETA: ${d.eta || 'N/A'})`).join('; ') || '',
     workType: i.workType,
     unplannedTags: JSON.stringify(i.unplannedTags || []),
@@ -125,7 +125,9 @@ class SheetsSyncManager {
   private enabled: boolean = true;
   private debounceMs: number = 1000; // Reduced for more responsive syncing
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private onlineHandler?: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private offlineHandler?: () => void;
   private static listenersRegistered = false;
   private static sharedHandlers: { online?: () => void; offline?: () => void } = {};
@@ -809,6 +811,7 @@ class SheetsSyncManager {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private loadPersistedQueue(): void {
     // Don't load persisted queue - this was causing duplicates on refresh
     // Clear any existing persisted queue to prevent old items from syncing

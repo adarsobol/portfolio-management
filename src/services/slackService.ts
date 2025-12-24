@@ -335,7 +335,8 @@ class SlackService {
   /**
    * Send message to Slack via webhook
    */
-  private async sendToSlack(payload: any, notificationKey?: string): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async sendToSlack(payload: any, _notificationKey?: string): Promise<void> {
     if (!this.config?.webhookUrl) {
       console.warn('Slack webhook URL not configured');
       return;
