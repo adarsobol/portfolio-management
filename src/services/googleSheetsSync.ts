@@ -39,6 +39,7 @@ export interface SheetsPullData {
 export function flattenInitiative(i: Initiative): Record<string, string | number | boolean> {
   return {
     id: i.id,
+    initiativeType: i.initiativeType || 'WP',
     l1_assetClass: i.l1_assetClass,
     l2_pillar: i.l2_pillar,
     l3_responsibility: i.l3_responsibility,
@@ -55,12 +56,20 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     eta: i.eta ?? '',
     originalEta: i.originalEta ?? '',
     lastUpdated: i.lastUpdated ?? '',
+    lastWeeklyUpdate: i.lastWeeklyUpdate ?? '',
     dependencies: i.dependencies?.map(d => `${d.team} (${d.deliverable || 'N/A'}, ETA: ${d.eta || 'N/A'})`).join('; ') || '',
     workType: i.workType,
     unplannedTags: JSON.stringify(i.unplannedTags || []),
     riskActionLog: i.riskActionLog || '',
+    isAtRisk: i.status === 'At Risk',
+    definitionOfDone: i.definitionOfDone || '',
+    tasks: JSON.stringify(i.tasks || []),
+    overlookedCount: i.overlookedCount ?? 0,
+    lastDelayDate: i.lastDelayDate ?? '',
+    completionRate: i.completionRate ?? 0,
     comments: JSON.stringify(i.comments || []),
-    history: JSON.stringify(i.history || [])
+    history: JSON.stringify(i.history || []),
+    version: i.version ?? 0
   };
 }
 
@@ -105,6 +114,18 @@ function loadFromLocalStorageCache(): Initiative[] | null {
 }
 
 // ============================================
+// CONFLICT TYPES
+// ============================================
+export interface SyncConflict {
+  id: string;
+  serverVersion: number;
+  clientVersion: number;
+  serverData: Record<string, unknown>;
+}
+
+type ConflictCallback = (conflicts: SyncConflict[]) => void;
+
+// ============================================
 // SYNC QUEUE MANAGER
 // ============================================
 class SheetsSyncManager {
@@ -122,6 +143,7 @@ class SheetsSyncManager {
     isLoading: false
   };
   private listeners: Set<(status: SyncStatus) => void> = new Set();
+  private conflictListeners: Set<ConflictCallback> = new Set();
   private enabled: boolean = true;
   private debounceMs: number = 1000; // Reduced for more responsive syncing
 
@@ -199,6 +221,17 @@ class SheetsSyncManager {
     this.listeners.add(callback);
     callback(this.status); // Immediate callback with current status
     return () => this.listeners.delete(callback);
+  }
+
+  /** Subscribe to conflict events */
+  onConflict(callback: ConflictCallback): () => void {
+    this.conflictListeners.add(callback);
+    return () => this.conflictListeners.delete(callback);
+  }
+
+  /** Emit conflicts to all listeners */
+  private emitConflicts(conflicts: SyncConflict[]): void {
+    this.conflictListeners.forEach(cb => cb(conflicts));
   }
 
   /** Enable or disable syncing */
@@ -709,14 +742,35 @@ class SheetsSyncManager {
         headers: this.getHeaders(),
         body: JSON.stringify({ initiatives: initiatives.map(flattenInitiative) })
       });
+      
       if (!response.ok) {
         const errorText = await response.text();
         logger.error('Sync initiatives failed', { context: 'SheetsSyncManager.syncInitiatives', metadata: { status: response.status, errorText: errorText.substring(0, 100) } });
         const errorMsg = errorText.length > 0 ? errorText.substring(0, 100) : response.statusText;
         this.status.error = `Sync failed (${response.status}): ${errorMsg}`;
         this.notify();
+        return false;
       }
-      return response.ok;
+      
+      // Parse response and check for conflicts
+      const result = await response.json();
+      
+      if (result.conflicts && result.conflicts.length > 0) {
+        logger.warn('Sync conflicts detected', { 
+          context: 'SheetsSyncManager.syncInitiatives', 
+          metadata: { conflictCount: result.conflicts.length } 
+        });
+        this.status.error = `${result.conflicts.length} conflict(s) detected - changes by another user`;
+        this.notify();
+        
+        // Emit conflicts to UI for resolution
+        this.emitConflicts(result.conflicts as SyncConflict[]);
+        
+        // Return true because the request succeeded, but conflicts exist
+        return true;
+      }
+      
+      return true;
     } catch (error) {
       logger.error('Sync initiatives error', { context: 'SheetsSyncManager.syncInitiatives', error: error instanceof Error ? error : new Error(String(error)) });
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {

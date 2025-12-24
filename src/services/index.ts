@@ -1,5 +1,5 @@
 export { sheetsSync, flattenInitiative, flattenChangeRecord } from './googleSheetsSync';
-export type { SyncStatus, SheetsPullData } from './googleSheetsSync';
+export type { SyncStatus, SheetsPullData, SyncConflict } from './googleSheetsSync';
 export { slackService } from './slackService';
 export { workflowEngine } from './workflowEngine';
 export { authService } from './authService';

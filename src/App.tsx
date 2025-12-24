@@ -5,10 +5,11 @@ import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, HIERARCHY, migratePermissio
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, Priority, UnplannedTag } from './types';
 import { getOwnerName, generateId, parseMentions, logger, generateInitiativeId, canCreateTasks, canViewTab } from './utils';
 import { useLocalStorage } from './hooks';
-import { slackService, workflowEngine, realtimeService } from './services';
+import { slackService, workflowEngine, realtimeService, sheetsSync, SyncConflict } from './services';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
 import AtRiskReasonModal from './components/modals/AtRiskReasonModal';
+import ConflictResolutionModal from './components/modals/ConflictResolutionModal';
 
 // Components
 import { TopNav } from './components/shared/TopNav';
@@ -95,6 +96,10 @@ export default function App() {
   // Comment Read State - tracks when each user last viewed comments on each initiative
   const [commentReadState, setCommentReadState] = useLocalStorage<UserCommentReadState>('portfolio-comment-read-state', {});
 
+  // Conflict resolution state
+  const [syncConflicts, setSyncConflicts] = useState<SyncConflict[]>([]);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+
   // Load users from API
   useEffect(() => {
     if (!isAuthenticated || usersLoaded) return;
@@ -122,7 +127,7 @@ export default function App() {
     loadUsers();
   }, [isAuthenticated, usersLoaded]);
 
-  // Load initiatives from localStorage on startup
+  // Load initiatives from Google Sheets on startup (with localStorage fallback)
   useEffect(() => {
     if (!isAuthenticated) {
       setIsDataLoading(false);
@@ -134,25 +139,20 @@ export default function App() {
     const loadData = async () => {
       setIsDataLoading(true);
       try {
-        // Load initiatives from localStorage
-        const cached = localStorage.getItem('portfolio-initiatives-cache');
-        const loadedInitiatives: Initiative[] = cached ? JSON.parse(cached) : [];
+        // Use sheetsSync which fetches from Google Sheets with localStorage fallback
+        const loadedInitiatives = await sheetsSync.loadInitiatives();
         
         if (!isMounted) return;
         
-        if (loadedInitiatives.length > 0) {
-          // Deduplicate by ID (keep first occurrence)
-          const deduplicatedInitiatives = deduplicateInitiatives(loadedInitiatives);
-          
-          const duplicatesRemoved = loadedInitiatives.length - deduplicatedInitiatives.length;
-          if (duplicatesRemoved > 0) {
-            console.log(`[DEBUG] loadData: Setting ${deduplicatedInitiatives.length} initiatives (removed ${duplicatesRemoved} duplicates)`);
-          }
-          
-          setInitiatives(deduplicatedInitiatives);
-        } else {
-          setInitiatives([]);
+        // Deduplicate by ID (keep first occurrence)
+        const deduplicatedInitiatives = deduplicateInitiatives(loadedInitiatives);
+        
+        const duplicatesRemoved = loadedInitiatives.length - deduplicatedInitiatives.length;
+        if (duplicatesRemoved > 0) {
+          console.log(`[DEBUG] loadData: Setting ${deduplicatedInitiatives.length} initiatives (removed ${duplicatesRemoved} duplicates)`);
         }
+        
+        setInitiatives(deduplicatedInitiatives);
       } catch (error) {
         logger.error('Failed to load initiatives', { context: 'App.loadData', error: error instanceof Error ? error : new Error(String(error)) });
         if (isMounted) {
@@ -215,6 +215,20 @@ export default function App() {
       };
     }
   }, [isAuthenticated, currentUser]);
+
+  // Subscribe to sync conflict events
+  useEffect(() => {
+    const unsubConflicts = sheetsSync.onConflict((conflicts) => {
+      if (conflicts.length > 0) {
+        setSyncConflicts(conflicts);
+        setShowConflictModal(true);
+      }
+    });
+
+    return () => {
+      unsubConflicts();
+    };
+  }, []);
 
   // Migrate config to ensure all new permissions and fields are present
   useEffect(() => {
@@ -1849,6 +1863,39 @@ export default function App() {
         currentReason={pendingAtRiskInitiative ? initiatives.find(i => i.id === pendingAtRiskInitiative.id)?.riskActionLog || '' : ''}
         onSave={handleAtRiskReasonSave}
         onCancel={handleAtRiskReasonCancel}
+      />
+
+      <ConflictResolutionModal
+        isOpen={showConflictModal}
+        conflicts={syncConflicts}
+        onKeepMine={async (conflictIds) => {
+          // Force push local changes by incrementing version
+          const conflictInitiatives = initiatives.filter(i => conflictIds.includes(i.id));
+          const updated = conflictInitiatives.map(i => ({
+            ...i,
+            version: (i.version || 0) + 100 // Force override with higher version
+          }));
+          updated.forEach(i => {
+            setInitiatives(prev => prev.map(init => init.id === i.id ? i : init));
+            sheetsSync.queueInitiativeSync(i);
+          });
+          showSuccess(`Kept your changes for ${conflictIds.length} initiative(s)`);
+          setSyncConflicts([]);
+        }}
+        onKeepTheirs={async () => {
+          // Reload from server
+          try {
+            const freshData = await sheetsSync.loadInitiatives();
+            setInitiatives(deduplicateInitiatives(freshData));
+            showSuccess('Reloaded data from server');
+          } catch (error) {
+            showError('Failed to reload data from server');
+          }
+          setSyncConflicts([]);
+        }}
+        onClose={() => {
+          setShowConflictModal(false);
+        }}
       />
     </div>
   );

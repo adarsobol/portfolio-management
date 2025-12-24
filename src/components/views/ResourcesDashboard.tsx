@@ -1874,62 +1874,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
         </div>
       </div>
 
-      {/* Health Score History Chart */}
-      {healthHistory.length > 0 && (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <History className="w-4 h-4 text-indigo-500" />
-              Health Score Trend
-            </h3>
-            <span className="text-xs text-slate-400">Last {healthHistory.length} snapshots</span>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={healthHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number, name: string) => [`${value}`, name.replace('Score', ' Score')]}
-                />
-                <Legend />
-                <ReferenceLine y={80} stroke="#10b981" strokeDasharray="5 5" label={{ value: 'Good', fill: '#10b981', fontSize: 10 }} />
-                <ReferenceLine y={60} stroke="#f59e0b" strokeDasharray="5 5" label={{ value: 'Warning', fill: '#f59e0b', fontSize: 10 }} />
-                <Line 
-                  type="monotone" 
-                  dataKey="scheduleScore" 
-                  name="Schedule"
-                  stroke="#10b981" 
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={{ fill: '#10b981', strokeWidth: 1, r: 3 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="effortScore" 
-                  name="Effort"
-                  stroke="#3b82f6" 
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={{ fill: '#3b82f6', strokeWidth: 1, r: 3 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="riskScore" 
-                  name="Risk"
-                  stroke="#f59e0b" 
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={{ fill: '#f59e0b', strokeWidth: 1, r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
       {/* Charts and Tables Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* Burndown Chart */}

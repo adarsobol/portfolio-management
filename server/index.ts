@@ -438,11 +438,13 @@ function getLastConnectionError(): string | null {
 // SHEET HEADERS
 // ============================================
 const INITIATIVE_HEADERS = [
-  'id', 'l1_assetClass', 'l2_pillar', 'l3_responsibility', 'l4_target',
+  'id', 'initiativeType', 'l1_assetClass', 'l2_pillar', 'l3_responsibility', 'l4_target',
   'title', 'ownerId', 'secondaryOwner', 'quarter', 'status', 'priority',
   'estimatedEffort', 'originalEstimatedEffort', 'actualEffort',
-  'eta', 'originalEta', 'lastUpdated', 'dependencies', 'workType',
-  'unplannedTags', 'riskActionLog', 'isAtRisk', 'comments', 'history'
+  'eta', 'originalEta', 'lastUpdated', 'lastWeeklyUpdate', 'dependencies', 'workType',
+  'unplannedTags', 'riskActionLog', 'isAtRisk', 'definitionOfDone',
+  'tasks', 'overlookedCount', 'lastDelayDate', 'completionRate',
+  'comments', 'history', 'version'
 ];
 
 const CHANGELOG_HEADERS = [
@@ -1269,16 +1271,51 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     // Create a map of existing IDs for faster lookup
     const existingIds = new Set(rows.map((r: GoogleSpreadsheetRow) => r.get('id')).filter((id: string) => id && !id.startsWith('_meta_')));
     
+    // Track conflicts for version-based conflict detection
+    const conflicts: Array<{
+      id: string;
+      serverVersion: number;
+      clientVersion: number;
+      serverData: Record<string, unknown>;
+    }> = [];
+    let syncedCount = 0;
+    
     for (const initiative of deduplicated) {
       const existing = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === initiative.id);
 
       if (existing) {
-        // Update existing row
+        // Check for version conflicts (optimistic locking)
+        const serverVersion = parseInt(existing.get('version') || '0', 10);
+        const clientVersion = parseInt(initiative.version || '0', 10);
+        
+        if (serverVersion > clientVersion) {
+          // Conflict detected - server has a newer version
+          console.warn(`[SERVER] Conflict detected for ${initiative.id}: server v${serverVersion} > client v${clientVersion}`);
+          conflicts.push({
+            id: initiative.id,
+            serverVersion,
+            clientVersion,
+            serverData: {
+              id: existing.get('id'),
+              title: existing.get('title'),
+              status: existing.get('status'),
+              eta: existing.get('eta'),
+              lastUpdated: existing.get('lastUpdated'),
+              version: serverVersion
+            }
+          });
+          continue; // Skip this initiative - conflict needs to be resolved
+        }
+        
+        // Increment version and update existing row
+        const newVersion = serverVersion + 1;
         Object.keys(initiative).forEach(key => {
           const value = initiative[key];
           existing.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
         });
+        existing.set('version', String(newVersion));
         await existing.save();
+        syncedCount++;
       } else if (!existingIds.has(initiative.id)) {
         // Only add if it doesn't exist (double-check to prevent duplicates)
         const rowData: Record<string, string> = {};
@@ -1286,15 +1323,28 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
           const value = initiative[key];
           rowData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
         });
+        // Set initial version for new initiatives
+        rowData['version'] = String((parseInt(initiative.version || '0', 10) || 0) + 1);
         await sheet.addRow(rowData);
         existingIds.add(initiative.id); // Track that we added it
+        syncedCount++;
       } else {
         console.warn(`[SERVER] Upsert: Initiative ${initiative.id} already exists, skipping add`);
       }
     }
 
-    console.log(`Synced ${deduplicated.length} initiatives`);
-    res.json({ success: true, count: deduplicated.length });
+    if (conflicts.length > 0) {
+      console.log(`Synced ${syncedCount} initiatives, ${conflicts.length} conflicts detected`);
+      res.json({ 
+        success: true, 
+        count: syncedCount, 
+        conflicts,
+        message: `${conflicts.length} initiative(s) have conflicts that need resolution`
+      });
+    } else {
+      console.log(`Synced ${syncedCount} initiatives`);
+      res.json({ success: true, count: syncedCount });
+    }
   } catch (error) {
     console.error('Error syncing initiatives:', error);
     res.status(500).json({ error: String(error) });
@@ -1461,6 +1511,7 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
 
         return {
           id: row.get('id') || '',
+          initiativeType: row.get('initiativeType') || 'WP',
           l1_assetClass: row.get('l1_assetClass') || '',
           l2_pillar: row.get('l2_pillar') || '',
           l3_responsibility: row.get('l3_responsibility') || '',
@@ -1477,13 +1528,20 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
           eta: row.get('eta') || '',
           originalEta: row.get('originalEta') || '',
           lastUpdated: row.get('lastUpdated') || '',
+          lastWeeklyUpdate: row.get('lastWeeklyUpdate') || undefined,
           dependencies: row.get('dependencies') || undefined,
           workType: row.get('workType') || 'Planned Work',
           unplannedTags: parseJson(row.get('unplannedTags'), []),
           riskActionLog: row.get('riskActionLog') || undefined,
           isAtRisk: row.get('isAtRisk') === 'true',
+          definitionOfDone: row.get('definitionOfDone') || undefined,
+          tasks: parseJson(row.get('tasks'), []),
+          overlookedCount: Number(row.get('overlookedCount')) || 0,
+          lastDelayDate: row.get('lastDelayDate') || undefined,
+          completionRate: Number(row.get('completionRate')) || 0,
           comments: parseJson(row.get('comments'), []),
-          history: parseJson(row.get('history'), [])
+          history: parseJson(row.get('history'), []),
+          version: Number(row.get('version')) || 0
         };
       });
 
@@ -1627,6 +1685,90 @@ app.get('/api/sheets/snapshots', authenticateToken, async (req: AuthenticatedReq
     res.json({ snapshots });
   } catch (error) {
     console.error('Error listing snapshots:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/sheets/scheduled-snapshot - Create automated weekly snapshot (Called by Cloud Scheduler)
+app.post('/api/sheets/scheduled-snapshot', async (req: Request, res: Response) => {
+  // Verify request is from Cloud Scheduler using a secret header
+  const schedulerSecret = req.headers['x-scheduler-secret'];
+  const expectedSecret = process.env.SCHEDULER_SECRET;
+  
+  if (!expectedSecret) {
+    console.error('SCHEDULER_SECRET environment variable not set');
+    res.status(500).json({ error: 'Scheduler not configured' });
+    return;
+  }
+  
+  if (schedulerSecret !== expectedSecret) {
+    console.warn('Unauthorized scheduled snapshot attempt');
+    res.status(403).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  try {
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      return;
+    }
+
+    // Load current initiatives
+    const sheet = doc.sheetsByTitle['Initiatives'];
+    if (!sheet) {
+      res.status(404).json({ error: 'No initiatives found' });
+      return;
+    }
+
+    const rows = await sheet.getRows();
+    const initiatives = rows
+      .filter((row: GoogleSpreadsheetRow) => row.get('id') && !row.get('id').startsWith('_meta_'))
+      .map((row: GoogleSpreadsheetRow) => {
+        const rowData: Record<string, string> = {};
+        INITIATIVE_HEADERS.forEach(header => {
+          rowData[header] = row.get(header) || '';
+        });
+        return rowData;
+      });
+
+    // Create snapshot with date-based name
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const tabName = `Snap_Weekly_${dateStr}`;
+
+    // Check if snapshot for today already exists
+    if (doc.sheetsByTitle[tabName]) {
+      console.log(`Snapshot ${tabName} already exists, skipping`);
+      res.json({ success: true, tabName, count: initiatives.length, message: 'Snapshot already exists' });
+      return;
+    }
+
+    const newSheet = await doc.addSheet({
+      title: tabName,
+      headerValues: INITIATIVE_HEADERS
+    });
+
+    // Add metadata row
+    await newSheet.addRow({
+      id: '_meta_scheduled',
+      title: `Automated weekly snapshot - ${dayName} ${now.toISOString()}`,
+      l1_assetClass: '',
+      l2_pillar: '',
+      l3_responsibility: '',
+      l4_target: ''
+    });
+
+    // Add all initiatives
+    if (initiatives.length > 0) {
+      await newSheet.addRows(initiatives);
+    }
+
+    console.log(`Created scheduled snapshot: ${tabName} with ${initiatives.length} initiatives`);
+    res.json({ success: true, tabName, count: initiatives.length });
+  } catch (error) {
+    console.error('Scheduled snapshot error:', error);
     res.status(500).json({ error: String(error) });
   }
 });
@@ -1812,6 +1954,7 @@ httpServer.listen(PORT, () => {
   console.log(`  GET  /api/sheets/pull         - Pull all data`);
   console.log(`  POST /api/sheets/push         - Push all data`);
   console.log(`  GET  /api/sheets/snapshots    - List snapshot tabs`);
+  console.log(`  POST /api/sheets/scheduled-snapshot - Automated weekly snapshot (Cloud Scheduler)`);
   console.log(`\nReal-time Collaboration (Socket.IO):`);
   console.log(`  - User presence tracking`);
   console.log(`  - Live initiative updates`);

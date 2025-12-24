@@ -170,6 +170,9 @@ export interface Initiative {
   
   // Completion tracking
   completionRate?: number; // Completion percentage (0-100)
+  
+  // Conflict detection
+  version?: number; // Increment on each save for optimistic locking
 }
 
 // Legacy permission keys (for backward compatibility)
