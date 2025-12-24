@@ -30,7 +30,8 @@ export const changePasswordSchema = z.object({
 const taskSchema = z.object({
   id: z.string().min(1, 'Task ID is required'),
   title: z.string().optional(),
-  effort: z.number().min(0, 'Task effort must be non-negative'),
+  estimatedEffort: z.number().min(0, 'Task estimated effort must be non-negative').optional(),
+  actualEffort: z.number().min(0, 'Task actual effort must be non-negative').optional(),
   eta: z.string().min(1, 'Task ETA is required'),
   ownerId: z.string().min(1, 'Task owner ID is required'),
   status: z.enum(['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete'], {
@@ -68,18 +69,21 @@ export const initiativeSchema = z.object({
   lastWeeklyUpdate: z.string().optional(),
   overlookedCount: z.number().min(0, 'Overlooked count must be non-negative').optional(),
   lastDelayDate: z.string().optional(),
-  dependencyTeams: z.array(z.string()).optional(),
-  dependencyTeamNotes: z.record(z.string()).optional(),
-  dependencies: z.array(z.any()).optional(),
+  dependencyTeams: z.union([z.array(z.string()), z.string()]).optional(),
+  dependencyTeamNotes: z.union([z.record(z.string()), z.string()]).optional(),
+  dependencies: z.union([z.array(z.any()), z.string()]).optional(),
   workType: z.enum(['Planned Work', 'Unplanned Work'], {
     errorMap: () => ({ message: 'Invalid work type' }),
   }),
-  unplannedTags: z.array(z.enum(['Unplanned', 'Risk Item', 'PM Item', 'Both'])).optional(),
+  unplannedTags: z.union([z.array(z.enum(['Unplanned', 'Risk Item', 'PM Item', 'Both'])), z.string()]).optional(),
   riskActionLog: z.string().optional(),
   definitionOfDone: z.string().optional(),
-  comments: z.array(z.any()).optional(),
-  tasks: z.array(taskSchema).optional(),
-  history: z.array(z.any()).optional(),
+  comments: z.union([z.array(z.any()), z.string()]).optional(),
+  tasks: z.union([z.array(taskSchema), z.string()]).optional(),
+  history: z.union([z.array(z.any()), z.string()]).optional(),
+  isAtRisk: z.boolean().optional(),
+  completionRate: z.number().min(0).optional(),
+  version: z.number().optional(),
 }).refine((data) => {
   const initiativeType = data.initiativeType || 'WP'; // Default to WP
   // WP initiatives require definitionOfDone
