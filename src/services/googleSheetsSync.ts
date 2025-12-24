@@ -77,6 +77,7 @@ export function flattenChangeRecord(c: ChangeRecord): Record<string, string> {
   return {
     id: c.id,
     issueType: c.issueType || 'Initiative',
+    parentId: c.parentId || c.initiativeId, // Parent ID for connecting items
     initiativeId: c.initiativeId,
     initiativeTitle: c.initiativeTitle,
     taskId: c.taskId || '',

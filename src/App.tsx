@@ -837,6 +837,7 @@ export default function App() {
     const change: ChangeRecord = {
       id: generateId(),
       issueType: taskId ? 'Task' : 'Initiative',
+      parentId: initiative.id, // Parent initiative ID for connecting items
       initiativeId: initiative.id,
       initiativeTitle: initiative.title,
       taskId,
