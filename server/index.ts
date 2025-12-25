@@ -1464,16 +1464,15 @@ app.post('/api/sheets/tasks', authenticateToken, async (req: AuthenticatedReques
     let sheet = doc.sheetsByTitle['Tasks'];
     
     if (!sheet) {
+      console.log('[SERVER] Creating Tasks sheet with headers');
       sheet = await doc.addSheet({
         title: 'Tasks',
         headerValues: TASK_HEADERS
       });
     } else {
-      // Ensure headers are set
-      await sheet.loadHeaderRow().catch(async () => {
-        console.log('[SERVER] Tasks sheet has no headers, setting them now');
-        await sheet!.setHeaderRow(TASK_HEADERS);
-      });
+      // Always set headers first to ensure they're correct
+      console.log('[SERVER] Setting/resetting Tasks sheet headers');
+      await sheet.setHeaderRow(TASK_HEADERS);
     }
 
     // Get existing rows and create a map by task ID
