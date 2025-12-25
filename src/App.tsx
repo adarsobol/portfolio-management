@@ -24,7 +24,6 @@ import { CalendarView } from './components/views/CalendarView';
 import { AdminPanel } from './components/views/AdminPanel';
 import { WorkflowsView } from './components/views/WorkflowsView';
 import { DependenciesView } from './components/views/DependenciesView';
-import { TrashView } from './components/views/TrashView';
 import { LoginPage } from './components/auth';
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
@@ -173,6 +172,10 @@ export default function App() {
           console.log(`[DEBUG] loadData: Setting ${deduplicatedInitiatives.length} initiatives (removed ${duplicatesRemoved} duplicates)`);
         }
         
+        // #region agent log
+        const sampleOwnerIds = deduplicatedInitiatives.slice(0, 5).map(i => ({ id: i.id, title: i.title, ownerId: i.ownerId }));
+        fetch('http://127.0.0.1:7242/ingest/30bff00f-1252-4a6a-a1a1-ff6715802d11',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:loadData',message:'Data loaded - current user and sample initiatives',data:{currentUserId:currentUser?.id,currentUserEmail:currentUser?.email,currentUserRole:currentUser?.role,sampleOwnerIds,totalInitiatives:deduplicatedInitiatives.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})}).catch(()=>{});
+        // #endregion
         setInitiatives(deduplicatedInitiatives);
       } catch (error) {
         logger.error('Failed to load initiatives', { context: 'App.loadData', error: error instanceof Error ? error : new Error(String(error)) });
@@ -571,12 +574,8 @@ export default function App() {
     const deduplicatedInitiatives = deduplicateInitiatives(initiatives);
     let data = [...deduplicatedInitiatives];
 
-    // For trash view, only show deleted items; for other views, exclude deleted items
-    if (currentView === 'trash') {
-      data = data.filter(i => i.status === Status.Deleted);
-    } else {
-      data = data.filter(i => i.status !== Status.Deleted);
-    }
+    // Exclude deleted items from regular views (trash is now in AdminPanel)
+    data = data.filter(i => i.status !== Status.Deleted);
 
     // Filter by Asset Class
     if (filterAssetClass) data = data.filter(i => i.l1_assetClass === filterAssetClass);
@@ -1940,6 +1939,9 @@ export default function App() {
             setUsers={setUsers}
             initiatives={initiatives}
             changeLog={changeLog}
+            deletedInitiatives={initiatives.filter(i => i.status === Status.Deleted)}
+            onRestore={handleRestoreInitiative}
+            isDataLoading={isDataLoading}
           />
         ) : (
            <>
@@ -2005,13 +2007,6 @@ export default function App() {
                    setIsModalOpen(true);
                  }}
                  onInitiativeUpdate={handleSave}
-               />
-            ) : currentView === 'trash' ? (
-               <TrashView
-                 deletedInitiatives={filteredInitiatives}
-                 users={users}
-                 onRestore={handleRestoreInitiative}
-                 isLoading={isDataLoading}
                />
             ) : (
               <TaskTable 

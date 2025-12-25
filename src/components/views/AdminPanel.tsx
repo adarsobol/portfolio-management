@@ -106,6 +106,9 @@ interface AdminPanelProps {
   changeLog: ChangeRecord[];
   onGenerate30Initiatives?: () => Promise<void>;
   onClearCache?: () => Promise<void>;
+  deletedInitiatives?: Initiative[];
+  onRestore?: (id: string) => void;
+  isDataLoading?: boolean;
 }
 
 // Types for bulk import
@@ -175,7 +178,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   initiatives,
   changeLog,
   onGenerate30Initiatives,
-  onClearCache: _onClearCache
+  onClearCache: _onClearCache,
+  deletedInitiatives = [],
+  onRestore,
+  isDataLoading = false
 }) => {
   void _onClearCache; // Reserved for cache clearing feature
   const [newUser, setNewUser] = useState<Partial<User>>({ role: Role.TeamLead });
@@ -206,6 +212,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     lastLogin: string | null;
   }>>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [loginHistoryError, setLoginHistoryError] = useState<string | null>(null);
   
   // Backup management state
   const [backups, setBackups] = useState<BackupInfo[]>([]);
@@ -219,6 +226,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Fetch login history
   const fetchLoginHistory = async () => {
     setIsLoadingHistory(true);
+    setLoginHistoryError(null);
     try {
       const response = await fetch(`${API_ENDPOINT}/api/admin/login-history`, {
         headers: { 
@@ -229,9 +237,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       if (response.ok) {
         const data = await response.json();
         setLoginHistory(data.users || []);
+      } else if (response.status === 403) {
+        setLoginHistoryError('Admin access required to view login history');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setLoginHistoryError(errorData.error || 'Failed to load login history');
       }
     } catch (error) {
       console.error('Failed to fetch login history:', error);
+      setLoginHistoryError('Network error while fetching login history');
     } finally {
       setIsLoadingHistory(false);
     }
@@ -872,10 +886,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
         </div>
         
+        {/* Error message */}
+        {loginHistoryError && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} />
+            {loginHistoryError}
+          </div>
+        )}
+        
         {isLoadingHistory ? (
           <div className="text-center py-8 text-slate-400">
             <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
             <p className="text-sm">Loading login history...</p>
+          </div>
+        ) : loginHistoryError ? (
+          <div className="text-center py-8 text-slate-400">
+            <Clock size={32} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">Unable to load login history</p>
+          </div>
+        ) : loginHistory.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <Users size={32} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm font-medium text-slate-500">No login history available</p>
+            <p className="text-xs text-slate-400 mt-1">User login times will appear here after users log in</p>
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto">
@@ -1136,6 +1169,91 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Trash Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
+                <Trash2 size={16} className="text-white" />
+              </div>
+              Trash
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 ml-8">
+              {deletedInitiatives.length} deleted initiative{deletedInitiatives.length !== 1 ? 's' : ''} - restore or permanently remove items
+            </p>
+          </div>
+        </div>
+        
+        {deletedInitiatives.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <Trash2 size={32} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm font-medium text-slate-500">Trash is empty</p>
+            <p className="text-xs text-slate-400 mt-1">Deleted items will appear here</p>
+          </div>
+        ) : (
+          <div className="max-h-96 overflow-y-auto p-4">
+            <div className="space-y-3">
+              {deletedInitiatives.map(initiative => (
+                <div
+                  key={initiative.id}
+                  className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-slate-800 truncate">
+                        {initiative.title}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Users size={14} />
+                          {users.find(u => u.id === initiative.ownerId)?.name || initiative.ownerId}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar size={14} />
+                          {initiative.l2_pillar}
+                        </span>
+                        {initiative.deletedAt && (
+                          <span className="flex items-center gap-1 text-red-500">
+                            <Clock size={14} />
+                            Deleted {formatRelativeTime(initiative.deletedAt)}
+                          </span>
+                        )}
+                      </div>
+                      {initiative.deletedAt && (
+                        <p className="text-xs text-slate-400 mt-1">
+                          Deleted on {new Date(initiative.deletedAt).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    {onRestore && (
+                      <button
+                        onClick={() => onRestore(initiative.id)}
+                        disabled={isDataLoading}
+                        className="ml-4 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RotateCcw size={14} />
+                        Restore
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Info notice */}
+        {deletedInitiatives.length > 0 && (
+          <div className="mx-4 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-800">
+              <strong>Note:</strong> Items in trash are kept in the database with a "Deleted" status. 
+              You can restore them at any time. To permanently delete items, remove them directly from the Google Sheet.
+            </p>
           </div>
         )}
       </div>

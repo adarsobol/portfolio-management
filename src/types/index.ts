@@ -1,7 +1,7 @@
 // Data Hierarchy & Enums
 
 // View types for navigation
-export type ViewType = 'all' | 'resources' | 'timeline' | 'admin' | 'workflows' | 'dependencies' | 'trash';
+export type ViewType = 'all' | 'resources' | 'timeline' | 'admin' | 'workflows' | 'dependencies';
 
 // Dependency teams for cross-team dependencies
 export enum DependencyTeam {

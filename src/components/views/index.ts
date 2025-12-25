@@ -5,4 +5,3 @@ export { CalendarView } from './CalendarView';
 export { AdminPanel } from './AdminPanel';
 export { WorkflowsView } from './WorkflowsView';
 export { DependenciesView } from './DependenciesView';
-export { TrashView } from './TrashView';
