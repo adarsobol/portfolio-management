@@ -1236,6 +1236,12 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         title: 'Initiatives',
         headerValues: INITIATIVE_HEADERS
       });
+    } else {
+      // Ensure headers are set if sheet exists but has no headers
+      await sheet.loadHeaderRow().catch(async () => {
+        console.log('[SERVER] Initiatives sheet has no headers, setting them now');
+        await sheet!.setHeaderRow(INITIATIVE_HEADERS);
+      });
     }
 
     // Get all rows and remove duplicates from sheet first
@@ -1403,6 +1409,12 @@ app.post('/api/sheets/changelog', authenticateToken, validate(changelogSchema), 
       sheet = await doc.addSheet({
         title: 'ChangeLog',
         headerValues: CHANGELOG_HEADERS
+      });
+    } else {
+      // Ensure headers are set if sheet exists but is empty
+      await sheet.loadHeaderRow().catch(async () => {
+        console.log('[SERVER] ChangeLog sheet has no headers, setting them now');
+        await sheet!.setHeaderRow(CHANGELOG_HEADERS);
       });
     }
 
