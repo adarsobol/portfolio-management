@@ -1165,13 +1165,14 @@ class SheetsSyncManager {
       
       if (!response.ok) {
         const errorText = await response.text();
+        const errorTextStr = String(errorText || '');
         console.error('[SYNC] Snapshot creation failed:', {
           status: response.status,
           statusText: response.statusText,
-          errorText: errorText.substring(0, 200)
+          errorText: errorTextStr.substring(0, 200)
         });
-        logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { status: response.status, errorText: errorText.substring(0, 100) } });
-        const errorMsg = errorText.length > 0 ? errorText.substring(0, 100) : response.statusText;
+        logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { status: response.status, errorText: errorTextStr.substring(0, 100) } });
+        const errorMsg = errorTextStr.length > 0 ? errorTextStr.substring(0, 100) : response.statusText;
         this.status.error = `Snapshot failed (${response.status}): ${errorMsg}`;
         this.notify();
         return false;
