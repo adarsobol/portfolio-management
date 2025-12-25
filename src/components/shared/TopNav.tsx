@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, Trash2 } from 'lucide-react';
 import { User as UserType, ViewType, AppConfig } from '../../types';
 import { canViewTab, canAccessAdmin } from '../../utils';
 
@@ -70,6 +70,9 @@ export const TopNav: React.FC<TopNavProps> = ({
               )}
               {canAccessAdminPanel && (
                 <NavButton view="admin" icon={Settings} label="Admin" activeGradient="from-slate-600 to-slate-700" />
+              )}
+              {canAccessAdminPanel && (
+                <NavButton view="trash" icon={Trash2} label="Trash" activeGradient="from-red-500 to-red-600" />
               )}
             </>
           )}

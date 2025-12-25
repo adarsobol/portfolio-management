@@ -1,7 +1,7 @@
 // Google Sheets Sync Service - Primary Mode
 // Google Sheets is the primary data source, localStorage is fallback cache
 
-import { Initiative, ChangeRecord, Snapshot, AppConfig, User, Task } from '../types';
+import { Initiative, ChangeRecord, Snapshot, AppConfig, User, Task, Status } from '../types';
 import { authService } from './authService';
 import { logger } from '../utils/logger';
 
@@ -79,7 +79,8 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     completionRate: i.completionRate ?? 0,
     comments: JSON.stringify(i.comments || []),
     history: JSON.stringify(i.history || []),
-    version: i.version ?? 0
+    version: i.version ?? 0,
+    deletedAt: i.deletedAt ?? ''
   };
 }
 
@@ -112,6 +113,7 @@ export interface FlatTask {
   tags: string;
   comments: string;
   lastUpdated: string;
+  deletedAt: string;
 }
 
 export function flattenTask(task: Task, initiative: Initiative): FlatTask {
@@ -127,7 +129,8 @@ export function flattenTask(task: Task, initiative: Initiative): FlatTask {
     status: task.status || '',
     tags: JSON.stringify(task.tags || []),
     comments: JSON.stringify(task.comments || []),
-    lastUpdated: new Date().toISOString().split('T')[0]
+    lastUpdated: new Date().toISOString().split('T')[0],
+    deletedAt: task.deletedAt || ''
   };
 }
 
@@ -168,8 +171,6 @@ export interface SyncConflict {
   serverData: Record<string, unknown>;
 }
 
-type ConflictCallback = (conflicts: SyncConflict[]) => void;
-
 // ============================================
 // SYNC QUEUE MANAGER
 // ============================================
@@ -189,7 +190,6 @@ class SheetsSyncManager {
     isLoading: false
   };
   private listeners: Set<(status: SyncStatus) => void> = new Set();
-  private conflictListeners: Set<ConflictCallback> = new Set();
   private enabled: boolean = true;
   private debounceMs: number = 1000; // Reduced for more responsive syncing
 
@@ -267,17 +267,6 @@ class SheetsSyncManager {
     this.listeners.add(callback);
     callback(this.status); // Immediate callback with current status
     return () => this.listeners.delete(callback);
-  }
-
-  /** Subscribe to conflict events */
-  onConflict(callback: ConflictCallback): () => void {
-    this.conflictListeners.add(callback);
-    return () => this.conflictListeners.delete(callback);
-  }
-
-  /** Emit conflicts to all listeners */
-  private emitConflicts(conflicts: SyncConflict[]): void {
-    this.conflictListeners.forEach(cb => cb(conflicts));
   }
 
   /** Enable or disable syncing */
@@ -600,11 +589,12 @@ class SheetsSyncManager {
   }
 
   /** Delete an initiative from Sheets */
-  async deleteInitiative(id: string): Promise<boolean> {
+  /** Soft delete an initiative (sets status to Deleted) */
+  async deleteInitiative(id: string): Promise<{ success: boolean; deletedAt?: string }> {
     if (!this.status.isOnline) {
       this.status.error = 'Offline - cannot delete from Sheets';
       this.notify();
-      return false;
+      return { success: false };
     }
 
     try {
@@ -616,7 +606,7 @@ class SheetsSyncManager {
       if (response.status === 401 || response.status === 403) {
         this.status.error = 'Authentication required';
         this.notify();
-        return false;
+        return { success: false };
       }
 
       if (!response.ok) {
@@ -624,11 +614,17 @@ class SheetsSyncManager {
         throw new Error(error.error || `Delete failed: ${response.statusText}`);
       }
 
-      // Remove from localStorage cache
+      const result = await response.json();
+
+      // Update localStorage cache to mark as deleted
       try {
         const cached = loadFromLocalStorageCache() || [];
-        const filtered = cached.filter((init: Initiative) => init.id !== id);
-        cacheToLocalStorage(filtered);
+        const updated = cached.map((init: Initiative) => 
+          init.id === id 
+            ? { ...init, status: Status.Deleted, deletedAt: result.deletedAt } 
+            : init
+        );
+        cacheToLocalStorage(updated);
       } catch {
         // Ignore cache errors
       }
@@ -640,10 +636,120 @@ class SheetsSyncManager {
 
       this.status.error = null;
       this.notify();
-      return true;
+      return { success: true, deletedAt: result.deletedAt };
     } catch (error) {
       logger.error('Failed to delete initiative', { context: 'SheetsSyncManager.deleteInitiative', error: error instanceof Error ? error : new Error(String(error)) });
       this.status.error = error instanceof Error ? error.message : 'Delete failed';
+      this.notify();
+      return { success: false };
+    }
+  }
+
+  /** Restore a soft-deleted initiative */
+  async restoreInitiative(id: string): Promise<boolean> {
+    if (!this.status.isOnline) {
+      this.status.error = 'Offline - cannot restore from Sheets';
+      this.notify();
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives/${id}/restore`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        this.status.error = 'Authentication required';
+        this.notify();
+        return false;
+      }
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || `Restore failed: ${response.statusText}`);
+      }
+
+      // Update localStorage cache to restore
+      try {
+        const cached = loadFromLocalStorageCache() || [];
+        const updated = cached.map((init: Initiative) => 
+          init.id === id 
+            ? { ...init, status: Status.NotStarted, deletedAt: undefined } 
+            : init
+        );
+        cacheToLocalStorage(updated);
+      } catch {
+        // Ignore cache errors
+      }
+
+      this.status.error = null;
+      this.notify();
+      return true;
+    } catch (error) {
+      logger.error('Failed to restore initiative', { context: 'SheetsSyncManager.restoreInitiative', error: error instanceof Error ? error : new Error(String(error)) });
+      this.status.error = error instanceof Error ? error.message : 'Restore failed';
+      this.notify();
+      return false;
+    }
+  }
+
+  /** Soft delete a task */
+  async deleteTask(id: string): Promise<{ success: boolean; deletedAt?: string }> {
+    if (!this.status.isOnline) {
+      this.status.error = 'Offline - cannot delete task from Sheets';
+      this.notify();
+      return { success: false };
+    }
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/sheets/tasks/${id}`, {
+        method: 'DELETE',
+        headers: this.getHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || `Delete task failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      this.status.error = null;
+      this.notify();
+      return { success: true, deletedAt: result.deletedAt };
+    } catch (error) {
+      logger.error('Failed to delete task', { context: 'SheetsSyncManager.deleteTask', error: error instanceof Error ? error : new Error(String(error)) });
+      this.status.error = error instanceof Error ? error.message : 'Delete task failed';
+      this.notify();
+      return { success: false };
+    }
+  }
+
+  /** Restore a soft-deleted task */
+  async restoreTask(id: string): Promise<boolean> {
+    if (!this.status.isOnline) {
+      this.status.error = 'Offline - cannot restore task from Sheets';
+      this.notify();
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/sheets/tasks/${id}/restore`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || `Restore task failed: ${response.statusText}`);
+      }
+
+      this.status.error = null;
+      this.notify();
+      return true;
+    } catch (error) {
+      logger.error('Failed to restore task', { context: 'SheetsSyncManager.restoreTask', error: error instanceof Error ? error : new Error(String(error)) });
+      this.status.error = error instanceof Error ? error.message : 'Restore task failed';
       this.notify();
       return false;
     }
@@ -879,22 +985,17 @@ class SheetsSyncManager {
         return false;
       }
       
-      // Parse response and check for conflicts
+      // Parse response and check for server-newer items (last-write-wins)
       const result = await response.json();
       
-      if (result.conflicts && result.conflicts.length > 0) {
-        logger.warn('Sync conflicts detected', { 
+      if (result.serverNewer && result.serverNewer.length > 0) {
+        // Server had newer data - log it but don't treat as error
+        // The data will be refreshed on next pull
+        logger.info('Some items had newer server data (last-write-wins)', { 
           context: 'SheetsSyncManager.syncInitiatives', 
-          metadata: { conflictCount: result.conflicts.length } 
+          metadata: { count: result.serverNewer.length } 
         });
-        this.status.error = `${result.conflicts.length} conflict(s) detected - changes by another user`;
-        this.notify();
-        
-        // Emit conflicts to UI for resolution
-        this.emitConflicts(result.conflicts as SyncConflict[]);
-        
-        // Return true because the request succeeded, but conflicts exist
-        return true;
+        console.log(`[SYNC] ${result.serverNewer.length} item(s) skipped - server has newer data`);
       }
       
       return true;

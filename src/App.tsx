@@ -5,11 +5,10 @@ import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, HIERARCHY, migratePermissio
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, Priority, UnplannedTag } from './types';
 import { getOwnerName, generateId, parseMentions, logger, generateInitiativeId, canCreateTasks, canViewTab } from './utils';
 import { useLocalStorage } from './hooks';
-import { slackService, workflowEngine, realtimeService, sheetsSync, SyncConflict } from './services';
+import { slackService, workflowEngine, realtimeService, sheetsSync } from './services';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
 import AtRiskReasonModal from './components/modals/AtRiskReasonModal';
-import ConflictResolutionModal from './components/modals/ConflictResolutionModal';
 
 // Components
 import { TopNav } from './components/shared/TopNav';
@@ -25,6 +24,7 @@ import { CalendarView } from './components/views/CalendarView';
 import { AdminPanel } from './components/views/AdminPanel';
 import { WorkflowsView } from './components/views/WorkflowsView';
 import { DependenciesView } from './components/views/DependenciesView';
+import { TrashView } from './components/views/TrashView';
 import { LoginPage } from './components/auth';
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
@@ -96,9 +96,6 @@ export default function App() {
   // Comment Read State - tracks when each user last viewed comments on each initiative
   const [commentReadState, setCommentReadState] = useLocalStorage<UserCommentReadState>('portfolio-comment-read-state', {});
 
-  // Conflict resolution state
-  const [syncConflicts, setSyncConflicts] = useState<SyncConflict[]>([]);
-  const [showConflictModal, setShowConflictModal] = useState(false);
 
   // Load users from API
   useEffect(() => {
@@ -216,19 +213,6 @@ export default function App() {
     }
   }, [isAuthenticated, currentUser]);
 
-  // Subscribe to sync conflict events
-  useEffect(() => {
-    const unsubConflicts = sheetsSync.onConflict((conflicts) => {
-      if (conflicts.length > 0) {
-        setSyncConflicts(conflicts);
-        setShowConflictModal(true);
-      }
-    });
-
-    return () => {
-      unsubConflicts();
-    };
-  }, []);
 
   // Migrate config to ensure all new permissions and fields are present
   useEffect(() => {
@@ -552,6 +536,13 @@ export default function App() {
     const deduplicatedInitiatives = deduplicateInitiatives(initiatives);
     let data = [...deduplicatedInitiatives];
 
+    // For trash view, only show deleted items; for other views, exclude deleted items
+    if (currentView === 'trash') {
+      data = data.filter(i => i.status === Status.Deleted);
+    } else {
+      data = data.filter(i => i.status !== Status.Deleted);
+    }
+
     // Filter by Asset Class
     if (filterAssetClass) data = data.filter(i => i.l1_assetClass === filterAssetClass);
     
@@ -619,7 +610,7 @@ export default function App() {
     }
 
     return data;
-  }, [initiatives, searchQuery, filterAssetClass, filterOwners, filterWorkType, sortConfig, users]);
+  }, [initiatives, searchQuery, filterAssetClass, filterOwners, filterWorkType, sortConfig, users, currentView]);
 
   const metrics = useMemo(() => {
     const totalEst = filteredInitiatives.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
@@ -920,7 +911,7 @@ export default function App() {
 
     // Confirmation dialog
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${initiative.title}"?\n\nThis action cannot be undone.`
+      `Are you sure you want to delete "${initiative.title}"?\n\nYou can restore it from the Trash later.`
     );
 
     if (!confirmed) {
@@ -930,26 +921,80 @@ export default function App() {
     try {
       setIsDataLoading(true);
       
-      // Remove from local state
-      setInitiatives(prev => prev.filter(i => i.id !== id));
+      // Soft delete in Google Sheets
+      const result = await sheetsSync.deleteInitiative(id);
       
-      // Update localStorage cache
-      const cached = localStorage.getItem('portfolio-initiatives-cache');
-      if (cached) {
-        const cachedInitiatives: Initiative[] = JSON.parse(cached);
-        const filtered = cachedInitiatives.filter(i => i.id !== id);
-        localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(filtered));
+      if (result.success) {
+        // Update local state to mark as deleted
+        setInitiatives(prev => prev.map(i => 
+          i.id === id 
+            ? { ...i, status: Status.Deleted, deletedAt: result.deletedAt } 
+            : i
+        ));
+        
+        // Update localStorage cache
+        const cached = localStorage.getItem('portfolio-initiatives-cache');
+        if (cached) {
+          const cachedInitiatives: Initiative[] = JSON.parse(cached);
+          const updated = cachedInitiatives.map(i => 
+            i.id === id 
+              ? { ...i, status: Status.Deleted, deletedAt: result.deletedAt } 
+              : i
+          );
+          localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(updated));
+        }
+        
+        showSuccess(`Initiative "${initiative.title}" has been moved to Trash`);
+      } else {
+        showError('Failed to delete initiative. Please try again.');
       }
-      
-      // Delete from Google Sheets
-      sheetsSync.deleteInitiative(id).catch(err => {
-        logger.error('Failed to delete from Sheets', { context: 'App.handleDeleteInitiative', error: err });
-      });
-      
-      showSuccess(`Initiative "${initiative.title}" has been deleted`);
     } catch (error) {
       logger.error('Failed to delete initiative', { context: 'App.handleDeleteInitiative', error: error instanceof Error ? error : new Error(String(error)) });
       showError('Failed to delete initiative. Please try again.');
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
+  const handleRestoreInitiative = async (id: string) => {
+    const initiative = initiatives.find(i => i.id === id);
+    if (!initiative) {
+      showError('Initiative not found');
+      return;
+    }
+
+    try {
+      setIsDataLoading(true);
+      
+      const success = await sheetsSync.restoreInitiative(id);
+      
+      if (success) {
+        // Update local state to restore
+        setInitiatives(prev => prev.map(i => 
+          i.id === id 
+            ? { ...i, status: Status.NotStarted, deletedAt: undefined } 
+            : i
+        ));
+        
+        // Update localStorage cache
+        const cached = localStorage.getItem('portfolio-initiatives-cache');
+        if (cached) {
+          const cachedInitiatives: Initiative[] = JSON.parse(cached);
+          const updated = cachedInitiatives.map(i => 
+            i.id === id 
+              ? { ...i, status: Status.NotStarted, deletedAt: undefined } 
+              : i
+          );
+          localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(updated));
+        }
+        
+        showSuccess(`Initiative "${initiative.title}" has been restored`);
+      } else {
+        showError('Failed to restore initiative. Please try again.');
+      }
+    } catch (error) {
+      logger.error('Failed to restore initiative', { context: 'App.handleRestoreInitiative', error: error instanceof Error ? error : new Error(String(error)) });
+      showError('Failed to restore initiative. Please try again.');
     } finally {
       setIsDataLoading(false);
     }
@@ -1878,6 +1923,13 @@ export default function App() {
                  }}
                  onInitiativeUpdate={handleSave}
                />
+            ) : currentView === 'trash' ? (
+               <TrashView
+                 deletedInitiatives={filteredInitiatives}
+                 users={users}
+                 onRestore={handleRestoreInitiative}
+                 isLoading={isDataLoading}
+               />
             ) : (
               <TaskTable 
                 filteredInitiatives={filteredInitiatives}
@@ -1926,38 +1978,6 @@ export default function App() {
         onCancel={handleAtRiskReasonCancel}
       />
 
-      <ConflictResolutionModal
-        isOpen={showConflictModal}
-        conflicts={syncConflicts}
-        onKeepMine={async (conflictIds) => {
-          // Force push local changes by incrementing version
-          const conflictInitiatives = initiatives.filter(i => conflictIds.includes(i.id));
-          const updated = conflictInitiatives.map(i => ({
-            ...i,
-            version: (i.version || 0) + 100 // Force override with higher version
-          }));
-          updated.forEach(i => {
-            setInitiatives(prev => prev.map(init => init.id === i.id ? i : init));
-            sheetsSync.queueInitiativeSync(i);
-          });
-          showSuccess(`Kept your changes for ${conflictIds.length} initiative(s)`);
-          setSyncConflicts([]);
-        }}
-        onKeepTheirs={async () => {
-          // Reload from server
-          try {
-            const freshData = await sheetsSync.loadInitiatives();
-            setInitiatives(deduplicateInitiatives(freshData));
-            showSuccess('Reloaded data from server');
-          } catch (error) {
-            showError('Failed to reload data from server');
-          }
-          setSyncConflicts([]);
-        }}
-        onClose={() => {
-          setShowConflictModal(false);
-        }}
-      />
     </div>
   );
 }

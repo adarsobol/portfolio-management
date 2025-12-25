@@ -444,7 +444,7 @@ const INITIATIVE_HEADERS = [
   'eta', 'originalEta', 'lastUpdated', 'lastWeeklyUpdate', 'dependencies', 'workType',
   'unplannedTags', 'riskActionLog', 'isAtRisk', 'definitionOfDone',
   'tasks', 'overlookedCount', 'lastDelayDate', 'completionRate',
-  'comments', 'history', 'version'
+  'comments', 'history', 'version', 'deletedAt'
 ];
 
 const CHANGELOG_HEADERS = [
@@ -454,7 +454,7 @@ const CHANGELOG_HEADERS = [
 
 const TASK_HEADERS = [
   'id', 'parentId', 'initiativeTitle', 'title', 'estimatedEffort', 'actualEffort',
-  'eta', 'ownerId', 'status', 'tags', 'comments', 'lastUpdated'
+  'eta', 'ownerId', 'status', 'tags', 'comments', 'lastUpdated', 'deletedAt'
 ];
 
 const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin'];
@@ -1282,11 +1282,9 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     // Create a map of existing IDs for faster lookup
     const existingIds = new Set(rows.map((r: GoogleSpreadsheetRow) => r.get('id')).filter((id: string) => id && !id.startsWith('_meta_')));
     
-    // Track conflicts for version-based conflict detection
-    const conflicts: Array<{
+    // Track items where server is newer (for client to update their local state)
+    const serverNewer: Array<{
       id: string;
-      serverVersion: number;
-      clientVersion: number;
       serverData: Record<string, unknown>;
     }> = [];
     let syncedCount = 0;
@@ -1295,30 +1293,30 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
       const existing = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === initiative.id);
 
       if (existing) {
-        // Check for version conflicts (optimistic locking)
-        const serverVersion = parseInt(existing.get('version') || '0', 10);
-        const clientVersion = parseInt(initiative.version || '0', 10);
+        // Last-write-wins based on lastUpdated timestamp
+        const serverLastUpdated = existing.get('lastUpdated') || '';
+        const clientLastUpdated = initiative.lastUpdated || '';
         
-        if (serverVersion > clientVersion) {
-          // Conflict detected - server has a newer version
-          console.warn(`[SERVER] Conflict detected for ${initiative.id}: server v${serverVersion} > client v${clientVersion}`);
-          conflicts.push({
+        // Compare timestamps - if server is newer, skip update and return server data
+        if (serverLastUpdated && clientLastUpdated && serverLastUpdated > clientLastUpdated) {
+          console.log(`[SERVER] Server is newer for ${initiative.id}: server ${serverLastUpdated} > client ${clientLastUpdated}`);
+          serverNewer.push({
             id: initiative.id,
-            serverVersion,
-            clientVersion,
             serverData: {
               id: existing.get('id'),
               title: existing.get('title'),
               status: existing.get('status'),
               eta: existing.get('eta'),
               lastUpdated: existing.get('lastUpdated'),
-              version: serverVersion
+              version: parseInt(existing.get('version') || '0', 10)
             }
           });
-          continue; // Skip this initiative - conflict needs to be resolved
+          continue; // Skip - server has newer data
         }
         
-        // Increment version and update existing row
+        // Client is newer or same - update the row
+        console.log(`[SERVER] Updating ${initiative.id}: client ${clientLastUpdated} >= server ${serverLastUpdated}`);
+        const serverVersion = parseInt(existing.get('version') || '0', 10);
         const newVersion = serverVersion + 1;
         Object.keys(initiative).forEach(key => {
           const value = initiative[key];
@@ -1344,13 +1342,13 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
       }
     }
 
-    if (conflicts.length > 0) {
-      console.log(`Synced ${syncedCount} initiatives, ${conflicts.length} conflicts detected`);
+    if (serverNewer.length > 0) {
+      console.log(`Synced ${syncedCount} initiatives, ${serverNewer.length} had newer server data`);
       res.json({ 
         success: true, 
         count: syncedCount, 
-        conflicts,
-        message: `${conflicts.length} initiative(s) have conflicts that need resolution`
+        serverNewer,
+        message: `${serverNewer.length} initiative(s) were skipped - server has newer data`
       });
     } else {
       console.log(`Synced ${syncedCount} initiatives`);
@@ -1362,7 +1360,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
   }
 });
 
-// DELETE /api/sheets/initiatives/:id - Delete an initiative (Protected)
+// DELETE /api/sheets/initiatives/:id - Soft delete an initiative (Protected)
 app.delete('/api/sheets/initiatives/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -1381,18 +1379,141 @@ app.delete('/api/sheets/initiatives/:id', authenticateToken, async (req: Authent
     }
 
     const rows = await sheet.getRows();
-    const rowToDelete = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+    const rowToUpdate = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
     
-    if (!rowToDelete) {
+    if (!rowToUpdate) {
       res.status(404).json({ error: 'Initiative not found' });
       return;
     }
 
-    await rowToDelete.delete();
-    console.log(`Deleted initiative ${id}`);
+    // Soft delete: set status to Deleted and add deletedAt timestamp
+    const deletedAt = new Date().toISOString();
+    rowToUpdate.set('status', 'Deleted');
+    rowToUpdate.set('deletedAt', deletedAt);
+    await rowToUpdate.save();
+    
+    console.log(`Soft deleted initiative ${id} at ${deletedAt}`);
+    res.json({ success: true, id, deletedAt });
+  } catch (error) {
+    console.error('Error soft deleting initiative:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// DELETE /api/sheets/tasks/:id - Soft delete a task (Protected)
+app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      return;
+    }
+
+    let sheet = doc.sheetsByTitle['Tasks'];
+    
+    if (!sheet) {
+      res.status(404).json({ error: 'Tasks sheet not found' });
+      return;
+    }
+
+    const rows = await sheet.getRows();
+    const rowToUpdate = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+    
+    if (!rowToUpdate) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // Soft delete: set status to Deleted and add deletedAt timestamp
+    const deletedAt = new Date().toISOString();
+    rowToUpdate.set('status', 'Deleted');
+    rowToUpdate.set('deletedAt', deletedAt);
+    await rowToUpdate.save();
+    
+    console.log(`Soft deleted task ${id} at ${deletedAt}`);
+    res.json({ success: true, id, deletedAt });
+  } catch (error) {
+    console.error('Error soft deleting task:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/sheets/initiatives/:id/restore - Restore a soft-deleted initiative (Protected)
+app.post('/api/sheets/initiatives/:id/restore', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      return;
+    }
+
+    let sheet = doc.sheetsByTitle['Initiatives'];
+    
+    if (!sheet) {
+      res.status(404).json({ error: 'Initiatives sheet not found' });
+      return;
+    }
+
+    const rows = await sheet.getRows();
+    const rowToUpdate = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+    
+    if (!rowToUpdate) {
+      res.status(404).json({ error: 'Initiative not found' });
+      return;
+    }
+
+    // Restore: clear deletedAt and set status to Not Started
+    rowToUpdate.set('status', 'Not Started');
+    rowToUpdate.set('deletedAt', '');
+    await rowToUpdate.save();
+    
+    console.log(`Restored initiative ${id}`);
     res.json({ success: true, id });
   } catch (error) {
-    console.error('Error deleting initiative:', error);
+    console.error('Error restoring initiative:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/sheets/tasks/:id/restore - Restore a soft-deleted task (Protected)
+app.post('/api/sheets/tasks/:id/restore', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      return;
+    }
+
+    let sheet = doc.sheetsByTitle['Tasks'];
+    
+    if (!sheet) {
+      res.status(404).json({ error: 'Tasks sheet not found' });
+      return;
+    }
+
+    const rows = await sheet.getRows();
+    const rowToUpdate = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+    
+    if (!rowToUpdate) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // Restore: clear deletedAt and set status to Not Started
+    rowToUpdate.set('status', 'Not Started');
+    rowToUpdate.set('deletedAt', '');
+    await rowToUpdate.save();
+    
+    console.log(`Restored task ${id}`);
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Error restoring task:', error);
     res.status(500).json({ error: String(error) });
   }
 });

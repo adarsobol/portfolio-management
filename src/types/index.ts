@@ -1,7 +1,7 @@
 // Data Hierarchy & Enums
 
 // View types for navigation
-export type ViewType = 'all' | 'resources' | 'timeline' | 'admin' | 'workflows' | 'dependencies';
+export type ViewType = 'all' | 'resources' | 'timeline' | 'admin' | 'workflows' | 'dependencies' | 'trash';
 
 // Dependency teams for cross-team dependencies
 export enum DependencyTeam {
@@ -41,7 +41,8 @@ export enum Status {
   InProgress = 'In Progress',
   AtRisk = 'At Risk',
   Done = 'Done',
-  Obsolete = 'Obsolete'
+  Obsolete = 'Obsolete',
+  Deleted = 'Deleted'
 }
 
 export enum Priority {
@@ -91,6 +92,7 @@ export interface Task {
   status: Status; // NotStarted/InProgress/Done
   tags?: UnplannedTag[]; // PM Item, Risk Item, Both
   comments?: Comment[];
+  deletedAt?: string; // ISO date string when soft-deleted
 }
 
 export interface Dependency {
@@ -176,6 +178,9 @@ export interface Initiative {
   
   // Conflict detection
   version?: number; // Increment on each save for optimistic locking
+  
+  // Soft delete
+  deletedAt?: string; // ISO date string when soft-deleted
 }
 
 // Legacy permission keys (for backward compatibility)
