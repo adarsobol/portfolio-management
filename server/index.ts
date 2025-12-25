@@ -2210,16 +2210,37 @@ app.get('/api/backups', authenticateToken, async (req: AuthenticatedRequest, res
     }
 
     const backupService = getBackupService();
-    if (!backupService) {
-      res.status(503).json({ 
-        error: 'Backup service not available',
-        message: 'GCS storage is not configured for this environment'
-      });
-      return;
-    }
+    if (backupService) {
+      // GCS-based backups
+      const backups = await backupService.listBackups();
+      res.json({ backups, source: 'gcs' });
+    } else {
+      // Fallback: List Google Sheets snapshots
+      const doc = await getDoc();
+      if (!doc) {
+        res.json({ backups: [], source: 'sheets', message: 'Using Sheets snapshots (GCS not configured)' });
+        return;
+      }
 
-    const backups = await backupService.listBackups();
-    res.json({ backups });
+      const snapshots = Object.keys(doc.sheetsByTitle)
+        .filter(title => title.startsWith('Snap_'))
+        .map(title => {
+          // Parse snapshot info from title (e.g., "Snap_2025-12-25T10-30-00_Name" or "Snap_Weekly_2025-12-25")
+          const dateMatch = title.match(/Snap_(?:Weekly_)?(\d{4}-\d{2}-\d{2})/);
+          const date = dateMatch ? dateMatch[1] : title;
+          return {
+            date,
+            path: title,
+            files: 1,
+            totalSize: 0,
+            status: 'success' as const,
+            timestamp: date + 'T00:00:00Z'
+          };
+        })
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      res.json({ backups: snapshots, source: 'sheets', message: 'Using Sheets snapshots (GCS not configured)' });
+    }
   } catch (error) {
     console.error('Error listing backups:', error);
     res.status(500).json({ error: String(error) });
@@ -2235,26 +2256,57 @@ app.get('/api/backups/:date', authenticateToken, async (req: AuthenticatedReques
     }
 
     const { date } = req.params;
-    
-    // Validate date format
-    if (!/^\d{4}-\d{2}-\d{2}/.test(date)) {
-      res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
-      return;
-    }
 
     const backupService = getBackupService();
-    if (!backupService) {
-      res.status(503).json({ error: 'Backup service not available' });
-      return;
-    }
+    if (backupService) {
+      // Validate date format for GCS
+      if (!/^\d{4}-\d{2}-\d{2}/.test(date)) {
+        res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+        return;
+      }
 
-    const backup = await backupService.getBackupDetails(date);
-    if (!backup) {
-      res.status(404).json({ error: `No backup found for ${date}` });
-      return;
-    }
+      const backup = await backupService.getBackupDetails(date);
+      if (!backup) {
+        res.status(404).json({ error: `No backup found for ${date}` });
+        return;
+      }
 
-    res.json({ backup });
+      res.json({ backup, source: 'gcs' });
+    } else {
+      // Fallback: Get Sheets snapshot details
+      const doc = await getDoc();
+      if (!doc) {
+        res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+        return;
+      }
+
+      // Find matching snapshot (date could be tab name or date string)
+      const matchingTab = Object.keys(doc.sheetsByTitle).find(title => 
+        title.includes(date) && title.startsWith('Snap_')
+      );
+
+      if (!matchingTab) {
+        res.status(404).json({ error: `No snapshot found matching ${date}` });
+        return;
+      }
+
+      const snapshotSheet = doc.sheetsByTitle[matchingTab];
+      const rows = await snapshotSheet.getRows();
+      const count = rows.filter((r: GoogleSpreadsheetRow) => r.get('id') && !r.get('id').startsWith('_meta_')).length;
+
+      res.json({
+        backup: {
+          id: matchingTab,
+          timestamp: date + 'T00:00:00Z',
+          date: date,
+          files: [{ name: 'initiatives', path: matchingTab, size: count }],
+          totalSize: count,
+          duration: 0,
+          status: 'success'
+        },
+        source: 'sheets'
+      });
+    }
   } catch (error) {
     console.error('Error getting backup details:', error);
     res.status(500).json({ error: String(error) });
@@ -2280,26 +2332,92 @@ app.post('/api/backups/restore/:date', authenticateToken, async (req: Authentica
       return;
     }
 
-    const backupService = getBackupService();
-    if (!backupService) {
-      res.status(503).json({ error: 'Backup service not available' });
-      return;
-    }
-
     console.log(`Admin ${req.user.email} initiating restore from backup ${date}`);
-    
-    const result = await backupService.restoreFromBackup(date, files);
-    
-    if (result.success) {
-      // Notify connected clients about the restore
+
+    const backupService = getBackupService();
+    if (backupService) {
+      // GCS-based restore
+      const result = await backupService.restoreFromBackup(date, files);
+      
+      if (result.success) {
+        io.emit('data:restored', { 
+          date, 
+          restoredBy: req.user.email,
+          timestamp: result.timestamp 
+        });
+      }
+
+      res.json({ ...result, source: 'gcs' });
+    } else {
+      // Fallback: Restore from Sheets snapshot
+      const doc = await getDoc();
+      if (!doc) {
+        res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+        return;
+      }
+
+      // Find matching snapshot
+      const matchingTab = Object.keys(doc.sheetsByTitle).find(title => 
+        title.includes(date) && title.startsWith('Snap_')
+      );
+
+      if (!matchingTab) {
+        res.status(404).json({ error: `No snapshot found matching ${date}` });
+        return;
+      }
+
+      const snapshotSheet = doc.sheetsByTitle[matchingTab];
+      const snapshotRows = await snapshotSheet.getRows();
+      
+      // Get initiatives from snapshot (excluding metadata rows)
+      const initiativesToRestore = snapshotRows
+        .filter((row: GoogleSpreadsheetRow) => row.get('id') && !row.get('id').startsWith('_meta_'))
+        .map((row: GoogleSpreadsheetRow) => {
+          const rowData: Record<string, string> = {};
+          INITIATIVE_HEADERS.forEach(header => {
+            rowData[header] = row.get(header) || '';
+          });
+          return rowData;
+        });
+
+      if (initiativesToRestore.length === 0) {
+        res.status(400).json({ error: 'Snapshot contains no initiatives to restore' });
+        return;
+      }
+
+      // Get or create main Initiatives sheet
+      let sheet = doc.sheetsByTitle['Initiatives'];
+      if (sheet) {
+        await sheet.clear();
+        await sheet.setHeaderRow(INITIATIVE_HEADERS);
+      } else {
+        sheet = await doc.addSheet({
+          title: 'Initiatives',
+          headerValues: INITIATIVE_HEADERS
+        });
+      }
+
+      // Restore initiatives
+      await sheet.addRows(initiativesToRestore);
+
+      console.log(`Restored ${initiativesToRestore.length} initiatives from snapshot ${matchingTab}`);
+
       io.emit('data:restored', { 
         date, 
         restoredBy: req.user.email,
-        timestamp: result.timestamp 
+        timestamp: new Date().toISOString() 
+      });
+
+      res.json({ 
+        success: true, 
+        filesRestored: initiativesToRestore.length,
+        errors: [],
+        timestamp: new Date().toISOString(),
+        backupDate: date,
+        source: 'sheets',
+        message: `Restored ${initiativesToRestore.length} initiatives from Sheets snapshot`
       });
     }
-
-    res.json(result);
   } catch (error) {
     console.error('Error restoring from backup:', error);
     res.status(500).json({ error: String(error) });
@@ -2389,20 +2507,86 @@ app.post('/api/backups/create', authenticateToken, async (req: AuthenticatedRequ
 
     const { label } = req.body;
 
-    const backupService = getBackupService();
-    if (!backupService) {
-      res.status(503).json({ error: 'Backup service not available' });
-      return;
-    }
-
     console.log(`Admin ${req.user.email} creating manual backup`);
-    
-    const manifest = await backupService.createManualBackup(label);
-    
-    res.json({ 
-      success: manifest.status !== 'failed',
-      manifest 
-    });
+
+    const backupService = getBackupService();
+    if (backupService) {
+      // GCS-based backup
+      const manifest = await backupService.createManualBackup(label);
+      res.json({ 
+        success: manifest.status !== 'failed',
+        manifest,
+        source: 'gcs'
+      });
+    } else {
+      // Fallback: Create Google Sheets snapshot
+      const doc = await getDoc();
+      if (!doc) {
+        res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+        return;
+      }
+
+      // Load current initiatives
+      const sheet = doc.sheetsByTitle['Initiatives'];
+      if (!sheet) {
+        res.status(404).json({ error: 'No initiatives found to backup' });
+        return;
+      }
+
+      const rows = await sheet.getRows();
+      const initiatives = rows
+        .filter((row: GoogleSpreadsheetRow) => row.get('id') && !row.get('id').startsWith('_meta_'))
+        .map((row: GoogleSpreadsheetRow) => {
+          const rowData: Record<string, string> = {};
+          INITIATIVE_HEADERS.forEach(header => {
+            rowData[header] = row.get(header) || '';
+          });
+          return rowData;
+        });
+
+      // Create snapshot with timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const safeName = (label || 'Manual').replace(/[^a-zA-Z0-9\s-]/g, '').slice(0, 30);
+      const tabName = `Snap_${timestamp}_${safeName}`.slice(0, 100);
+
+      const newSheet = await doc.addSheet({
+        title: tabName,
+        headerValues: INITIATIVE_HEADERS
+      });
+
+      // Add metadata row
+      await newSheet.addRow({
+        id: `_meta_manual`,
+        title: `Manual backup by ${req.user.email} - ${now.toISOString()}`,
+        l1_assetClass: '',
+        l2_pillar: '',
+        l3_responsibility: '',
+        l4_target: ''
+      });
+
+      // Add all initiatives
+      if (initiatives.length > 0) {
+        await newSheet.addRows(initiatives);
+      }
+
+      console.log(`Created Sheets snapshot: ${tabName} with ${initiatives.length} initiatives`);
+      
+      res.json({ 
+        success: true,
+        manifest: {
+          id: tabName,
+          timestamp: now.toISOString(),
+          date: now.toISOString().split('T')[0],
+          files: [{ name: 'initiatives', path: tabName, size: initiatives.length }],
+          totalSize: initiatives.length,
+          duration: 0,
+          status: 'success'
+        },
+        source: 'sheets',
+        message: 'Created Google Sheets snapshot (GCS not configured)'
+      });
+    }
   } catch (error) {
     console.error('Error creating manual backup:', error);
     res.status(500).json({ error: String(error) });
