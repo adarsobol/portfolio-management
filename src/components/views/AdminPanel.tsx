@@ -223,6 +223,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [backupError, setBackupError] = useState<string | null>(null);
   const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
   
+  // Snapshots state
+  const [snapshots, setSnapshots] = useState<Array<{ title: string }>>([]);
+  const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
+  const [snapshotsError, setSnapshotsError] = useState<string | null>(null);
+  
   // Fetch login history
   const fetchLoginHistory = async () => {
     setIsLoadingHistory(true);
@@ -328,6 +333,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
   
+  // Fetch snapshots
+  const fetchSnapshots = async () => {
+    setIsLoadingSnapshots(true);
+    setSnapshotsError(null);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/sheets/snapshots`, {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSnapshots(data.snapshots || []);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setSnapshotsError(errorData.error || 'Failed to load snapshots');
+      }
+    } catch (error) {
+      console.error('Failed to fetch snapshots:', error);
+      setSnapshotsError('Network error while fetching snapshots');
+    } finally {
+      setIsLoadingSnapshots(false);
+    }
+  };
+  
   // Restore from backup
   const restoreFromBackup = async (date: string) => {
     if (!confirm(`Are you sure you want to restore data from ${date}? This will overwrite current data.`)) {
@@ -374,6 +405,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
     fetchLoginHistory();
     fetchBackups();
+    fetchSnapshots();
   }, []);
   
   // Format relative time
@@ -1101,6 +1133,79 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
           </div>
         )}
+        
+      </div>
+
+      {/* Snapshots Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-blue-50 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-lg">
+                <FileSpreadsheet size={16} className="text-white" />
+              </div>
+              Snapshots
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 ml-8">View all snapshot tabs created in Google Sheets</p>
+          </div>
+          <button
+            onClick={fetchSnapshots}
+            disabled={isLoadingSnapshots}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <RefreshCw size={14} className={isLoadingSnapshots ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+        
+        {/* Error message */}
+        {snapshotsError && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} />
+            {snapshotsError}
+          </div>
+        )}
+        
+        {isLoadingSnapshots ? (
+          <div className="text-center py-8 text-slate-400">
+            <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+            <p className="text-sm">Loading snapshots...</p>
+          </div>
+        ) : snapshotsError ? (
+          <div className="text-center py-8 text-slate-400">
+            <FileSpreadsheet size={32} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">Unable to load snapshots</p>
+          </div>
+        ) : snapshots.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <FileSpreadsheet size={32} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm font-medium text-slate-500">No snapshots found</p>
+            <p className="text-xs text-slate-400 mt-1">Snapshots will appear here when created</p>
+          </div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Snapshot Name</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {snapshots.map((snapshot, index) => (
+                  <tr key={index} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <FileSpreadsheet size={16} className="text-indigo-500" />
+                        <span className="font-medium text-slate-700">{snapshot.title}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
         
         {/* Backup Details Modal */}
         {selectedBackup && (

@@ -2213,7 +2213,7 @@ app.get('/api/admin/connected-users', authenticateToken, async (req: Authenticat
 app.get('/api/admin/login-history', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Only admins can access this endpoint
-    if (req.user?.email !== 'adar.sobol@pagaya.com') {
+    if (req.user?.role !== 'Admin') {
       res.status(403).json({ error: 'Admin access required' });
       return;
     }
