@@ -2112,6 +2112,85 @@ app.delete('/api/notifications', authenticateToken, async (req: AuthenticatedReq
 });
 
 // ============================================
+// ADMIN: LOGIN TRACKING ENDPOINTS
+// ============================================
+
+// GET /api/admin/connected-users - Get live connected users (admin only)
+app.get('/api/admin/connected-users', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access this endpoint
+    if (req.user?.email !== 'adar.sobol@pagaya.com') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const users = Array.from(connectedUsers.values()).map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      currentView: user.currentView,
+      editingInitiativeId: user.editingInitiativeId,
+      lastActivity: user.lastActivity,
+      connectedSince: user.lastActivity // Using lastActivity as proxy for connection time
+    }));
+
+    res.json({ 
+      connectedUsers: users,
+      totalConnected: users.length,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Error fetching connected users:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/admin/login-history - Get login history for all users (admin only)
+app.get('/api/admin/login-history', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access this endpoint
+    if (req.user?.email !== 'adar.sobol@pagaya.com') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    const usersSheet = doc.sheetsByTitle['Users'];
+    if (!usersSheet) {
+      res.json({ users: [] });
+      return;
+    }
+
+    const rows = await usersSheet.getRows();
+    const users = rows.map((r: GoogleSpreadsheetRow) => ({
+      id: r.get('id'),
+      email: r.get('email'),
+      name: r.get('name'),
+      role: r.get('role'),
+      avatar: r.get('avatar'),
+      lastLogin: r.get('lastLogin') || null
+    })).sort((a, b) => {
+      // Sort by lastLogin, most recent first, null values at end
+      if (!a.lastLogin && !b.lastLogin) return 0;
+      if (!a.lastLogin) return 1;
+      if (!b.lastLogin) return -1;
+      return new Date(b.lastLogin).getTime() - new Date(a.lastLogin).getTime();
+    });
+
+    res.json({ users });
+  } catch (error) {
+    console.error('Get login history error:', error);
+    res.status(500).json({ error: 'Failed to get login history' });
+  }
+});
+
+// ============================================
 // EXPORT ENDPOINTS (Server-side file generation)
 // ============================================
 

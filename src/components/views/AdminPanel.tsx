@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw } from 'lucide-react';
 import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
 import { generateId, exportToExcel } from '../../utils';
 import * as XLSX from 'xlsx';
@@ -174,6 +174,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   
   // Permission tab state
   const [activePermissionTab, setActivePermissionTab] = useState<'tabs' | 'tasks' | 'admin'>('tabs');
+  
+  // Login history state
+  const [loginHistory, setLoginHistory] = useState<Array<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    avatar?: string;
+    lastLogin: string | null;
+  }>>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  
+  // Fetch login history
+  const fetchLoginHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/admin/login-history`, {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLoginHistory(data.users || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch login history:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  // Initial fetch
+  useEffect(() => {
+    fetchLoginHistory();
+  }, []);
+  
+  // Format relative time
+  const formatRelativeTime = (timestamp: string | null) => {
+    if (!timestamp) return 'Never';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   const isAdminAccess = currentUser.email === 'adar.sobol@pagaya.com';
   if (!isAdminAccess) {
@@ -644,6 +698,83 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </tbody>
            </table>
          </div>
+      </div>
+
+      {/* Login History Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-teal-50 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg">
+                <Clock size={16} className="text-white" />
+              </div>
+              Login History
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 ml-8">Track when users last logged in</p>
+          </div>
+          <button
+            onClick={fetchLoginHistory}
+            disabled={isLoadingHistory}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <RefreshCw size={14} className={isLoadingHistory ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+        
+        {isLoadingHistory ? (
+          <div className="text-center py-8 text-slate-400">
+            <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+            <p className="text-sm">Loading login history...</p>
+          </div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 font-semibold text-slate-600">User</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Email</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Role</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Last Login</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loginHistory.map(user => (
+                  <tr key={user.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
+                          alt={user.name}
+                          className="w-7 h-7 rounded-full bg-slate-200"
+                        />
+                        <span className="font-medium text-slate-700">{user.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{user.email}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {user.lastLogin ? (
+                        <div>
+                          <p className="text-sm">{formatRelativeTime(user.lastLogin)}</p>
+                          <p className="text-xs text-slate-400">
+                            {new Date(user.lastLogin).toLocaleString()}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">Never logged in</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Bulk Import Section */}
