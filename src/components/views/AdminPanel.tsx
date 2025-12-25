@@ -1206,10 +1206,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
       </div>
-        
-        {/* Backup Details Modal */}
-        {selectedBackup && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBackup(null)}>
+
+      {/* Backup Details Modal */}
+      {selectedBackup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBackup(null)}>
             <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                 <h4 className="font-bold text-slate-800">Backup Details: {selectedBackup.date}</h4>
@@ -1287,7 +1287,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
           </div>
         )}
-      </div>
 
       {/* Trash Section */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
