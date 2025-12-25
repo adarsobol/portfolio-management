@@ -2522,7 +2522,11 @@ app.post('/api/backups/create', authenticateToken, async (req: AuthenticatedRequ
       // Fallback: Create Google Sheets snapshot
       const doc = await getDoc();
       if (!doc) {
-        res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+        res.status(503).json({ 
+          error: 'Cannot create backup - Google Sheets connection unavailable',
+          message: 'This may be due to Node.js OpenSSL compatibility. Backups will work in production (Cloud Run).',
+          hint: 'Try switching to Node 20 LTS: nvm use 20'
+        });
         return;
       }
 

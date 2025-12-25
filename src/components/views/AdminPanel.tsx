@@ -298,10 +298,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       const data = await response.json();
       if (data.success) {
-        setBackupSuccess(`Backup created successfully! ${data.manifest.files.length} files backed up.`);
+        setBackupSuccess(`Backup created successfully! ${data.manifest.files.length} files backed up.${data.source === 'sheets' ? ' (Sheets snapshot)' : ''}`);
         fetchBackups();
+      } else if (response.status === 503) {
+        // Service unavailable - usually OpenSSL/connection issue
+        setBackupError(data.message || 'Backup service temporarily unavailable. This works in production.');
       } else {
-        setBackupError('Failed to create backup');
+        setBackupError(data.error || 'Failed to create backup');
       }
     } catch (error) {
       console.error('Failed to create backup:', error);
