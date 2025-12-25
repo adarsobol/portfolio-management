@@ -452,6 +452,11 @@ const CHANGELOG_HEADERS = [
   'field', 'oldValue', 'newValue', 'changedBy', 'timestamp'
 ];
 
+const TASK_HEADERS = [
+  'id', 'parentId', 'initiativeTitle', 'title', 'estimatedEffort', 'actualEffort',
+  'eta', 'ownerId', 'status', 'tags', 'comments', 'lastUpdated'
+];
+
 const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin'];
 
 // ============================================
@@ -1436,6 +1441,74 @@ app.post('/api/sheets/changelog', authenticateToken, validate(changelogSchema), 
     res.json({ success: true, count: changes.length });
   } catch (error) {
     console.error('Error appending changelog:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/sheets/tasks - Sync tasks to separate Tasks sheet (Protected)
+app.post('/api/sheets/tasks', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { tasks } = req.body;
+
+    if (!tasks || !Array.isArray(tasks)) {
+      res.status(400).json({ error: 'Tasks array is required' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      return;
+    }
+
+    let sheet = doc.sheetsByTitle['Tasks'];
+    
+    if (!sheet) {
+      sheet = await doc.addSheet({
+        title: 'Tasks',
+        headerValues: TASK_HEADERS
+      });
+    } else {
+      // Ensure headers are set
+      await sheet.loadHeaderRow().catch(async () => {
+        console.log('[SERVER] Tasks sheet has no headers, setting them now');
+        await sheet!.setHeaderRow(TASK_HEADERS);
+      });
+    }
+
+    // Get existing rows and create a map by task ID
+    const rows = await sheet.getRows();
+    const existingTaskIds = new Set(rows.map((r: GoogleSpreadsheetRow) => r.get('id')));
+
+    let syncedCount = 0;
+    for (const task of tasks) {
+      const existing = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === task.id);
+
+      if (existing) {
+        // Update existing task
+        Object.keys(task).forEach(key => {
+          const value = task[key];
+          existing.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
+        });
+        await existing.save();
+        syncedCount++;
+      } else if (!existingTaskIds.has(task.id)) {
+        // Add new task
+        const rowData: Record<string, string> = {};
+        Object.keys(task).forEach(key => {
+          const value = task[key];
+          rowData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+        });
+        await sheet.addRow(rowData);
+        existingTaskIds.add(task.id);
+        syncedCount++;
+      }
+    }
+
+    console.log(`Synced ${syncedCount} tasks`);
+    res.json({ success: true, count: syncedCount });
+  } catch (error) {
+    console.error('Error syncing tasks:', error);
     res.status(500).json({ error: String(error) });
   }
 });

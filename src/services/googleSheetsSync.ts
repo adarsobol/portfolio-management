@@ -1,7 +1,7 @@
 // Google Sheets Sync Service - Primary Mode
 // Google Sheets is the primary data source, localStorage is fallback cache
 
-import { Initiative, ChangeRecord, Snapshot, AppConfig, User } from '../types';
+import { Initiative, ChangeRecord, Snapshot, AppConfig, User, Task } from '../types';
 import { authService } from './authService';
 import { logger } from '../utils/logger';
 
@@ -21,10 +21,16 @@ export interface SyncStatus {
   isLoading: boolean;
 }
 
+interface TaskWithParent {
+  task: Task;
+  initiative: Initiative;
+}
+
 interface SyncQueue {
   initiatives: Map<string, Initiative>; // Deduped by ID
   changes: ChangeRecord[];
   snapshots: Snapshot[];
+  tasks: Map<string, TaskWithParent>; // Deduped by task ID
 }
 
 export interface SheetsPullData {
@@ -93,6 +99,38 @@ export function flattenChangeRecord(c: ChangeRecord): Record<string, string> {
   };
 }
 
+export interface FlatTask {
+  id: string;
+  parentId: string;
+  initiativeTitle: string;
+  title: string;
+  estimatedEffort: number;
+  actualEffort: number;
+  eta: string;
+  ownerId: string;
+  status: string;
+  tags: string;
+  comments: string;
+  lastUpdated: string;
+}
+
+export function flattenTask(task: Task, initiative: Initiative): FlatTask {
+  return {
+    id: task.id,
+    parentId: initiative.id,
+    initiativeTitle: initiative.title,
+    title: task.title || '',
+    estimatedEffort: task.estimatedEffort ?? 0,
+    actualEffort: task.actualEffort ?? 0,
+    eta: task.eta || '',
+    ownerId: task.ownerId || '',
+    status: task.status || '',
+    tags: JSON.stringify(task.tags || []),
+    comments: JSON.stringify(task.comments || []),
+    lastUpdated: new Date().toISOString().split('T')[0]
+  };
+}
+
 // ============================================
 // LOCAL STORAGE CACHE
 // ============================================
@@ -139,7 +177,8 @@ class SheetsSyncManager {
   private queue: SyncQueue = {
     initiatives: new Map(),
     changes: [],
-    snapshots: []
+    snapshots: [],
+    tasks: new Map()
   };
   private syncTimeout: ReturnType<typeof setTimeout> | null = null;
   private status: SyncStatus = {
@@ -500,6 +539,22 @@ class SheetsSyncManager {
     this.scheduleSyncFlush();
   }
 
+  /** Queue tasks for sync to separate Tasks sheet */
+  queueTasksSync(tasks: Task[], initiative: Initiative): void {
+    if (!this.enabled) return;
+
+    const taskCount = tasks.length;
+    console.log(`[SYNC] Queuing ${taskCount} tasks from ${initiative.id} for sync`);
+    
+    tasks.forEach(task => {
+      this.queue.tasks.set(task.id, { task, initiative });
+    });
+    
+    this.updatePendingCount();
+    this.persistQueue();
+    this.scheduleSyncFlush();
+  }
+
   /** Force immediate sync */
   async forceSyncNow(): Promise<void> {
     if (this.syncTimeout) {
@@ -658,7 +713,7 @@ class SheetsSyncManager {
 
   /** Clear all pending items */
   clearQueue(): void {
-    this.queue = { initiatives: new Map(), changes: [], snapshots: [] };
+    this.queue = { initiatives: new Map(), changes: [], snapshots: [], tasks: new Map() };
     this.updatePendingCount();
     this.persistQueue();
   }
@@ -686,7 +741,8 @@ class SheetsSyncManager {
     return (
       this.queue.initiatives.size +
       this.queue.changes.length +
-      this.queue.snapshots.length
+      this.queue.snapshots.length +
+      this.queue.tasks.size
     );
   }
 
@@ -722,11 +778,12 @@ class SheetsSyncManager {
     const toSync = {
       initiatives: Array.from(this.queue.initiatives.values()),
       changes: [...this.queue.changes],
-      snapshots: [...this.queue.snapshots]
+      snapshots: [...this.queue.snapshots],
+      tasks: Array.from(this.queue.tasks.values())
     };
 
     // Clear queue before async operations
-    this.queue = { initiatives: new Map(), changes: [], snapshots: [] };
+    this.queue = { initiatives: new Map(), changes: [], snapshots: [], tasks: new Map() };
     this.persistQueue();
 
     const errors: string[] = [];
@@ -760,6 +817,19 @@ class SheetsSyncManager {
         }
       } else {
         console.log('[SYNC] No changelogs to sync');
+      }
+
+      // Sync tasks to separate Tasks sheet
+      if (toSync.tasks.length > 0) {
+        console.log(`[SYNC] Syncing ${toSync.tasks.length} task(s)...`);
+        const success = await this.syncTasks(toSync.tasks);
+        if (!success) {
+          console.error('[SYNC] Tasks sync FAILED, re-queuing');
+          toSync.tasks.forEach(t => this.queue.tasks.set(t.task.id, t));
+          errors.push('tasks');
+        } else {
+          console.log('[SYNC] Tasks sync SUCCESS');
+        }
       }
 
       // Create snapshot tabs
@@ -867,6 +937,41 @@ class SheetsSyncManager {
     }
   }
 
+  private async syncTasks(tasksWithParent: TaskWithParent[]): Promise<boolean> {
+    try {
+      const flatTasks = tasksWithParent.map(({ task, initiative }) => flattenTask(task, initiative));
+      console.log(`[SYNC] POST ${API_ENDPOINT}/api/sheets/tasks with ${flatTasks.length} task(s)`);
+      
+      const response = await fetch(`${API_ENDPOINT}/api/sheets/tasks`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ tasks: flatTasks })
+      });
+      
+      console.log(`[SYNC] Tasks response status: ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('Sync tasks failed', { context: 'SheetsSyncManager.syncTasks', metadata: { status: response.status, errorText: errorText.substring(0, 100) } });
+        const errorMsg = errorText.length > 0 ? errorText.substring(0, 100) : response.statusText;
+        this.status.error = `Tasks sync failed (${response.status}): ${errorMsg}`;
+        this.notify();
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error('Sync tasks error', { context: 'SheetsSyncManager.syncTasks', error: error instanceof Error ? error : new Error(String(error)) });
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        this.status.error = 'Cannot connect to server. Make sure the backend server is running on port 3001.';
+      } else {
+        this.status.error = error instanceof Error ? error.message : 'Network error';
+      }
+      this.notify();
+      return false;
+    }
+  }
+
   private async createSnapshotTab(snapshot: Snapshot): Promise<boolean> {
     try {
       const response = await fetch(`${API_ENDPOINT}/api/sheets/snapshot`, {
@@ -906,7 +1011,8 @@ class SheetsSyncManager {
         JSON.stringify({
           initiatives: Array.from(this.queue.initiatives.entries()),
           changes: this.queue.changes,
-          snapshots: this.queue.snapshots
+          snapshots: this.queue.snapshots,
+          tasks: Array.from(this.queue.tasks.entries())
         })
       );
     } catch {

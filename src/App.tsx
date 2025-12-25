@@ -1113,6 +1113,11 @@ export default function App() {
       // Sync to Google Sheets
       sheetsSync.queueInitiativeSync(item);
       
+      // Sync tasks to separate Tasks sheet
+      if (item.tasks && item.tasks.length > 0) {
+        sheetsSync.queueTasksSync(item.tasks, item);
+      }
+      
       // Force immediate sync for new initiatives to prevent data loss on refresh
       if (existingIndex === -1) {
         sheetsSync.forceSyncNow();
@@ -1301,6 +1306,11 @@ export default function App() {
         // Sync to Google Sheets
         sheetsSync.queueInitiativeSync(updated);
         
+        // Sync tasks to separate Tasks sheet
+        if (updated.tasks && updated.tasks.length > 0) {
+          sheetsSync.queueTasksSync(updated.tasks, updated);
+        }
+        
         return updated;
       }
       return i;
@@ -1368,6 +1378,11 @@ export default function App() {
         
         // Sync to Google Sheets
         sheetsSync.queueInitiativeSync(updated);
+        
+        // Sync tasks to separate Tasks sheet
+        if (updated.tasks && updated.tasks.length > 0) {
+          sheetsSync.queueTasksSync(updated.tasks, updated);
+        }
         
         // Check for "At Risk" status changes notification
         if (oldStatus !== Status.AtRisk) {
