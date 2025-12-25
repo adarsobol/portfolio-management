@@ -1075,9 +1075,20 @@ class SheetsSyncManager {
 
   private async createSnapshotTab(snapshot: Snapshot): Promise<boolean> {
     try {
+      console.log('[SYNC] createSnapshotTab called with:', {
+        hasSnapshot: !!snapshot,
+        hasData: !!(snapshot && snapshot.data),
+        dataType: snapshot?.data ? typeof snapshot.data : 'undefined',
+        dataLength: Array.isArray(snapshot?.data) ? snapshot.data.length : 'not array',
+        snapshotId: snapshot?.id,
+        snapshotName: snapshot?.name,
+        timestamp: snapshot?.timestamp
+      });
+
       // Validate snapshot data before sending
       if (!snapshot || !snapshot.data) {
         const errorMsg = 'Snapshot data is missing';
+        console.error('[SYNC] Snapshot validation failed:', errorMsg);
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
         this.notify();
@@ -1086,6 +1097,7 @@ class SheetsSyncManager {
 
       if (!Array.isArray(snapshot.data)) {
         const errorMsg = 'Snapshot data is not an array';
+        console.error('[SYNC] Snapshot validation failed:', errorMsg, { dataType: typeof snapshot.data, data: snapshot.data });
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg, dataType: typeof snapshot.data } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
         this.notify();
@@ -1094,38 +1106,70 @@ class SheetsSyncManager {
 
       if (snapshot.data.length === 0) {
         const errorMsg = 'Snapshot data array is empty. Cannot create snapshot without initiatives.';
+        console.error('[SYNC] Snapshot validation failed:', errorMsg);
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
         this.notify();
         return false;
       }
 
-      console.log(`[SYNC] Creating snapshot with ${snapshot.data.length} initiatives`);
+      console.log(`[SYNC] Validated snapshot: ${snapshot.data.length} initiatives, flattening data...`);
 
       // Flatten initiatives for sending
-      const flattenedData = snapshot.data.map(flattenInitiative);
+      const flattenedData = snapshot.data.map((initiative, index) => {
+        try {
+          const flattened = flattenInitiative(initiative);
+          if (index < 3) {
+            console.log(`[SYNC] Flattened initiative ${index}:`, {
+              id: flattened.id,
+              title: flattened.title?.substring(0, 50),
+              hasAllRequiredFields: !!flattened.id && !!flattened.title
+            });
+          }
+          return flattened;
+        } catch (flattenError) {
+          console.error(`[SYNC] Error flattening initiative ${index}:`, flattenError, initiative);
+          throw flattenError;
+        }
+      });
       
       if (flattenedData.length === 0) {
         const errorMsg = 'Failed to flatten snapshot data';
+        console.error('[SYNC] Snapshot flattening failed:', errorMsg);
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
         this.notify();
         return false;
       }
+
+      console.log(`[SYNC] Flattened ${flattenedData.length} initiatives, sending to server...`);
+
+      const requestBody = {
+        snapshot: {
+          ...snapshot,
+          data: flattenedData
+        }
+      };
+
+      console.log('[SYNC] Sending snapshot request:', {
+        snapshotId: requestBody.snapshot.id,
+        dataCount: requestBody.snapshot.data.length,
+        firstItemKeys: requestBody.snapshot.data[0] ? Object.keys(requestBody.snapshot.data[0]).slice(0, 10) : []
+      });
 
       const response = await fetch(`${API_ENDPOINT}/api/sheets/snapshot`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({
-          snapshot: {
-            ...snapshot,
-            data: flattenedData
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[SYNC] Snapshot creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText.substring(0, 200)
+        });
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { status: response.status, errorText: errorText.substring(0, 100) } });
         const errorMsg = errorText.length > 0 ? errorText.substring(0, 100) : response.statusText;
         this.status.error = `Snapshot failed (${response.status}): ${errorMsg}`;
@@ -1134,9 +1178,14 @@ class SheetsSyncManager {
       }
 
       const result = await response.json();
-      console.log(`[SYNC] Snapshot created successfully: ${result.tabName || 'unknown'} with ${result.count || snapshot.data.length} items`);
+      console.log(`[SYNC] Snapshot created successfully:`, {
+        tabName: result.tabName,
+        count: result.count,
+        expectedCount: snapshot.data.length
+      });
       return true;
     } catch (error) {
+      console.error('[SYNC] Snapshot creation error:', error);
       logger.error('Create snapshot error', { context: 'SheetsSyncManager.createSnapshotTab', error: error instanceof Error ? error : new Error(String(error)) });
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         this.status.error = 'Cannot connect to server. Make sure the backend server is running on port 3001.';

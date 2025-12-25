@@ -510,9 +510,12 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
       if (missingHeaders.length > 0) {
         console.log('[SERVER] Adding missing Users columns:', missingHeaders);
         await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
+        // After updating headers, we need to reload rows to get the new column structure
+        console.log('[SERVER] Headers updated, will reload rows after header update');
       }
     }
 
+    // Reload rows after potential header updates to ensure we have the latest structure
     const rows = await usersSheet.getRows();
     let userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
 
@@ -524,15 +527,47 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
       return;
     } else {
       // Update metadata
-      if (picture && userRow.get('avatar') !== picture) userRow.set('avatar', picture);
+      if (picture && userRow.get('avatar') !== picture) {
+        userRow.set('avatar', picture);
+      }
+      
+      // Update last login timestamp
       const loginTimestamp = new Date().toISOString();
-      userRow.set('lastLogin', loginTimestamp);
-      try {
-        await userRow.save();
-        console.log(`[SERVER] Updated lastLogin for ${email}: ${loginTimestamp}`);
-      } catch (saveError) {
-        console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-        // Continue with login even if save fails
+      console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
+      
+      // Verify the column exists in headers
+      await usersSheet.loadHeaderRow().catch(() => {});
+      const headers = usersSheet.headerValues || [];
+      if (!headers.includes('lastLogin')) {
+        console.error(`[SERVER] ERROR: lastLogin column not found in headers:`, headers);
+        // Try to add it
+        await usersSheet.setHeaderRow([...headers, 'lastLogin']);
+        // Reload the row after header update
+        const updatedRows = await usersSheet.getRows();
+        userRow = updatedRows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (!userRow) {
+          console.error(`[SERVER] ERROR: Could not find user row after header update`);
+        }
+      }
+      
+      if (userRow) {
+        userRow.set('lastLogin', loginTimestamp);
+        try {
+          await userRow.save();
+          console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
+          
+          // Verify the save worked by reading it back
+          await userRow.load();
+          const savedTimestamp = userRow.get('lastLogin');
+          if (savedTimestamp === loginTimestamp) {
+            console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+          } else {
+            console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+          }
+        } catch (saveError) {
+          console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+          // Continue with login even if save fails
+        }
       }
     }
 
@@ -607,9 +642,12 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
       if (missingHeaders.length > 0) {
         console.log('[SERVER] Adding missing Users columns:', missingHeaders);
         await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
+        // After updating headers, we need to reload rows to get the new column structure
+        console.log('[SERVER] Headers updated, will reload rows after header update');
       }
     }
 
+    // Reload rows after potential header updates to ensure we have the latest structure
     const rows = await usersSheet.getRows();
     const userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
 
@@ -626,15 +664,57 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
       return;
     }
 
-    // Update last login
+    // Update last login timestamp
     const loginTimestamp = new Date().toISOString();
-    userRow.set('lastLogin', loginTimestamp);
-    try {
-      await userRow.save();
-      console.log(`[SERVER] Updated lastLogin for ${email}: ${loginTimestamp}`);
-    } catch (saveError) {
-      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-      // Continue with login even if save fails
+    console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
+    
+    // Verify the column exists in headers
+    await usersSheet.loadHeaderRow().catch(() => {});
+    const headers = usersSheet.headerValues || [];
+    if (!headers.includes('lastLogin')) {
+      console.error(`[SERVER] ERROR: lastLogin column not found in headers:`, headers);
+      // Try to add it
+      await usersSheet.setHeaderRow([...headers, 'lastLogin']);
+      // Reload the row after header update
+      const updatedRows = await usersSheet.getRows();
+      const updatedUserRow = updatedRows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+      if (updatedUserRow) {
+        updatedUserRow.set('lastLogin', loginTimestamp);
+        try {
+          await updatedUserRow.save();
+          console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
+          
+          // Verify the save worked by reading it back
+          await updatedUserRow.load();
+          const savedTimestamp = updatedUserRow.get('lastLogin');
+          if (savedTimestamp === loginTimestamp) {
+            console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+          } else {
+            console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+          }
+        } catch (saveError) {
+          console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+        }
+      }
+    } else {
+      // Column exists, proceed with normal save
+      userRow.set('lastLogin', loginTimestamp);
+      try {
+        await userRow.save();
+        console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
+        
+        // Verify the save worked by reading it back
+        await userRow.load();
+        const savedTimestamp = userRow.get('lastLogin');
+        if (savedTimestamp === loginTimestamp) {
+          console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+        } else {
+          console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+        }
+      } catch (saveError) {
+        console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+        // Continue with login even if save fails
+      }
     }
 
     // Generate JWT token
@@ -1676,6 +1756,15 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
   try {
     const { snapshot } = req.body;
 
+    console.log('[SERVER] Snapshot creation request received:', {
+      hasSnapshot: !!snapshot,
+      hasData: !!(snapshot && snapshot.data),
+      dataType: snapshot?.data ? typeof snapshot.data : 'undefined',
+      dataLength: Array.isArray(snapshot?.data) ? snapshot.data.length : 'not array',
+      snapshotId: snapshot?.id,
+      snapshotName: snapshot?.name
+    });
+
     if (!snapshot || !snapshot.data) {
       console.error('[SERVER] Snapshot creation failed: Missing snapshot or snapshot.data');
       res.status(400).json({ error: 'Invalid snapshot data: snapshot or data is missing' });
@@ -1684,15 +1773,49 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
 
     // Validate that data is an array and not empty
     if (!Array.isArray(snapshot.data)) {
-      console.error('[SERVER] Snapshot creation failed: snapshot.data is not an array', typeof snapshot.data);
+      console.error('[SERVER] Snapshot creation failed: snapshot.data is not an array', {
+        type: typeof snapshot.data,
+        value: snapshot.data
+      });
       res.status(400).json({ error: 'Invalid snapshot data: data must be an array' });
       return;
     }
 
     if (snapshot.data.length === 0) {
       console.error('[SERVER] Snapshot creation failed: snapshot.data is empty');
-      res.status(400).json({ error: 'Invalid snapshot data: data array is empty. Cannot create snapshot without initiatives.' });
-      return;
+      console.log('[SERVER] Attempting to pull current initiatives from Sheets as fallback...');
+      
+      // Fallback: Try to pull current initiatives from the Initiatives sheet
+      const doc = await getDoc();
+      if (!doc) {
+        res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+        return;
+      }
+
+      const initiativesSheet = doc.sheetsByTitle['Initiatives'];
+      if (initiativesSheet) {
+        const rows = await initiativesSheet.getRows();
+        const initiatives = rows
+          .filter((row: GoogleSpreadsheetRow) => row.get('id') && !row.get('id').startsWith('_meta_'))
+          .map((row: GoogleSpreadsheetRow) => {
+            const rowData: Record<string, string> = {};
+            INITIATIVE_HEADERS.forEach(header => {
+              rowData[header] = row.get(header) || '';
+            });
+            return rowData;
+          });
+
+        if (initiatives.length > 0) {
+          console.log(`[SERVER] Using ${initiatives.length} initiatives from Initiatives sheet as snapshot data`);
+          snapshot.data = initiatives;
+        } else {
+          res.status(400).json({ error: 'Invalid snapshot data: data array is empty and no initiatives found in Sheets. Cannot create snapshot without initiatives.' });
+          return;
+        }
+      } else {
+        res.status(400).json({ error: 'Invalid snapshot data: data array is empty. Cannot create snapshot without initiatives.' });
+        return;
+      }
     }
 
     console.log(`[SERVER] Creating snapshot with ${snapshot.data.length} initiatives`);
@@ -1711,6 +1834,8 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
       .slice(0, 50);
     const tabName = `Snap_${timestamp}_${safeName}`.slice(0, 100);
 
+    console.log(`[SERVER] Creating snapshot tab: ${tabName}`);
+
     const newSheet = await doc.addSheet({
       title: tabName,
       headerValues: INITIATIVE_HEADERS
@@ -1726,18 +1851,39 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
     });
 
     // Map snapshot data to rows, ensuring all required fields are present
+    console.log(`[SERVER] Mapping ${snapshot.data.length} initiatives to rows...`);
     const rowsToAdd = snapshot.data.map((item: Record<string, unknown>, index: number) => {
       const rowData: Record<string, string> = {};
       INITIATIVE_HEADERS.forEach(header => {
         const value = item[header];
         rowData[header] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
       });
+      
+      // Log first few items for debugging
+      if (index < 3) {
+        console.log(`[SERVER] Mapped item ${index}:`, {
+          id: rowData.id,
+          title: rowData.title?.substring(0, 50),
+          hasAllHeaders: INITIATIVE_HEADERS.every(h => rowData.hasOwnProperty(h))
+        });
+      }
+      
       return rowData;
     });
 
     if (rowsToAdd.length > 0) {
+      console.log(`[SERVER] Adding ${rowsToAdd.length} rows to snapshot sheet...`);
       await newSheet.addRows(rowsToAdd);
-      console.log(`[SERVER] Created snapshot tab: ${tabName} with ${rowsToAdd.length} initiatives`);
+      console.log(`[SERVER] Successfully created snapshot tab: ${tabName} with ${rowsToAdd.length} initiatives`);
+      
+      // Verify rows were added
+      const verifyRows = await newSheet.getRows();
+      const dataRows = verifyRows.filter((r: GoogleSpreadsheetRow) => !r.get('id')?.startsWith('_meta_'));
+      console.log(`[SERVER] Verification: Snapshot contains ${dataRows.length} data rows (expected ${rowsToAdd.length})`);
+      
+      if (dataRows.length !== rowsToAdd.length) {
+        console.error(`[SERVER] WARNING: Row count mismatch. Expected ${rowsToAdd.length}, got ${dataRows.length}`);
+      }
     } else {
       console.error('[SERVER] No rows to add to snapshot after mapping');
       res.status(400).json({ error: 'Failed to map snapshot data to rows' });
