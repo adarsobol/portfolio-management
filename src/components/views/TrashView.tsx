@@ -1,4 +1,3 @@
-import React from 'react';
 import { Trash2, RotateCcw, Clock, User as UserIcon, Calendar } from 'lucide-react';
 import { Initiative, User, Status } from '../../types';
 

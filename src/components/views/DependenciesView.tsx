@@ -164,7 +164,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
           const bAtRisk = b.initiative.status === Status.AtRisk ? 1 : 0;
           if (bAtRisk !== aAtRisk) comparison = bAtRisk - aAtRisk;
           else {
-            const statusOrder = { [Status.AtRisk]: 0, [Status.InProgress]: 1, [Status.NotStarted]: 2, [Status.Done]: 3, [Status.Obsolete]: 4 };
+            const statusOrder = { [Status.AtRisk]: 0, [Status.InProgress]: 1, [Status.NotStarted]: 2, [Status.Done]: 3, [Status.Obsolete]: 4, [Status.Deleted]: 5 };
             comparison = (statusOrder[a.initiative.status] || 99) - (statusOrder[b.initiative.status] || 99);
           }
           break;

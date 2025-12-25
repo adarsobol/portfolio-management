@@ -173,6 +173,7 @@ export class WorkflowEngine {
           [Status.AtRisk]: Status.Done,
           [Status.Done]: Status.Done,
           [Status.Obsolete]: Status.Obsolete,
+          [Status.Deleted]: Status.Deleted,
         };
         const newStatus = transitions[initiative.status];
         if (newStatus && newStatus !== initiative.status) {
