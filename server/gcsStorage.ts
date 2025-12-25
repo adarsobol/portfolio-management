@@ -27,6 +27,19 @@ interface Snapshot {
   data: Initiative[];
 }
 
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  initiativeId: string;
+  initiativeTitle: string;
+  timestamp: string;
+  read: boolean;
+  userId?: string;
+  metadata?: Record<string, unknown>;
+}
+
 // ============================================
 // CONFIGURATION
 // ============================================
@@ -43,7 +56,8 @@ const PATHS = {
   CHANGELOG: 'data/changelog.json',
   CONFIG: 'data/config.json',
   USERS: 'data/users.json',
-  SNAPSHOTS_DIR: 'snapshots/'
+  SNAPSHOTS_DIR: 'snapshots/',
+  NOTIFICATIONS_DIR: 'data/notifications/'
 };
 
 // ============================================
@@ -292,6 +306,129 @@ export class GCSStorage {
     } catch (error) {
       console.error('Failed to load snapshot from GCS:', error);
       return null;
+    }
+  }
+
+  // ============================================
+  // NOTIFICATIONS
+  // ============================================
+
+  /**
+   * Get the file path for a user's notifications
+   */
+  private getNotificationFilePath(userId: string): string {
+    return `${PATHS.NOTIFICATIONS_DIR}${userId}.json`;
+  }
+
+  /**
+   * Load notifications for a specific user
+   */
+  async loadNotifications(userId: string): Promise<Notification[]> {
+    if (!this.initialized) throw new Error('GCS not initialized');
+
+    try {
+      const filePath = this.getNotificationFilePath(userId);
+      // @ts-expect-error - Dynamic typing for optional package
+      const file = this.bucket.file(filePath);
+      const [exists] = await file.exists();
+      
+      if (!exists) {
+        return [];
+      }
+
+      const [contents] = await file.download();
+      return JSON.parse(contents.toString());
+    } catch (error) {
+      console.error(`Failed to load notifications for user ${userId} from GCS:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Save all notifications for a user (overwrites existing)
+   */
+  async saveNotifications(userId: string, notifications: Notification[]): Promise<boolean> {
+    if (!this.initialized) throw new Error('GCS not initialized');
+
+    try {
+      const filePath = this.getNotificationFilePath(userId);
+      // @ts-expect-error - Dynamic typing for optional package
+      const file = this.bucket.file(filePath);
+      
+      // Keep only last 100 notifications per user to prevent unbounded growth
+      const trimmedNotifications = notifications.slice(0, 100);
+      
+      await file.save(JSON.stringify(trimmedNotifications, null, 2), {
+        contentType: 'application/json',
+        metadata: {
+          cacheControl: 'private, max-age=0'
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      console.error(`Failed to save notifications for user ${userId} to GCS:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Add a new notification for a user
+   */
+  async addNotification(userId: string, notification: Notification): Promise<boolean> {
+    try {
+      const notifications = await this.loadNotifications(userId);
+      notifications.unshift(notification); // Add to beginning (newest first)
+      return this.saveNotifications(userId, notifications);
+    } catch (error) {
+      console.error(`Failed to add notification for user ${userId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark a notification as read
+   */
+  async markNotificationRead(userId: string, notificationId: string): Promise<boolean> {
+    try {
+      const notifications = await this.loadNotifications(userId);
+      const index = notifications.findIndex(n => n.id === notificationId);
+      
+      if (index === -1) {
+        return false; // Notification not found
+      }
+      
+      notifications[index].read = true;
+      return this.saveNotifications(userId, notifications);
+    } catch (error) {
+      console.error(`Failed to mark notification ${notificationId} as read:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark all notifications as read for a user
+   */
+  async markAllNotificationsRead(userId: string): Promise<boolean> {
+    try {
+      const notifications = await this.loadNotifications(userId);
+      const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
+      return this.saveNotifications(userId, updatedNotifications);
+    } catch (error) {
+      console.error(`Failed to mark all notifications as read for user ${userId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear all notifications for a user
+   */
+  async clearNotifications(userId: string): Promise<boolean> {
+    try {
+      return this.saveNotifications(userId, []);
+    } catch (error) {
+      console.error(`Failed to clear notifications for user ${userId}:`, error);
+      return false;
     }
   }
 }

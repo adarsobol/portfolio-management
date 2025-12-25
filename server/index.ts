@@ -1982,6 +1982,136 @@ app.post('/api/sheets/scheduled-snapshot', async (req: Request, res: Response) =
 });
 
 // ============================================
+// NOTIFICATION ENDPOINTS
+// ============================================
+
+// GET /api/notifications/:userId - Get notifications for a user
+app.get('/api/notifications/:userId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    
+    // Users can only access their own notifications
+    if (req.user?.id !== userId && req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Cannot access other users notifications' });
+      return;
+    }
+
+    const gcs = getGCSStorage();
+    if (gcs) {
+      const notifications = await gcs.loadNotifications(userId);
+      res.json({ notifications });
+    } else {
+      // Fallback: return empty array if GCS not available
+      res.json({ notifications: [] });
+    }
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/notifications - Create a new notification
+app.post('/api/notifications', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { notification, targetUserId } = req.body;
+
+    if (!notification || !targetUserId) {
+      res.status(400).json({ error: 'Notification and targetUserId are required' });
+      return;
+    }
+
+    const gcs = getGCSStorage();
+    if (gcs) {
+      const success = await gcs.addNotification(targetUserId, notification);
+      if (success) {
+        // Emit real-time notification to the target user via Socket.IO
+        io.emit('notification:received', { userId: targetUserId, notification });
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ error: 'Failed to save notification' });
+      }
+    } else {
+      // Emit via Socket.IO even without GCS persistence
+      io.emit('notification:received', { userId: targetUserId, notification });
+      res.json({ success: true, message: 'Notification sent via real-time only (no persistence)' });
+    }
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// PATCH /api/notifications/:notificationId/read - Mark a notification as read
+app.patch('/api/notifications/:notificationId/read', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User ID required' });
+      return;
+    }
+
+    const gcs = getGCSStorage();
+    if (gcs) {
+      const success = await gcs.markNotificationRead(userId, notificationId);
+      res.json({ success });
+    } else {
+      res.json({ success: true, message: 'No persistence available' });
+    }
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/notifications/mark-all-read - Mark all notifications as read for current user
+app.post('/api/notifications/mark-all-read', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User ID required' });
+      return;
+    }
+
+    const gcs = getGCSStorage();
+    if (gcs) {
+      const success = await gcs.markAllNotificationsRead(userId);
+      res.json({ success });
+    } else {
+      res.json({ success: true, message: 'No persistence available' });
+    }
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// DELETE /api/notifications - Clear all notifications for current user
+app.delete('/api/notifications', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User ID required' });
+      return;
+    }
+
+    const gcs = getGCSStorage();
+    if (gcs) {
+      const success = await gcs.clearNotifications(userId);
+      res.json({ success });
+    } else {
+      res.json({ success: true, message: 'No persistence available' });
+    }
+  } catch (error) {
+    console.error('Error clearing notifications:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// ============================================
 // EXPORT ENDPOINTS (Server-side file generation)
 // ============================================
 
@@ -2163,10 +2293,17 @@ httpServer.listen(PORT, () => {
   console.log(`  POST /api/sheets/push         - Push all data`);
   console.log(`  GET  /api/sheets/snapshots    - List snapshot tabs`);
   console.log(`  POST /api/sheets/scheduled-snapshot - Automated weekly snapshot (Cloud Scheduler)`);
+  console.log(`\nNotification Endpoints (Protected):`);
+  console.log(`  GET  /api/notifications/:userId  - Get user notifications`);
+  console.log(`  POST /api/notifications          - Create notification`);
+  console.log(`  PATCH /api/notifications/:id/read - Mark as read`);
+  console.log(`  POST /api/notifications/mark-all-read - Mark all as read`);
+  console.log(`  DELETE /api/notifications        - Clear all notifications`);
   console.log(`\nReal-time Collaboration (Socket.IO):`);
   console.log(`  - User presence tracking`);
   console.log(`  - Live initiative updates`);
   console.log(`  - Collaborative editing indicators`);
+  console.log(`  - Real-time notification push`);
   console.log(`\nDefault admin credentials:`);
   console.log(`  Email: adar.sobol@pagaya.com`);
   console.log(`  Password: admin123`);

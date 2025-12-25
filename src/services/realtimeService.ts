@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { Initiative, Comment, User } from '../types';
+import { Initiative, Comment, User, Notification } from '../types';
 
 const SOCKET_URL = import.meta.env.VITE_API_ENDPOINT || (typeof window !== 'undefined' ? window.location.origin : '');
 
@@ -24,6 +24,7 @@ type InitiativeCreateCallback = (data: { initiative: Initiative; createdBy: stri
 type CommentCallback = (data: { initiativeId: string; comment: Comment; addedBy: string }) => void;
 type EditingCallback = (data: EditingIndicator) => void;
 type EditEndedCallback = (data: { initiativeId: string; userId: string }) => void;
+type NotificationCallback = (data: { userId: string; notification: Notification }) => void;
 
 class RealtimeService {
   private socket: Socket | null = null;
@@ -34,6 +35,7 @@ class RealtimeService {
   private commentCallbacks: Set<CommentCallback> = new Set();
   private editingCallbacks: Set<EditingCallback> = new Set();
   private editEndedCallbacks: Set<EditEndedCallback> = new Set();
+  private notificationCallbacks: Set<NotificationCallback> = new Set();
   private isConnected = false;
 
   connect(user: User): void {
@@ -106,6 +108,14 @@ class RealtimeService {
 
     this.socket.on('initiative:editEnded', (data: { initiativeId: string; userId: string }) => {
       this.editEndedCallbacks.forEach(cb => cb(data));
+    });
+
+    // Handle real-time notifications
+    this.socket.on('notification:received', (data: { userId: string; notification: Notification }) => {
+      // Only trigger callback if notification is for the current user
+      if (this.currentUser && data.userId === this.currentUser.id) {
+        this.notificationCallbacks.forEach(cb => cb(data));
+      }
     });
   }
 
@@ -196,6 +206,12 @@ class RealtimeService {
   onEditingEnd(callback: EditEndedCallback): () => void {
     this.editEndedCallbacks.add(callback);
     return () => this.editEndedCallbacks.delete(callback);
+  }
+
+  // Subscribe to notifications
+  onNotificationReceived(callback: NotificationCallback): () => void {
+    this.notificationCallbacks.add(callback);
+    return () => this.notificationCallbacks.delete(callback);
   }
 
   // Get connection status

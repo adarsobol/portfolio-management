@@ -5,7 +5,7 @@ import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, HIERARCHY, migratePermissio
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, Priority, UnplannedTag } from './types';
 import { getOwnerName, generateId, parseMentions, logger, generateInitiativeId, canCreateTasks, canViewTab } from './utils';
 import { useLocalStorage } from './hooks';
-import { slackService, workflowEngine, realtimeService, sheetsSync } from './services';
+import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
 import AtRiskReasonModal from './components/modals/AtRiskReasonModal';
@@ -90,8 +90,9 @@ export default function App() {
   // Audit State
   const [changeLog, setChangeLog] = useState<ChangeRecord[]>([]);
   
-  // Notifications State
-  const [notifications, setNotifications] = useLocalStorage<Notification[]>('portfolio-notifications', []);
+  // Notifications State - synced with server
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoaded, setNotificationsLoaded] = useState(false);
   
   // Comment Read State - tracks when each user last viewed comments on each initiative
   const [commentReadState, setCommentReadState] = useLocalStorage<UserCommentReadState>('portfolio-comment-read-state', {});
@@ -123,6 +124,29 @@ export default function App() {
 
     loadUsers();
   }, [isAuthenticated, usersLoaded]);
+
+  // Load notifications from server
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.id || notificationsLoaded) return;
+
+    const loadNotifications = async () => {
+      try {
+        const serverNotifications = await notificationService.fetchNotifications(currentUser.id);
+        setNotifications(serverNotifications);
+      } catch (error) {
+        logger.error('Failed to load notifications from server', { 
+          context: 'App.loadNotifications', 
+          error: error instanceof Error ? error : new Error(String(error)) 
+        });
+        // Fall back to empty array
+        setNotifications([]);
+      } finally {
+        setNotificationsLoaded(true);
+      }
+    };
+
+    loadNotifications();
+  }, [isAuthenticated, currentUser?.id, notificationsLoaded]);
 
   // Load initiatives from Google Sheets on startup (with localStorage fallback)
   useEffect(() => {
@@ -204,10 +228,21 @@ export default function App() {
         }));
       });
 
+      // Subscribe to real-time notifications
+      const unsubNotification = realtimeService.onNotificationReceived(({ notification }) => {
+        // Add the notification to local state (it's already been filtered for current user)
+        setNotifications(prev => {
+          // Avoid duplicates
+          if (prev.find(n => n.id === notification.id)) return prev;
+          return [notification, ...prev];
+        });
+      });
+
       return () => {
         unsubUpdate();
         unsubCreate();
         unsubComment();
+        unsubNotification();
         realtimeService.disconnect();
       };
     }
@@ -820,7 +855,21 @@ export default function App() {
   };
 
   const addNotification = (notification: Notification) => {
+    // Add to local state for immediate UI update
     setNotifications(prev => [notification, ...prev]);
+    
+    // Save to server for persistence
+    // Determine the target user: use notification.userId or metadata.ownerId
+    const targetUserId = notification.userId || notification.metadata?.ownerId;
+    if (targetUserId && typeof targetUserId === 'string') {
+      notificationService.createNotification(targetUserId, notification)
+        .catch(error => {
+          logger.error('Failed to save notification to server', { 
+            context: 'App.addNotification', 
+            error: error instanceof Error ? error : new Error(String(error)) 
+          });
+        });
+    }
   };
 
   // Actions
@@ -1017,6 +1066,14 @@ export default function App() {
       if (existingIndex > -1) {
         const existing = nextInitiatives[existingIndex];
         const changes: ChangeRecord[] = [];
+        // Record status changes
+        if (existing.status !== item.status) {
+          changes.push(recordChange(existing, 'Status', existing.status, item.status));
+        }
+        // Record priority changes
+        if (existing.priority !== item.priority) {
+          changes.push(recordChange(existing, 'Priority', existing.priority, item.priority));
+        }
         if ((existing.estimatedEffort || 0) !== (item.estimatedEffort || 0)) {
           changes.push(recordChange(existing, 'Effort', existing.estimatedEffort || 0, item.estimatedEffort || 0));
         }
@@ -1277,7 +1334,7 @@ export default function App() {
         const oldValue = i[field];
         const fieldName = field === 'estimatedEffort' ? 'Effort' : field === 'eta' ? 'ETA' : field === 'status' ? 'Status' : field;
         
-        if (oldValue !== value && (field === 'estimatedEffort' || field === 'eta')) {
+        if (oldValue !== value && (field === 'estimatedEffort' || field === 'eta' || field === 'status' || field === 'priority')) {
            const change = recordChange(i, fieldName, oldValue, value);
            setChangeLog(prevLog => [change, ...prevLog]);
            i.history = [...(i.history || []), change];
@@ -1682,15 +1739,42 @@ export default function App() {
 
   // Notification Handlers
   const handleMarkAsRead = (id: string) => {
+    // Update local state immediately
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    
+    // Sync with server
+    notificationService.markAsRead(id).catch(error => {
+      logger.error('Failed to mark notification as read on server', { 
+        context: 'App.handleMarkAsRead', 
+        error: error instanceof Error ? error : new Error(String(error)) 
+      });
+    });
   };
 
   const handleMarkAllAsRead = () => {
+    // Update local state immediately
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    
+    // Sync with server
+    notificationService.markAllAsRead().catch(error => {
+      logger.error('Failed to mark all notifications as read on server', { 
+        context: 'App.handleMarkAllAsRead', 
+        error: error instanceof Error ? error : new Error(String(error)) 
+      });
+    });
   };
 
   const handleClearAll = () => {
+    // Update local state immediately
     setNotifications([]);
+    
+    // Sync with server
+    notificationService.clearAll().catch(error => {
+      logger.error('Failed to clear notifications on server', { 
+        context: 'App.handleClearAll', 
+        error: error instanceof Error ? error : new Error(String(error)) 
+      });
+    });
   };
 
   const handleNotificationClick = (notification: Notification) => {
