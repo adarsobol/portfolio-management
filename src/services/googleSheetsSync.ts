@@ -1120,9 +1120,10 @@ class SheetsSyncManager {
         try {
           const flattened = flattenInitiative(initiative);
           if (index < 3) {
+            const titleStr = typeof flattened.title === 'string' ? flattened.title : String(flattened.title || '');
             console.log(`[SYNC] Flattened initiative ${index}:`, {
               id: flattened.id,
-              title: flattened.title?.substring(0, 50),
+              title: titleStr.substring(0, 50),
               hasAllRequiredFields: !!flattened.id && !!flattened.title
             });
           }
