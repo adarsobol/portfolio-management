@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw } from 'lucide-react';
+import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck } from 'lucide-react';
 import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
 import { generateId, exportToExcel } from '../../utils';
 import * as XLSX from 'xlsx';
@@ -143,6 +143,27 @@ interface ImportResult {
   total?: number;
 }
 
+// Backup types
+interface BackupInfo {
+  date: string;
+  path: string;
+  files: number;
+  totalSize: number;
+  status: 'success' | 'partial' | 'failed';
+  timestamp: string;
+}
+
+interface BackupManifest {
+  id: string;
+  timestamp: string;
+  date: string;
+  files: { name: string; path: string; size: number }[];
+  totalSize: number;
+  duration: number;
+  status: 'success' | 'partial' | 'failed';
+  errors?: string[];
+}
+
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -186,6 +207,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   }>>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
+  // Backup management state
+  const [backups, setBackups] = useState<BackupInfo[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const [selectedBackup, setSelectedBackup] = useState<BackupManifest | null>(null);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
+  
   // Fetch login history
   const fetchLoginHistory = async () => {
     setIsLoadingHistory(true);
@@ -207,9 +237,126 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
   
+  // Fetch backups
+  const fetchBackups = async () => {
+    setIsLoadingBackups(true);
+    setBackupError(null);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/backups`, {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBackups(data.backups || []);
+      } else if (response.status === 503) {
+        setBackupError('Backup service not available. GCS storage may not be configured.');
+      } else {
+        setBackupError('Failed to fetch backups');
+      }
+    } catch (error) {
+      console.error('Failed to fetch backups:', error);
+      setBackupError('Network error while fetching backups');
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+  
+  // Fetch backup details
+  const fetchBackupDetails = async (date: string) => {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/backups/${date}`, {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedBackup(data.backup);
+      }
+    } catch (error) {
+      console.error('Failed to fetch backup details:', error);
+    }
+  };
+  
+  // Create manual backup
+  const createManualBackup = async () => {
+    setIsCreatingBackup(true);
+    setBackupError(null);
+    setBackupSuccess(null);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/backups/create`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        },
+        body: JSON.stringify({ label: 'manual' })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setBackupSuccess(`Backup created successfully! ${data.manifest.files.length} files backed up.`);
+        fetchBackups();
+      } else {
+        setBackupError('Failed to create backup');
+      }
+    } catch (error) {
+      console.error('Failed to create backup:', error);
+      setBackupError('Network error while creating backup');
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  };
+  
+  // Restore from backup
+  const restoreFromBackup = async (date: string) => {
+    if (!confirm(`Are you sure you want to restore data from ${date}? This will overwrite current data.`)) {
+      return;
+    }
+    
+    setIsRestoring(true);
+    setBackupError(null);
+    setBackupSuccess(null);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/backups/restore/${date}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+        },
+        body: JSON.stringify({ confirm: true })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setBackupSuccess(`Restored ${data.filesRestored} files from ${date}. Refreshing page...`);
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setBackupError(`Restore failed: ${data.errors?.join(', ') || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to restore backup:', error);
+      setBackupError('Network error while restoring backup');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+  
+  // Format bytes
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+  
   // Initial fetch
   useEffect(() => {
     fetchLoginHistory();
+    fetchBackups();
   }, []);
   
   // Format relative time
@@ -773,6 +920,219 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* Backup Management Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg">
+                <Database size={16} className="text-white" />
+              </div>
+              Backup Management
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 ml-8">Create backups, restore data, and manage backup history</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={createManualBackup}
+              disabled={isCreatingBackup}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg hover:from-violet-600 hover:to-purple-600 transition-colors disabled:opacity-50"
+            >
+              {isCreatingBackup ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
+              Create Backup
+            </button>
+            <button
+              onClick={fetchBackups}
+              disabled={isLoadingBackups}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <RefreshCw size={14} className={isLoadingBackups ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
+        </div>
+        
+        {/* Status messages */}
+        {backupError && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} />
+            {backupError}
+          </div>
+        )}
+        {backupSuccess && (
+          <div className="mx-6 mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+            <CheckCircle2 size={16} />
+            {backupSuccess}
+          </div>
+        )}
+        
+        {isLoadingBackups ? (
+          <div className="text-center py-8 text-slate-400">
+            <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+            <p className="text-sm">Loading backups...</p>
+          </div>
+        ) : backups.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <Database size={32} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No backups available</p>
+            <p className="text-xs mt-1">Create your first backup using the button above</p>
+          </div>
+        ) : (
+          <div className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {backups.slice(0, 9).map((backup) => (
+                <div
+                  key={backup.date}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-violet-300 hover:shadow-sm transition-all cursor-pointer"
+                  onClick={() => fetchBackupDetails(backup.date)}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-1.5 rounded-lg ${
+                        backup.status === 'success' ? 'bg-emerald-100' :
+                        backup.status === 'partial' ? 'bg-amber-100' : 'bg-red-100'
+                      }`}>
+                        <FileCheck size={14} className={
+                          backup.status === 'success' ? 'text-emerald-600' :
+                          backup.status === 'partial' ? 'text-amber-600' : 'text-red-600'
+                        } />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">{backup.date}</p>
+                        <p className="text-xs text-slate-400">
+                          {new Date(backup.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      backup.status === 'success' ? 'bg-emerald-100 text-emerald-700' :
+                      backup.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {backup.status}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between text-xs text-slate-500 mt-3">
+                    <span>{backup.files} files</span>
+                    <span>{formatBytes(backup.totalSize)}</span>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        restoreFromBackup(backup.date);
+                      }}
+                      disabled={isRestoring}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
+                    >
+                      {isRestoring ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                      Restore
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`${API_ENDPOINT}/api/backups/${backup.date}/download`, '_blank');
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                      <Download size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {backups.length > 9 && (
+              <p className="text-center text-xs text-slate-400 mt-4">
+                Showing 9 of {backups.length} backups
+              </p>
+            )}
+          </div>
+        )}
+        
+        {/* Backup Details Modal */}
+        {selectedBackup && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBackup(null)}>
+            <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h4 className="font-bold text-slate-800">Backup Details: {selectedBackup.date}</h4>
+                <button onClick={() => setSelectedBackup(null)} className="text-slate-400 hover:text-slate-600">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Status</p>
+                    <p className="font-semibold text-slate-700 capitalize">{selectedBackup.status}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Total Size</p>
+                    <p className="font-semibold text-slate-700">{formatBytes(selectedBackup.totalSize)}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Files</p>
+                    <p className="font-semibold text-slate-700">{selectedBackup.files.length}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Duration</p>
+                    <p className="font-semibold text-slate-700">{selectedBackup.duration}ms</p>
+                  </div>
+                </div>
+                
+                <h5 className="font-semibold text-slate-700 mb-2">Files:</h5>
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-slate-500">Name</th>
+                        <th className="px-3 py-2 text-right font-medium text-slate-500">Size</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedBackup.files.map((file, idx) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2 text-slate-700">{file.name}</td>
+                          <td className="px-3 py-2 text-right text-slate-500">{formatBytes(file.size)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {selectedBackup.errors && selectedBackup.errors.length > 0 && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-xs font-medium text-red-700 mb-1">Errors:</p>
+                    {selectedBackup.errors.map((err, idx) => (
+                      <p key={idx} className="text-xs text-red-600">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+                <button
+                  onClick={() => setSelectedBackup(null)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    restoreFromBackup(selectedBackup.date);
+                    setSelectedBackup(null);
+                  }}
+                  disabled={isRestoring}
+                  className="px-4 py-2 text-sm font-medium text-white bg-violet-500 rounded-lg hover:bg-violet-600 disabled:opacity-50"
+                >
+                  Restore This Backup
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

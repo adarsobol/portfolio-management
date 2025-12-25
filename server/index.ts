@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { isGCSEnabled, getGCSConfig, initializeGCSStorage, getGCSStorage } from './gcsStorage';
 import { generateInitiativeId } from './idGenerator';
+import { initializeBackupService, getBackupService, isBackupServiceEnabled } from './backupService';
 import {
   validate,
   loginSchema,
@@ -45,6 +46,11 @@ if (STORAGE_BACKEND === 'gcs') {
     initializeGCSStorage(gcsConfig).then(storage => {
       if (storage) {
         console.log('GCS Storage initialized successfully');
+        // Initialize backup service
+        if (isBackupServiceEnabled()) {
+          initializeBackupService(gcsConfig.bucketName, gcsConfig.projectId);
+          console.log('Backup Service initialized');
+        }
       } else {
         console.error('Failed to initialize GCS Storage, falling back to Sheets');
       }
@@ -2191,6 +2197,267 @@ app.get('/api/admin/login-history', authenticateToken, async (req: Authenticated
 });
 
 // ============================================
+// BACKUP & RESTORE ENDPOINTS (Admin only)
+// ============================================
+
+// GET /api/backups - List all available backups
+app.get('/api/backups', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access backup endpoints
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ 
+        error: 'Backup service not available',
+        message: 'GCS storage is not configured for this environment'
+      });
+      return;
+    }
+
+    const backups = await backupService.listBackups();
+    res.json({ backups });
+  } catch (error) {
+    console.error('Error listing backups:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/backups/:date - Get backup details for a specific date
+app.get('/api/backups/:date', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { date } = req.params;
+    
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}/.test(date)) {
+      res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+      return;
+    }
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    const backup = await backupService.getBackupDetails(date);
+    if (!backup) {
+      res.status(404).json({ error: `No backup found for ${date}` });
+      return;
+    }
+
+    res.json({ backup });
+  } catch (error) {
+    console.error('Error getting backup details:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/backups/restore/:date - Restore from a daily backup
+app.post('/api/backups/restore/:date', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { date } = req.params;
+    const { confirm, files } = req.body;
+
+    if (!confirm) {
+      res.status(400).json({ 
+        error: 'Confirmation required',
+        message: 'Set confirm: true in request body to proceed with restore'
+      });
+      return;
+    }
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    console.log(`Admin ${req.user.email} initiating restore from backup ${date}`);
+    
+    const result = await backupService.restoreFromBackup(date, files);
+    
+    if (result.success) {
+      // Notify connected clients about the restore
+      io.emit('data:restored', { 
+        date, 
+        restoredBy: req.user.email,
+        timestamp: result.timestamp 
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error restoring from backup:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/backups/versions/:file - List object versions for a file
+app.get('/api/backups/versions/:file', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { file } = req.params;
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    const versions = await backupService.listObjectVersions(file);
+    res.json({ versions, file });
+  } catch (error) {
+    console.error('Error listing object versions:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/backups/restore-version - Restore a specific object version
+app.post('/api/backups/restore-version', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { file, versionId, confirm } = req.body;
+
+    if (!file || !versionId) {
+      res.status(400).json({ error: 'file and versionId are required' });
+      return;
+    }
+
+    if (!confirm) {
+      res.status(400).json({ 
+        error: 'Confirmation required',
+        message: 'Set confirm: true in request body to proceed with restore'
+      });
+      return;
+    }
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    console.log(`Admin ${req.user.email} restoring ${file} to version ${versionId}`);
+    
+    const result = await backupService.restoreObjectVersion(file, versionId);
+    
+    if (result.success) {
+      io.emit('data:restored', { 
+        file,
+        versionId,
+        restoredBy: req.user.email,
+        timestamp: result.timestamp 
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error restoring object version:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/backups/create - Create a manual backup
+app.post('/api/backups/create', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { label } = req.body;
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    console.log(`Admin ${req.user.email} creating manual backup`);
+    
+    const manifest = await backupService.createManualBackup(label);
+    
+    res.json({ 
+      success: manifest.status !== 'failed',
+      manifest 
+    });
+  } catch (error) {
+    console.error('Error creating manual backup:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/backups/:date/verify - Verify backup integrity
+app.get('/api/backups/:date/verify', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { date } = req.params;
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    const result = await backupService.verifyBackup(date);
+    res.json(result);
+  } catch (error) {
+    console.error('Error verifying backup:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/backups/:date/download - Get download URLs for backup files
+app.get('/api/backups/:date/download', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { date } = req.params;
+
+    const backupService = getBackupService();
+    if (!backupService) {
+      res.status(503).json({ error: 'Backup service not available' });
+      return;
+    }
+
+    const result = await backupService.getBackupDownloadUrls(date);
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting download URLs:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// ============================================
 // EXPORT ENDPOINTS (Server-side file generation)
 // ============================================
 
@@ -2378,6 +2645,15 @@ httpServer.listen(PORT, () => {
   console.log(`  PATCH /api/notifications/:id/read - Mark as read`);
   console.log(`  POST /api/notifications/mark-all-read - Mark all as read`);
   console.log(`  DELETE /api/notifications        - Clear all notifications`);
+  console.log(`\nBackup & Restore Endpoints (Admin only):`);
+  console.log(`  GET  /api/backups                - List all backups`);
+  console.log(`  GET  /api/backups/:date          - Get backup details`);
+  console.log(`  POST /api/backups/create         - Create manual backup`);
+  console.log(`  POST /api/backups/restore/:date  - Restore from backup`);
+  console.log(`  GET  /api/backups/versions/:file - List object versions`);
+  console.log(`  POST /api/backups/restore-version - Restore specific version`);
+  console.log(`  GET  /api/backups/:date/verify   - Verify backup integrity`);
+  console.log(`  GET  /api/backups/:date/download - Get backup download URLs`);
   console.log(`\nReal-time Collaboration (Socket.IO):`);
   console.log(`  - User presence tracking`);
   console.log(`  - Live initiative updates`);
