@@ -325,10 +325,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
     return (
       <th 
-        className={`px-3 py-2.5 text-left font-bold text-slate-700 cursor-pointer bg-gradient-to-b from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 transition-all border-r border-slate-200 select-none whitespace-nowrap text-xs tracking-wider ${alignRight ? 'text-right' : ''}`}
+        className={`px-3 py-2.5 text-center font-bold text-slate-700 cursor-pointer bg-gradient-to-b from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 transition-all border-r border-slate-200 select-none whitespace-nowrap text-xs tracking-wider ${alignRight ? 'text-right' : ''}`}
         onClick={() => handleSort(sortKey)}
       >
-        <div className={`flex items-center gap-1.5 ${alignRight ? 'justify-end' : ''}`}>
+        <div className={`flex items-center gap-1.5 ${alignRight ? 'justify-end' : 'justify-center'}`}>
           {label}
           <div className={`${isActive ? 'text-blue-500' : 'text-slate-400'}`}>
             {isActive ? (
@@ -1425,7 +1425,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <SortableHeader label="Owner" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
-              <th className="px-3 py-2.5 text-right font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">Effort (act/plan)</th>
+              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">Effort (act/plan)</th>
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
               <SortableHeader label="ETA / Update" sortKey="eta" />
             </tr>

@@ -58,7 +58,7 @@ const HelpButton: React.FC<{
   const positionClasses = {
     top: 'bottom-full right-0 mb-2',
     bottom: 'top-full right-0 mt-2',
-    left: 'right-full top-0 mr-2',
+    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
     right: 'left-full top-0 ml-2'
   };
 
@@ -140,7 +140,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
       
       {/* 1. Initiative Status */}
       <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-        <HelpButton metricKey="initiativesStatus" position="bottom" />
+        <HelpButton metricKey="initiativesStatus" position="left" />
         <div className="flex justify-between items-start mb-3 pr-6">
           <div>
             <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Initiatives status</p>
@@ -179,7 +179,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
 
       {/* 2. BAU Buffer Health */}
       <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-        <HelpButton metricKey="bauBufferHealth" position="bottom" />
+        <HelpButton metricKey="bauBufferHealth" position="left" />
         <div className="flex justify-between items-start mb-4 pr-6">
           <div>
             <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">BAU effort</p>
@@ -228,7 +228,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
 
       {/* 3. Capacity Load */}
       <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
-        <HelpButton metricKey="capacityLoad" position="bottom" />
+        <HelpButton metricKey="capacityLoad" position="left" />
         <div className="flex justify-between items-start mb-4 pr-6">
           <div>
             <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Capacity load</p>

@@ -941,14 +941,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-500">
-                      {user.lastLogin ? (
-                        <div>
-                          <p className="text-sm">{formatRelativeTime(user.lastLogin)}</p>
-                          <p className="text-xs text-slate-400">
-                            {new Date(user.lastLogin).toLocaleString()}
-                          </p>
-                        </div>
-                      ) : (
+                      {user.lastLogin ? (() => {
+                        try {
+                          const loginDate = new Date(user.lastLogin);
+                          if (isNaN(loginDate.getTime())) {
+                            return <span className="text-slate-400 italic">Invalid timestamp</span>;
+                          }
+                          return (
+                            <div>
+                              <p className="text-sm">{formatRelativeTime(user.lastLogin)}</p>
+                              <p className="text-xs text-slate-400">
+                                {loginDate.toLocaleString()}
+                              </p>
+                            </div>
+                          );
+                        } catch (error) {
+                          console.error('Error parsing lastLogin timestamp:', error, user.lastLogin);
+                          return <span className="text-slate-400 italic">Invalid timestamp</span>;
+                        }
+                      })() : (
                         <span className="text-slate-400 italic">Never logged in</span>
                       )}
                     </td>

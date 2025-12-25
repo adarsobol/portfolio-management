@@ -525,8 +525,15 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     } else {
       // Update metadata
       if (picture && userRow.get('avatar') !== picture) userRow.set('avatar', picture);
-      userRow.set('lastLogin', new Date().toISOString());
-      await userRow.save();
+      const loginTimestamp = new Date().toISOString();
+      userRow.set('lastLogin', loginTimestamp);
+      try {
+        await userRow.save();
+        console.log(`[SERVER] Updated lastLogin for ${email}: ${loginTimestamp}`);
+      } catch (saveError) {
+        console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+        // Continue with login even if save fails
+      }
     }
 
     if (!userRow) throw new Error('Failed to retrieve user after creation');
@@ -620,8 +627,15 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
     }
 
     // Update last login
-    userRow.set('lastLogin', new Date().toISOString());
-    await userRow.save();
+    const loginTimestamp = new Date().toISOString();
+    userRow.set('lastLogin', loginTimestamp);
+    try {
+      await userRow.save();
+      console.log(`[SERVER] Updated lastLogin for ${email}: ${loginTimestamp}`);
+    } catch (saveError) {
+      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+      // Continue with login even if save fails
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -1663,9 +1677,25 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
     const { snapshot } = req.body;
 
     if (!snapshot || !snapshot.data) {
-      res.status(400).json({ error: 'Invalid snapshot data' });
+      console.error('[SERVER] Snapshot creation failed: Missing snapshot or snapshot.data');
+      res.status(400).json({ error: 'Invalid snapshot data: snapshot or data is missing' });
       return;
     }
+
+    // Validate that data is an array and not empty
+    if (!Array.isArray(snapshot.data)) {
+      console.error('[SERVER] Snapshot creation failed: snapshot.data is not an array', typeof snapshot.data);
+      res.status(400).json({ error: 'Invalid snapshot data: data must be an array' });
+      return;
+    }
+
+    if (snapshot.data.length === 0) {
+      console.error('[SERVER] Snapshot creation failed: snapshot.data is empty');
+      res.status(400).json({ error: 'Invalid snapshot data: data array is empty. Cannot create snapshot without initiatives.' });
+      return;
+    }
+
+    console.log(`[SERVER] Creating snapshot with ${snapshot.data.length} initiatives`);
 
     const doc = await getDoc();
     if (!doc) {
@@ -1695,19 +1725,28 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
       l4_target: ''
     });
 
-    await newSheet.addRows(snapshot.data.map((item: Record<string, unknown>) => {
+    // Map snapshot data to rows, ensuring all required fields are present
+    const rowsToAdd = snapshot.data.map((item: Record<string, unknown>, index: number) => {
       const rowData: Record<string, string> = {};
       INITIATIVE_HEADERS.forEach(header => {
         const value = item[header];
         rowData[header] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
       });
       return rowData;
-    }));
+    });
 
-    console.log(`Created snapshot tab: ${tabName} with ${snapshot.data.length} items`);
-    res.json({ success: true, tabName });
+    if (rowsToAdd.length > 0) {
+      await newSheet.addRows(rowsToAdd);
+      console.log(`[SERVER] Created snapshot tab: ${tabName} with ${rowsToAdd.length} initiatives`);
+    } else {
+      console.error('[SERVER] No rows to add to snapshot after mapping');
+      res.status(400).json({ error: 'Failed to map snapshot data to rows' });
+      return;
+    }
+
+    res.json({ success: true, tabName, count: rowsToAdd.length });
   } catch (error) {
-    console.error('Error creating snapshot:', error);
+    console.error('[SERVER] Error creating snapshot:', error);
     res.status(500).json({ error: String(error) });
   }
 });
