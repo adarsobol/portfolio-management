@@ -223,7 +223,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const response = await fetch(`${API_ENDPOINT}/api/admin/login-history`, {
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
         }
       });
       if (response.ok) {
@@ -245,7 +245,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const response = await fetch(`${API_ENDPOINT}/api/backups`, {
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
         }
       });
       if (response.ok) {
@@ -270,7 +270,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const response = await fetch(`${API_ENDPOINT}/api/backups/${date}`, {
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
         }
       });
       if (response.ok) {
@@ -292,7 +292,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
         },
         body: JSON.stringify({ label: 'manual' })
       });
@@ -328,7 +328,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
         },
         body: JSON.stringify({ confirm: true })
       });
