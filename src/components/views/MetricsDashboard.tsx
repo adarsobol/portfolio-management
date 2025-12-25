@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { PieChart as PieChartIcon, Shield, Battery, AlertTriangle, HelpCircle } from 'lucide-react';
 
@@ -37,7 +37,22 @@ const MetricTooltip: React.FC<{
   position?: 'top' | 'bottom' | 'left' | 'right';
 }> = ({ metricKey, children, position = 'bottom' }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const tooltip = METRIC_TOOLTIPS[metricKey];
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    if (!isVisible) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
+        setIsVisible(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isVisible]);
 
   if (!tooltip) return <>{children}</>;
 
@@ -49,14 +64,18 @@ const MetricTooltip: React.FC<{
   };
 
   return (
-    <div 
-      className="relative inline-block"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-    >
+    <div className="relative inline-flex items-start gap-1" ref={tooltipRef}>
       {children}
+      <button
+        type="button"
+        onClick={() => setIsVisible(!isVisible)}
+        className="mt-1 p-0.5 rounded-full hover:bg-slate-200 transition-colors flex-shrink-0"
+        aria-label={`Info about ${tooltip.title}`}
+      >
+        <HelpCircle className={`w-3.5 h-3.5 ${isVisible ? 'text-blue-500' : 'text-slate-400'} hover:text-blue-500 transition-colors`} />
+      </button>
       {isVisible && (
-        <div className={`absolute z-50 ${positionClasses[position]} w-72 pointer-events-none`}>
+        <div className={`absolute z-50 ${positionClasses[position]} w-72`}>
           <div className="bg-slate-900 text-white p-4 rounded-lg shadow-xl text-left">
             <div className="flex items-center gap-2 mb-2">
               <HelpCircle className="w-4 h-4 text-blue-400" />
