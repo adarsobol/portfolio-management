@@ -1126,17 +1126,16 @@ export default function App() {
         newComments.forEach(comment => {
           const mentionedUserIds = parseMentions(comment.text, users);
           mentionedUserIds.forEach(userId => {
-            if (userId !== currentUser.id) {
-              addNotification(createNotification(
-                NotificationType.Mention,
-                `You were mentioned`,
-                `${currentUser.name} mentioned you in a comment on "${item.title}"`,
-                item.id,
-                item.title,
-                userId,
-                { commentId: comment.id, commentText: comment.text }
-              ));
-            }
+            // Create mention notification (including self-mentions for testing/visibility)
+            addNotification(createNotification(
+              NotificationType.Mention,
+              `You were mentioned`,
+              `${currentUser.name} mentioned you in a comment on "${item.title}"`,
+              item.id,
+              item.title,
+              userId,
+              { commentId: comment.id, commentText: comment.text }
+            ));
           });
           
           // Notify initiative owner about new comment (if commenter is not the owner)
@@ -1825,8 +1824,8 @@ export default function App() {
         // Handle @mentions in the comment
         const mentionedUserIds = parseMentions(comment.text, users);
         mentionedUserIds.forEach(userId => {
-          // Don't notify the commenter or the owner (owner already gets a notification)
-          if (userId !== currentUser.id && userId !== initiative.ownerId) {
+          // Don't notify the owner again (they already get a NewComment notification above)
+          if (userId !== initiative.ownerId) {
             addNotification(createNotification(
               NotificationType.Mention,
               'You were mentioned',

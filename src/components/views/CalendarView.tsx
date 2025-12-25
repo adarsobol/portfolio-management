@@ -325,7 +325,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Change Status
           </div>
-          {Object.values(Status).map(status => (
+          {Object.values(Status).filter(status => status !== Status.Deleted).map(status => (
             <button
               key={status}
               onClick={() => handleStatusChange(status)}

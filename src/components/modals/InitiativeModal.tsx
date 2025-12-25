@@ -1208,7 +1208,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         onChange={(e) => handleChange('status', e.target.value)}
                         className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                       >
-                        {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+                        {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1815,7 +1815,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                               >
                                 <option value="">Select...</option>
-                                {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+                                {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                               </select>
                             ) : (
                               <select
@@ -2087,7 +2087,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     onChange={(e) => updateTask(task.id, 'status', e.target.value)}
                                     className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-300"
                                   >
-                                    {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+                                    {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                                   </select>
                                 </div>
                               </div>
@@ -2449,7 +2449,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             onChange={(e) => handleBulkRowChange(row.id, 'status', e.target.value)}
                             className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
-                            {Object.values(Status).map(s => <option key={s} value={s}>{s}</option>)}
+                            {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         </div>
                         <div>
@@ -2654,7 +2654,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                       className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     >
                                       <option value="">Select...</option>
-                                      {Object.values(Status).map(s => (
+                                      {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
                                         <option key={s} value={s}>{s}</option>
                                       ))}
                                     </select>

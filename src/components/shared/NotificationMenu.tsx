@@ -142,7 +142,7 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                     <Check size={16} />
                   </button>
                 )}
-                {notifications.length > 0 && (
+                {userNotifications.length > 0 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -224,10 +224,10 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
             </div>
 
             {/* Footer */}
-            {notifications.length > 0 && (
+            {userNotifications.length > 0 && (
               <div className="p-3 border-t border-slate-200 bg-slate-50">
                 <p className="text-xs text-slate-500 text-center">
-                  {notifications.length} total notification{notifications.length !== 1 ? 's' : ''}
+                  {userNotifications.length} total notification{userNotifications.length !== 1 ? 's' : ''}
                 </p>
               </div>
             )}

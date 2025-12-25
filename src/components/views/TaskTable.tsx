@@ -551,7 +551,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                onChange={(e) => handleInlineUpdate(item.id, 'status', e.target.value)}
                className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full ${getStatusSelectStyle(item.status)}`}
              >
-               {Object.values(Status).map(s => <option key={s} value={s} className="bg-white text-slate-900">{s}</option>)}
+               {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s} className="bg-white text-slate-900">{s}</option>)}
              </select>
           ) : (
              <StatusBadge status={item.status} />
@@ -952,7 +952,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
                                 className={`flex-1 text-[10px] font-bold border px-1 py-0.5 rounded cursor-pointer ${getStatusSelectStyle(task.status)}`}
                               >
-                                {Object.values(Status).map(s => (
+                                {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
                                   <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
                                 ))}
                               </select>
@@ -1180,7 +1180,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               onChange={(e) => setNewTaskForm(prev => ({ ...prev, status: e.target.value as Status }))}
                               className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                             >
-                              {Object.values(Status).map(s => (
+                              {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
                                 <option key={s} value={s}>{s}</option>
                               ))}
                             </select>
