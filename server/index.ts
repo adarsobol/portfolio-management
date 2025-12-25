@@ -502,6 +502,15 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
         title: 'Users',
         headerValues: USER_HEADERS
       });
+    } else {
+      // Ensure headers are up-to-date (adds missing columns like lastLogin)
+      await usersSheet.loadHeaderRow().catch(() => {});
+      const currentHeaders = usersSheet.headerValues || [];
+      const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
+      if (missingHeaders.length > 0) {
+        console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+        await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
+      }
     }
 
     const rows = await usersSheet.getRows();
@@ -583,6 +592,15 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
         lastLogin: ''
       });
       console.log('Created Users sheet with default admin user');
+    } else {
+      // Ensure headers are up-to-date (adds missing columns like lastLogin)
+      await usersSheet.loadHeaderRow().catch(() => {});
+      const currentHeaders = usersSheet.headerValues || [];
+      const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
+      if (missingHeaders.length > 0) {
+        console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+        await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
+      }
     }
 
     const rows = await usersSheet.getRows();
@@ -2167,10 +2185,19 @@ app.get('/api/admin/login-history', authenticateToken, async (req: Authenticated
       return;
     }
 
-    const usersSheet = doc.sheetsByTitle['Users'];
+    let usersSheet = doc.sheetsByTitle['Users'];
     if (!usersSheet) {
       res.json({ users: [] });
       return;
+    }
+
+    // Ensure headers are up-to-date (adds missing columns like lastLogin)
+    await usersSheet.loadHeaderRow().catch(() => {});
+    const currentHeaders = usersSheet.headerValues || [];
+    const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
+    if (missingHeaders.length > 0) {
+      console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+      await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
     }
 
     const rows = await usersSheet.getRows();

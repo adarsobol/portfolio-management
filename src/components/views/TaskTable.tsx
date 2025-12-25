@@ -270,6 +270,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const getOwnerNameById = (id?: string) => getOwnerName(users, id);
 
   const canInlineEdit = (item: Initiative): boolean => {
+    // #region agent log
+    const canEditAll = canEditAllTasks(config, currentUser.role);
+    const canEditOwn = canEditOwnTasks(config, currentUser.role);
+    const ownerMatch = item.ownerId === currentUser.id;
+    const editTasksPermValue = config.rolePermissions?.[currentUser.role]?.editTasks;
+    const result = canEditAll || (ownerMatch && canEditOwn);
+    console.log('[DEBUG canInlineEdit]', { currentUserId: currentUser.id, currentUserRole: currentUser.role, itemOwnerId: item.ownerId, itemTitle: item.title, ownerMatch, canEditAll, canEditOwn, editTasksPermValue, result });
+    fetch('http://127.0.0.1:7242/ingest/30bff00f-1252-4a6a-a1a1-ff6715802d11',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TaskTable.tsx:canInlineEdit',message:'Permission check for inline edit',data:{currentUserId:currentUser.id,currentUserRole:currentUser.role,itemOwnerId:item.ownerId,itemTitle:item.title,ownerMatch,canEditAll,canEditOwn,editTasksPermValue,result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C,E'})}).catch(()=>{});
+    // #endregion
     // Check if user can edit all tasks
     if (canEditAllTasks(config, currentUser.role)) return true;
     // Check if user can edit own tasks and this is their task

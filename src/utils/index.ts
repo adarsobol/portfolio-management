@@ -178,6 +178,9 @@ export const hasEditAccess = (level: TabAccessLevel): boolean => {
  */
 export const getPermission = (config: AppConfig, role: Role, key: PermissionKey): PermissionValue => {
   const perms = config.rolePermissions[role];
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/30bff00f-1252-4a6a-a1a1-ff6715802d11',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/index.ts:getPermission',message:'Getting permission value',data:{role,key,hasConfig:!!config,hasRolePermissions:!!config?.rolePermissions,hasPermsForRole:!!perms,permValue:perms?.[key]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})}).catch(()=>{});
+  // #endregion
   if (!perms) {
     // Return default based on permission type
     if (key.startsWith('access')) {
