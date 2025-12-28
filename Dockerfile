@@ -40,6 +40,8 @@ RUN npm ci --only=production
 # Copy server files
 COPY server/ ./server/
 COPY tsconfig.json ./
+# Copy shared types (needed by server imports)
+COPY src/types/ ./src/types/
 
 # ============================================
 # Stage 3: Production Image
@@ -65,6 +67,8 @@ RUN npm install -g tsx
 # Copy server source
 COPY --from=backend-builder /app/server ./server
 COPY --from=backend-builder /app/tsconfig.json ./
+# Copy shared types (needed by server imports)
+COPY --from=backend-builder /app/src/types ./src/types
 
 # Copy built frontend
 COPY --from=frontend-builder /app/dist ./dist
