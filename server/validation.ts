@@ -16,9 +16,7 @@ export const registerUserSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(1, 'Name is required'),
-  role: z.enum(['Admin', 'Team Lead', 'Group Lead (Director)', 'Portfolio Ops', 'VP'], {
-    errorMap: () => ({ message: 'Invalid role' }),
-  }),
+  role: z.enum(['Admin', 'Team Lead', 'Group Lead (Director)', 'Portfolio Ops', 'VP']),
   avatar: z.string().url('Invalid avatar URL').optional().or(z.literal('')),
 });
 
@@ -70,9 +68,7 @@ export const bulkImportUsersSchema = z.object({
   users: z.array(z.object({
     email: z.string().email('Invalid email address'),
     name: z.string().min(1, 'Name is required'),
-    role: z.enum(['Admin', 'Team Lead', 'Group Lead (Director)', 'Portfolio Ops', 'VP'], {
-      errorMap: () => ({ message: 'Invalid role' }),
-    }),
+    role: z.enum(['Admin', 'Team Lead', 'Group Lead (Director)', 'Portfolio Ops', 'VP']),
     avatar: z.string().url('Invalid avatar URL').optional().or(z.literal('')),
   })).min(1, 'At least one user is required'),
 });
@@ -85,7 +81,7 @@ export const validate = (schema: z.ZodSchema) => {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map(err => ({
+        const errors = error.issues.map((err: z.ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));

@@ -648,7 +648,6 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
           console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
           
           // Verify the save worked by reading it back
-          await userRow.load();
           const savedTimestamp = userRow.get('lastLogin');
           if (savedTimestamp === loginTimestamp) {
             console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
@@ -776,7 +775,6 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
           console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
           
           // Verify the save worked by reading it back
-          await updatedUserRow.load();
           const savedTimestamp = updatedUserRow.get('lastLogin');
           if (savedTimestamp === loginTimestamp) {
             console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
@@ -795,7 +793,6 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
         console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
         
         // Verify the save worked by reading it back
-        await userRow.load();
         const savedTimestamp = userRow.get('lastLogin');
         if (savedTimestamp === loginTimestamp) {
           console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
