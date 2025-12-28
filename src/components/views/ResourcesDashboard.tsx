@@ -718,7 +718,8 @@ const MetricTooltip: React.FC<{
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   value?: number; // Optional value for dynamic interpretations
-}> = ({ metricKey, children, position = 'top', value }) => {
+  hideExternalIcon?: boolean; // Hide the external help icon when card has internal one
+}> = ({ metricKey, children, position = 'top', value, hideExternalIcon = false }) => {
   const [isVisible, setIsVisible] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const tooltip = METRIC_TOOLTIPS[metricKey];
@@ -796,16 +797,18 @@ const MetricTooltip: React.FC<{
   };
 
   return (
-    <div className="relative inline-flex items-start gap-1" ref={tooltipRef}>
+    <div className="relative inline-flex items-start gap-1" ref={tooltipRef} onClick={hideExternalIcon ? () => setIsVisible(!isVisible) : undefined}>
       {children}
-      <button
-        type="button"
-        onClick={() => setIsVisible(!isVisible)}
-        className="mt-1 p-0.5 rounded-full hover:bg-slate-200 transition-colors flex-shrink-0"
-        aria-label={`Info about ${tooltip.title}`}
-      >
-        <HelpCircle className={`w-3.5 h-3.5 ${isVisible ? 'text-blue-500' : 'text-slate-400'} hover:text-blue-500 transition-colors`} />
-      </button>
+      {!hideExternalIcon && (
+        <button
+          type="button"
+          onClick={() => setIsVisible(!isVisible)}
+          className="mt-1 p-0.5 rounded-full hover:bg-slate-200 transition-colors flex-shrink-0"
+          aria-label={`Info about ${tooltip.title}`}
+        >
+          <HelpCircle className={`w-3.5 h-3.5 ${isVisible ? 'text-blue-500' : 'text-slate-400'} hover:text-blue-500 transition-colors`} />
+        </button>
+      )}
       {isVisible && (
         <div className={`absolute z-50 ${positionClasses[position]} w-80`}>
           <div className="bg-slate-900 text-white p-4 rounded-lg shadow-xl text-left">
@@ -1544,225 +1547,239 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
         </div>
       </div>
 
-      {/* Schedule Health Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricTooltip metricKey="avgDelay" position="bottom" value={healthMetrics.avgDelay}>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <p className="text-xs text-slate-500 font-semibold tracking-wider">Avg delay</p>
-              </div>
-              <TrafficLight status={healthMetrics.avgDelay <= 0 ? 'good' : healthMetrics.avgDelay <= 7 ? 'warning' : 'critical'} />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-black ${healthMetrics.avgDelay <= 0 ? 'text-emerald-600' : healthMetrics.avgDelay <= 7 ? 'text-amber-500' : 'text-red-500'}`}>
-                {healthMetrics.avgDelay > 0 ? '+' : ''}{healthMetrics.avgDelay}
-              </span>
-              <span className="text-slate-400 text-xs">days</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5">
-              {healthMetrics.avgDelay <= 0 ? 'Ahead of schedule' : 'Behind original ETAs'}
-            </p>
-          </div>
-        </MetricTooltip>
-
-        <MetricTooltip metricKey="onTimeRate" position="bottom" value={healthMetrics.onTimeRate}>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
-                <p className="text-xs text-slate-500 font-semibold tracking-wider">On-time rate</p>
-              </div>
-              <TrafficLight status={healthMetrics.onTimeRate >= 80 ? 'good' : healthMetrics.onTimeRate >= 60 ? 'warning' : 'critical'} />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-black ${healthMetrics.onTimeRate >= 80 ? 'text-emerald-600' : healthMetrics.onTimeRate >= 60 ? 'text-amber-500' : 'text-red-500'}`}>
-                {healthMetrics.onTimeRate}%
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-2">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${getHealthBarColor(healthMetrics.onTimeRate)}`}
-                style={{ width: `${healthMetrics.onTimeRate}%` }}
-              />
-            </div>
-          </div>
-        </MetricTooltip>
-
-        <MetricTooltip metricKey="etaSlippage" position="bottom" value={healthMetrics.etaSlippageCount}>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <p className="text-xs text-slate-500 font-semibold tracking-wider">ETA slippage</p>
-              </div>
-              <TrafficLight status={healthMetrics.etaSlippageCount === 0 ? 'good' : healthMetrics.etaSlippageCount <= 3 ? 'warning' : 'critical'} />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black text-slate-800">{healthMetrics.etaSlippageCount}</span>
-              <span className="text-slate-400 text-xs">items</span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5">with ETA changes from baseline</p>
-          </div>
-        </MetricTooltip>
-
-        {/* Delay Distribution */}
-        <div ref={delayRef} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
-          <h3 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-            <span className="w-1.5 h-3 bg-gradient-to-b from-emerald-500 to-red-500 rounded-full"></span>
-            Delay Distribution
-          </h3>
-          {showDelayChart && (
-          <div className="h-32">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={healthMetrics.delayBuckets} margin={{ top: 2, right: 5, left: 5, bottom: 2 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
-                  formatter={(value: number) => [`${value} items`, 'Count']}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {healthMetrics.delayBuckets.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          )}
-        </div>
-      </div>
-
-      {/* Effort Health Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricTooltip metricKey="effortVariance" position="bottom" value={healthMetrics.effortVariance}>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                {healthMetrics.effortVariance >= 0 
-                  ? <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
-                  : <TrendingDown className="w-3.5 h-3.5 text-slate-400" />
-                }
-                <p className="text-xs text-slate-500 font-semibold tracking-wider">Effort variance</p>
-              </div>
-              <TrafficLight status={Math.abs(healthMetrics.effortVariance) <= 10 ? 'good' : Math.abs(healthMetrics.effortVariance) <= 25 ? 'warning' : 'critical'} />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-black ${Math.abs(healthMetrics.effortVariance) <= 10 ? 'text-emerald-600' : Math.abs(healthMetrics.effortVariance) <= 25 ? 'text-amber-500' : 'text-red-500'}`}>
-                {healthMetrics.effortVariance > 0 ? '+' : ''}{healthMetrics.effortVariance}%
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5">
-              {healthMetrics.effortVariance > 0 ? 'Scope increased from baseline' : healthMetrics.effortVariance < 0 ? 'Scope reduced from baseline' : 'On target'}
-            </p>
-          </div>
-        </MetricTooltip>
-
-        <MetricTooltip metricKey="netScopeChange" position="bottom" value={healthMetrics.netScopeChange}>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-slate-400" />
-                <p className="text-xs text-slate-500 font-semibold tracking-wider">Net scope change</p>
-              </div>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-black ${healthMetrics.netScopeChange === 0 ? 'text-slate-800' : healthMetrics.netScopeChange > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                {isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange > 0 ? '+' : ''}{isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange}
-              </span>
-              <span className="text-slate-400 text-xs">weeks</span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1.5">
-              {healthMetrics.totalCurrentEffort}w current vs {healthMetrics.totalOriginalEffort}w original
-            </p>
-          </div>
-        </MetricTooltip>
-
-        <MetricTooltip metricKey="estimationAccuracy" position="bottom" value={healthMetrics.estimationAccuracy}>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
-                <p className="text-xs text-slate-500 font-semibold tracking-wider">Est. accuracy</p>
-              </div>
-              <TrafficLight status={healthMetrics.estimationAccuracy >= 90 ? 'good' : healthMetrics.estimationAccuracy >= 70 ? 'warning' : 'critical'} />
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-black ${healthMetrics.estimationAccuracy >= 90 ? 'text-emerald-600' : healthMetrics.estimationAccuracy >= 70 ? 'text-amber-500' : 'text-red-500'}`}>
-                {healthMetrics.estimationAccuracy}%
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1.5">Based on completed items</p>
-          </div>
-        </MetricTooltip>
-
-        {/* Obsolete Effort */}
-        {(healthMetrics.totalObsoleteEstimatedEffort > 0 || healthMetrics.totalObsoleteActualEffort > 0) && (
-          <MetricTooltip metricKey="obsoleteEffort" position="bottom" value={healthMetrics.totalObsoleteEstimatedEffort}>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-full">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                  <History className="w-3.5 h-3.5 text-purple-500" />
-                  <p className="text-xs text-slate-500 font-semibold tracking-wider">Obsolete effort</p>
+      {/* Health Metrics Grid - Schedule & Effort Sections */}
+      <div className="space-y-4">
+        {/* Schedule Health Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <MetricTooltip metricKey="avgDelay" position="bottom" value={healthMetrics.avgDelay}>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <p className="text-sm text-slate-500 font-medium">Avg delay</p>
                 </div>
-                <span className="text-xs text-slate-400">{healthMetrics.obsoleteCount} {healthMetrics.obsoleteCount === 1 ? 'item' : 'items'}</span>
+                <TrafficLight status={healthMetrics.avgDelay <= 0 ? 'good' : healthMetrics.avgDelay <= 7 ? 'warning' : 'critical'} />
               </div>
-              <div className="flex gap-2">
-                <div className="flex-1 p-2 bg-purple-50 rounded-lg border border-purple-100">
-                  <div className="text-xs text-purple-600 font-medium mb-1">Est.</div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-bold text-purple-700">
-                      {healthMetrics.totalObsoleteEstimatedEffort.toFixed(1)}
-                    </span>
-                    <span className="text-xs text-purple-500">w</span>
-                  </div>
+              <div>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-3xl font-black ${healthMetrics.avgDelay <= 0 ? 'text-emerald-600' : healthMetrics.avgDelay <= 7 ? 'text-amber-500' : 'text-red-500'}`}>
+                    {healthMetrics.avgDelay > 0 ? '+' : ''}{healthMetrics.avgDelay}
+                  </span>
+                  <span className="text-slate-400 text-sm">days</span>
                 </div>
-                <div className="flex-1 p-2 bg-purple-50 rounded-lg border border-purple-100">
-                  <div className="text-xs text-purple-600 font-medium mb-1">Actual</div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-bold text-purple-700">
-                      {healthMetrics.totalObsoleteActualEffort.toFixed(1)}
-                    </span>
-                    <span className="text-xs text-purple-500">w</span>
-                  </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  {healthMetrics.avgDelay <= 0 ? 'Ahead of schedule' : 'Behind original ETAs'}
+                </p>
+              </div>
+            </div>
+          </MetricTooltip>
+
+          <MetricTooltip metricKey="onTimeRate" position="bottom" value={healthMetrics.onTimeRate}>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-slate-400" />
+                  <p className="text-sm text-slate-500 font-medium">On-time rate</p>
+                </div>
+                <TrafficLight status={healthMetrics.onTimeRate >= 80 ? 'good' : healthMetrics.onTimeRate >= 60 ? 'warning' : 'critical'} />
+              </div>
+              <div>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-3xl font-black ${healthMetrics.onTimeRate >= 80 ? 'text-emerald-600' : healthMetrics.onTimeRate >= 60 ? 'text-amber-500' : 'text-red-500'}`}>
+                    {healthMetrics.onTimeRate}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full mt-3">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${getHealthBarColor(healthMetrics.onTimeRate)}`}
+                    style={{ width: `${healthMetrics.onTimeRate}%` }}
+                  />
                 </div>
               </div>
             </div>
           </MetricTooltip>
-        )}
+
+          <MetricTooltip metricKey="etaSlippage" position="bottom" value={healthMetrics.etaSlippageCount}>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <p className="text-sm text-slate-500 font-medium">ETA slippage</p>
+                </div>
+                <TrafficLight status={healthMetrics.etaSlippageCount === 0 ? 'good' : healthMetrics.etaSlippageCount <= 3 ? 'warning' : 'critical'} />
+              </div>
+              <div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-slate-800">{healthMetrics.etaSlippageCount}</span>
+                  <span className="text-slate-400 text-sm">items</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">with ETA changes from baseline</p>
+              </div>
+            </div>
+          </MetricTooltip>
+
+          {/* Delay Distribution */}
+          <div ref={delayRef} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow h-[160px] flex flex-col w-full">
+            <h3 className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-4 bg-gradient-to-b from-emerald-500 to-red-500 rounded-full"></span>
+              Delay Distribution
+            </h3>
+            {showDelayChart && (
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={healthMetrics.delayBuckets} margin={{ top: 2, right: 5, left: 5, bottom: 2 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
+                    formatter={(value: number) => [`${value} items`, 'Count']}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {healthMetrics.delayBuckets.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            )}
+          </div>
+        </div>
+
+        {/* Effort Health Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <MetricTooltip metricKey="effortVariance" position="bottom" value={healthMetrics.effortVariance}>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {healthMetrics.effortVariance >= 0 
+                  ? <TrendingUp className="w-4 h-4 text-slate-400" />
+                  : <TrendingDown className="w-4 h-4 text-slate-400" />
+                }
+                <p className="text-sm text-slate-500 font-medium">Effort variance</p>
+              </div>
+              <TrafficLight status={Math.abs(healthMetrics.effortVariance) <= 10 ? 'good' : Math.abs(healthMetrics.effortVariance) <= 25 ? 'warning' : 'critical'} />
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-3xl font-black ${Math.abs(healthMetrics.effortVariance) <= 10 ? 'text-emerald-600' : Math.abs(healthMetrics.effortVariance) <= 25 ? 'text-amber-500' : 'text-red-500'}`}>
+                  {healthMetrics.effortVariance > 0 ? '+' : ''}{healthMetrics.effortVariance}%
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                {healthMetrics.effortVariance > 0 ? 'Scope increased from baseline' : healthMetrics.effortVariance < 0 ? 'Scope reduced from baseline' : 'On target'}
+              </p>
+            </div>
+          </div>
+        </MetricTooltip>
+
+        <MetricTooltip metricKey="netScopeChange" position="bottom" value={healthMetrics.netScopeChange}>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-slate-400" />
+                <p className="text-sm text-slate-500 font-medium">Net scope change</p>
+              </div>
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-3xl font-black ${healthMetrics.netScopeChange === 0 ? 'text-slate-800' : healthMetrics.netScopeChange > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                  {isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange > 0 ? '+' : ''}{isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange}
+                </span>
+                <span className="text-slate-400 text-sm">weeks</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                {healthMetrics.totalCurrentEffort}w current vs {healthMetrics.totalOriginalEffort}w original
+              </p>
+            </div>
+          </div>
+        </MetricTooltip>
+
+        <MetricTooltip metricKey="estimationAccuracy" position="bottom" value={healthMetrics.estimationAccuracy}>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-slate-400" />
+                <p className="text-sm text-slate-500 font-medium">Est. accuracy</p>
+              </div>
+              <TrafficLight status={healthMetrics.estimationAccuracy >= 90 ? 'good' : healthMetrics.estimationAccuracy >= 70 ? 'warning' : 'critical'} />
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-3xl font-black ${healthMetrics.estimationAccuracy >= 90 ? 'text-emerald-600' : healthMetrics.estimationAccuracy >= 70 ? 'text-amber-500' : 'text-red-500'}`}>
+                  {healthMetrics.estimationAccuracy}%
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">Based on completed items</p>
+            </div>
+          </div>
+        </MetricTooltip>
+
+        {/* Wasted Effort Analysis (Always visible) */}
+        <MetricTooltip metricKey="obsoleteEffort" position="bottom" value={healthMetrics.totalObsoleteEstimatedEffort}>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-purple-500" />
+                <p className="text-sm text-slate-500 font-medium">Wasted Effort</p>
+              </div>
+              <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">{healthMetrics.obsoleteCount} obsolete</span>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1 p-3 bg-purple-50 rounded-xl">
+                <div className="text-xs text-purple-600 font-medium mb-1">Allocated</div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-purple-700">
+                    {healthMetrics.totalObsoleteEstimatedEffort.toFixed(1)}
+                  </span>
+                  <span className="text-xs text-purple-500">w</span>
+                </div>
+              </div>
+              <div className="flex-1 p-3 bg-purple-50 rounded-xl">
+                <div className="text-xs text-purple-600 font-medium mb-1">Actual</div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-purple-700">
+                    {healthMetrics.totalObsoleteActualEffort.toFixed(1)}
+                  </span>
+                  <span className="text-xs text-purple-500">w</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </MetricTooltip>
+        </div>
       </div>
 
       {/* Change Activity & Status Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Change Activity */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <FileEdit className="w-3.5 h-3.5" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <FileEdit className="w-4 h-4" />
               Change Activity
             </h3>
             <span className="text-xs text-slate-400">{healthMetrics.totalChanges} total changes</span>
           </div>
           
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          {/* Change Activity Mini Cards */}
+          <div className="flex justify-center gap-4 mb-4">
             <MetricTooltip metricKey="totalChanges" position="bottom" value={healthMetrics.totalChanges}>
-              <div className="text-center p-2.5 bg-slate-50 rounded-lg cursor-help hover:bg-slate-100 transition-colors">
+              <div className="text-center p-3 bg-slate-50 rounded-xl cursor-help hover:bg-slate-100 transition-colors h-[70px] w-[120px] flex flex-col justify-center items-center">
                 <div className="text-xl font-bold text-slate-800">{healthMetrics.totalChanges}</div>
                 <div className="text-xs text-slate-500">Total</div>
               </div>
             </MetricTooltip>
             <div 
               onClick={() => setShowChangesListModal(true)}
-              className="text-center p-2.5 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+              className="text-center p-3 bg-blue-50 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors h-[70px] w-[120px] flex flex-col justify-center items-center"
             >
               <div className="text-xl font-bold text-blue-600">{healthMetrics.changeFrequency}</div>
               <div className="text-xs text-slate-500">Per Item</div>
             </div>
             <MetricTooltip metricKey="recentChanges" position="bottom" value={healthMetrics.recentChanges}>
-              <div className="text-center p-2.5 bg-emerald-50 rounded-lg cursor-help hover:bg-emerald-100 transition-colors">
+              <div className="text-center p-3 bg-emerald-50 rounded-xl cursor-help hover:bg-emerald-100 transition-colors h-[70px] w-[120px] flex flex-col justify-center items-center">
                 <div className="text-xl font-bold text-emerald-600">{healthMetrics.recentChanges}</div>
                 <div className="text-xs text-slate-500">Last 7 Days</div>
               </div>
@@ -1799,96 +1816,77 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
         </div>
 
         {/* Status & Completion Health */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
               Status & Completion
             </h3>
           </div>
           
-          {/* Status Distribution */}
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
-              <div className="flex items-center justify-between">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <span className="text-base font-bold text-slate-600">{healthMetrics.statusCounts.notStarted}</span>
+          {/* Status Distribution Cards - 2 rows of 3 */}
+          <div className="space-y-3 mb-5">
+            {/* Row 1: Not Started, In Progress, At Risk */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-4 bg-slate-50 rounded-xl h-[90px] flex flex-col justify-center items-center">
+                <span className="w-3 h-3 rounded-full bg-slate-400 mb-2" />
+                <span className="text-2xl font-bold text-slate-600">{healthMetrics.statusCounts.notStarted}</span>
+                <div className="text-xs text-slate-500 mt-1">Not Started</div>
               </div>
-              <div className="text-[9px] text-slate-500 mt-1">Not Started</div>
-            </div>
-            <div className="p-2 bg-blue-50 rounded-lg border border-blue-100">
-              <div className="flex items-center justify-between">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-base font-bold text-blue-600">{healthMetrics.statusCounts.inProgress}</span>
+              <div className="p-4 bg-blue-50 rounded-xl h-[90px] flex flex-col justify-center items-center">
+                <span className="w-3 h-3 rounded-full bg-blue-500 mb-2" />
+                <span className="text-2xl font-bold text-blue-600">{healthMetrics.statusCounts.inProgress}</span>
+                <div className="text-xs text-blue-600 mt-1">In Progress</div>
               </div>
-              <div className="text-[9px] text-blue-600 mt-1">In Progress</div>
-            </div>
-            <div className="p-2 bg-red-50 rounded-lg border border-red-100">
-              <div className="flex items-center justify-between">
-                <AlertCircle className="w-3.5 h-3.5 text-red-500" />
-                <span className="text-base font-bold text-red-600">{healthMetrics.statusCounts.atRisk}</span>
+              <div className="p-4 bg-red-50 rounded-xl h-[90px] flex flex-col justify-center items-center">
+                <AlertCircle className="w-4 h-4 text-red-500 mb-2" />
+                <span className="text-2xl font-bold text-red-600">{healthMetrics.statusCounts.atRisk}</span>
+                <div className="text-xs text-red-600 mt-1">At Risk</div>
               </div>
-              <div className="text-[9px] text-red-600 mt-1">At Risk</div>
             </div>
-            <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100">
-              <div className="flex items-center justify-between">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="text-base font-bold text-emerald-600">{healthMetrics.statusCounts.done}</span>
+            {/* Row 2: Done, Obsolete, Avg Completion */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-4 bg-emerald-50 rounded-xl h-[90px] flex flex-col justify-center items-center">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 mb-2" />
+                <span className="text-2xl font-bold text-emerald-600">{healthMetrics.statusCounts.done}</span>
+                <div className="text-xs text-emerald-600 mt-1">Done</div>
               </div>
-              <div className="text-[9px] text-emerald-600 mt-1">Done</div>
-            </div>
-            <div className="p-2 bg-purple-50 rounded-lg border border-purple-100">
-              <div className="flex items-center justify-between">
-                <span className="w-2 h-2 rounded-full bg-purple-500" />
-                <span className="text-base font-bold text-purple-600">{healthMetrics.statusCounts.obsolete}</span>
+              <div className="p-4 bg-purple-50 rounded-xl h-[90px] flex flex-col justify-center items-center">
+                <span className="w-3 h-3 rounded-full bg-purple-500 mb-2" />
+                <span className="text-2xl font-bold text-purple-600">{healthMetrics.statusCounts.obsolete}</span>
+                <div className="text-xs text-purple-600 mt-1">Obsolete</div>
               </div>
-              <div className="text-[9px] text-purple-600 mt-1">Obsolete</div>
-            </div>
-          </div>
-
-          {/* Completion Rate */}
-          <div className="mb-2">
-            <MetricTooltip metricKey="avgCompletionRate" position="top" value={healthMetrics.avgCompletionRate}>
-              <div className="cursor-help">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-500">Avg. Completion Rate</span>
-                  <span className={`text-xs font-semibold ${healthMetrics.avgCompletionRate >= 70 ? 'text-emerald-600' : healthMetrics.avgCompletionRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+              <MetricTooltip metricKey="avgCompletionRate" position="top" value={healthMetrics.avgCompletionRate} hideExternalIcon>
+                <div className={`p-4 rounded-xl h-[90px] w-full flex flex-col justify-center items-center cursor-help relative ${healthMetrics.avgCompletionRate >= 70 ? 'bg-emerald-50' : healthMetrics.avgCompletionRate >= 40 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 absolute top-2 right-2" />
+                  <span className={`text-2xl font-bold ${healthMetrics.avgCompletionRate >= 70 ? 'text-emerald-600' : healthMetrics.avgCompletionRate >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
                     {healthMetrics.avgCompletionRate}%
                   </span>
+                  <div className="text-xs text-slate-500 mt-1">Avg. Completion</div>
                 </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${healthMetrics.avgCompletionRate >= 70 ? 'bg-emerald-500' : healthMetrics.avgCompletionRate >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
-                    style={{ width: `${healthMetrics.avgCompletionRate}%` }}
-                  />
-                </div>
-              </div>
-            </MetricTooltip>
+              </MetricTooltip>
+            </div>
           </div>
 
-          {/* Low Completion Items & Stale Items */}
-          <div className="space-y-3 pt-3 border-t border-slate-100">
-            <MetricTooltip metricKey="lowCompletionItems" position="top" value={healthMetrics.lowCompletionCount}>
-              <div className="flex items-center justify-between cursor-help">
-                <div className="flex items-center gap-2">
-                  <TrendingDown className="w-4 h-4 text-amber-500" />
-                  <span className="text-sm text-slate-600">Low Completion (&lt;30%)</span>
-                </div>
-                <span className={`text-sm font-bold ${healthMetrics.lowCompletionCount === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+          {/* Low Completion Items & Stale Items - Centered */}
+          <div className="flex justify-center gap-3">
+            <MetricTooltip metricKey="lowCompletionItems" position="top" value={healthMetrics.lowCompletionCount} hideExternalIcon>
+              <div className="p-4 bg-amber-50 rounded-xl h-[90px] w-[200px] flex flex-col justify-center items-center cursor-help hover:bg-amber-100 transition-colors relative">
+                <HelpCircle className="w-3.5 h-3.5 text-slate-400 absolute top-2 right-2" />
+                <span className={`text-2xl font-bold ${healthMetrics.lowCompletionCount === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {healthMetrics.lowCompletionCount}
                 </span>
+                <div className="text-xs text-slate-500 mt-1">Low (&lt;30%)</div>
               </div>
             </MetricTooltip>
 
-            <MetricTooltip metricKey="staleItems" position="top" value={healthMetrics.staleItems.length}>
-              <div className="flex items-center justify-between cursor-help">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm text-slate-600">Stale (14+ days)</span>
-                </div>
-                <span className={`text-sm font-bold ${healthMetrics.staleItems.length === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+            <MetricTooltip metricKey="staleItems" position="top" value={healthMetrics.staleItems.length} hideExternalIcon>
+              <div className="p-4 bg-slate-100 rounded-xl h-[90px] w-[200px] flex flex-col justify-center items-center cursor-help hover:bg-slate-200 transition-colors relative">
+                <HelpCircle className="w-3.5 h-3.5 text-slate-400 absolute top-2 right-2" />
+                <span className={`text-2xl font-bold ${healthMetrics.staleItems.length === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {healthMetrics.staleItems.length}
                 </span>
+                <div className="text-xs text-slate-500 mt-1">Stale (14+ days)</div>
               </div>
             </MetricTooltip>
           </div>
@@ -2206,3 +2204,4 @@ export const ResourcesDashboard = memo(ResourcesDashboardComponent, (prevProps, 
   // Props are equal, skip re-render
   return true;
 });
+
