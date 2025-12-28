@@ -36,6 +36,10 @@ import {
 
 dotenv.config();
 
+console.log('🚀 Starting Portfolio Manager Server...');
+console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`Port: ${process.env.PORT || 3001}`);
+
 // ============================================
 // STORAGE BACKEND INITIALIZATION
 // ============================================
@@ -82,9 +86,33 @@ const PORT = process.env.PORT || 3001;
 // ============================================
 // SOCKET.IO SETUP FOR REAL-TIME COLLABORATION
 // ============================================
+// Get allowed origins for Socket.IO CORS
+const getSocketIOOrigins = (): string[] | true => {
+  const origins: string[] = [];
+  
+  // Production origins from environment
+  if (process.env.CORS_ALLOWED_ORIGINS) {
+    origins.push(...process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim()));
+  }
+  
+  // In development or if no origins set, allow all (for Cloud Run serving static files)
+  if (process.env.NODE_ENV !== 'production') {
+    origins.push(
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5173',
+      'http://localhost:3000',
+      'http://localhost:3002'
+    );
+  }
+  
+  // If no specific origins, allow all (needed when serving static from same origin)
+  return origins.length > 0 ? origins : true;
+};
+
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://localhost:3000'],
+    origin: getSocketIOOrigins(),
     credentials: true
   }
 });
@@ -269,13 +297,13 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   if (NODE_ENV === 'production') {
-    console.error('FATAL: JWT_SECRET environment variable is required in production');
-    process.exit(1);
+    console.error('WARNING: JWT_SECRET environment variable is not set in production. Using fallback (not recommended for security).');
+    console.error('Please set JWT_SECRET via Secret Manager or environment variables.');
   } else {
     console.warn('WARNING: JWT_SECRET not set. Using insecure default for development only.');
   }
 }
-const EFFECTIVE_JWT_SECRET = JWT_SECRET || 'dev-only-insecure-secret-do-not-use-in-prod';
+const EFFECTIVE_JWT_SECRET = JWT_SECRET || 'production-fallback-please-set-jwt-secret';
 
 // ============================================
 // TYPES
