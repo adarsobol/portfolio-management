@@ -842,5 +842,21 @@ export const INITIAL_CONFIG: AppConfig = {
       system: true,
       readOnly: true,
     },
+    {
+      id: generateId(),
+      name: 'Team-Based Asset Class Assignment',
+      description: 'Automatically assign asset class based on creator team when new initiatives are created (PL, Auto, POS, Advisory teams only)',
+      enabled: true,
+      trigger: WorkflowTrigger.OnCreate,
+      action: {
+        type: WorkflowAction.SetAssetClass,
+      },
+      createdBy: 'system',
+      createdAt: new Date().toISOString(),
+      runCount: 0,
+      executionLog: [],
+      system: true,
+      readOnly: true,
+    },
   ]
 };

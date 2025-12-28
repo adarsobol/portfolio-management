@@ -262,6 +262,7 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
       case WorkflowTrigger.OnEtaChange: return 'ETA Change';
       case WorkflowTrigger.OnEffortChange: return 'Effort Change';
       case WorkflowTrigger.OnConditionMet: return 'Condition Met';
+      case WorkflowTrigger.OnCreate: return 'On Create';
       default: return trigger;
     }
   };

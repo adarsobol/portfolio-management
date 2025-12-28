@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Settings, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
-import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
-import { generateId, exportToExcel } from '../../utils';
+import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
+import { generateId } from '../../utils';
 import * as XLSX from 'xlsx';
 
 // BadgePermission Component for visual permission display
@@ -99,6 +99,80 @@ const BadgePermission: React.FC<BadgePermissionProps> = ({ value, onChange, type
   }
 };
 
+// CollapsibleSection Component for lazy-loading admin sections
+interface CollapsibleSectionProps {
+  id: string;
+  title: string;
+  description?: string;
+  icon: React.ReactNode;
+  gradientFrom: string;
+  gradientTo: string;
+  isExpanded: boolean;
+  onToggle: (id: string) => void;
+  headerActions?: React.ReactNode;
+  children: React.ReactNode;
+  onFirstExpand?: () => void;
+  hasLoaded?: boolean;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
+  id,
+  title,
+  description,
+  icon,
+  gradientFrom,
+  gradientTo,
+  isExpanded,
+  onToggle,
+  headerActions,
+  children,
+  onFirstExpand,
+  hasLoaded = true,
+}) => {
+  const handleToggle = () => {
+    if (!isExpanded && onFirstExpand && !hasLoaded) {
+      onFirstExpand();
+    }
+    onToggle(id);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div 
+        className={`px-6 py-4 border-b border-slate-200 bg-gradient-to-r ${gradientFrom} ${gradientTo} flex justify-between items-center cursor-pointer hover:opacity-95 transition-opacity`}
+        onClick={handleToggle}
+      >
+        <div className="flex items-center gap-3">
+          {icon}
+          <div>
+            <h3 className="font-bold text-slate-800">{title}</h3>
+            {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {headerActions && (
+            <div onClick={e => e.stopPropagation()}>
+              {headerActions}
+            </div>
+          )}
+          <div className="p-1 rounded-lg hover:bg-white/50 transition-colors">
+            {isExpanded ? (
+              <ChevronUp size={20} className="text-slate-600" />
+            ) : (
+              <ChevronDown size={20} className="text-slate-600" />
+            )}
+          </div>
+        </div>
+      </div>
+      {isExpanded && (
+        <div className="animate-in slide-in-from-top-2 duration-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface AdminPanelProps {
   currentUser: User;
   config: AppConfig;
@@ -106,8 +180,6 @@ interface AdminPanelProps {
   users: User[];
   setUsers: (users: User[]) => void;
   initiatives: Initiative[];
-  changeLog: ChangeRecord[];
-  onGenerate30Initiatives?: () => Promise<void>;
   onClearCache?: () => Promise<void>;
   deletedInitiatives?: Initiative[];
   onRestore?: (id: string) => void;
@@ -179,8 +251,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   users,
   setUsers,
   initiatives,
-  changeLog,
-  onGenerate30Initiatives,
   onClearCache: _onClearCache,
   deletedInitiatives = [],
   onRestore,
@@ -188,6 +258,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   void _onClearCache; // Reserved for cache clearing feature
   const [newUser, setNewUser] = useState<Partial<User>>({ role: Role.TeamLead });
+  
+  // Collapsible sections state - track which sections are expanded
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  
+  // Track which sections have loaded their data (for lazy loading)
+  const [loadedSections, setLoadedSections] = useState<Set<string>>(new Set());
+  
+  const toggleSection = useCallback((sectionId: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
+  }, []);
+  
+  const markSectionLoaded = useCallback((sectionId: string) => {
+    setLoadedSections(prev => new Set(prev).add(sectionId));
+  }, []);
   
   // User import state
   const [userImportData, setUserImportData] = useState<ParsedUser[]>([]);
@@ -225,11 +317,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isRestoring, setIsRestoring] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
-  
-  // Snapshots state
-  const [snapshots, setSnapshots] = useState<Array<{ title: string }>>([]);
-  const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
-  const [snapshotsError, setSnapshotsError] = useState<string | null>(null);
   
   // Fetch login history
   const fetchLoginHistory = async () => {
@@ -336,32 +423,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
   
-  // Fetch snapshots
-  const fetchSnapshots = async () => {
-    setIsLoadingSnapshots(true);
-    setSnapshotsError(null);
-    try {
-      const response = await fetch(`${API_ENDPOINT}/api/sheets/snapshots`, {
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSnapshots(data.snapshots || []);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        setSnapshotsError(errorData.error || 'Failed to load snapshots');
-      }
-    } catch (error) {
-      console.error('Failed to fetch snapshots:', error);
-      setSnapshotsError('Network error while fetching snapshots');
-    } finally {
-      setIsLoadingSnapshots(false);
-    }
-  };
-  
   // Restore from backup
   const restoreFromBackup = async (date: string) => {
     if (!confirm(`Are you sure you want to restore data from ${date}? This will overwrite current data.`)) {
@@ -405,11 +466,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
   
   // Initial fetch
-  useEffect(() => {
-    fetchLoginHistory();
-    fetchBackups();
-    fetchSnapshots();
-  }, []);
+  // Note: Data is fetched lazily when sections are expanded
   
   // Format relative time
   const formatRelativeTime = (timestamp: string | null) => {
@@ -773,144 +830,90 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           Admin Configuration
         </h2>
 
-        <div className="flex items-center gap-3">
-          {onGenerate30Initiatives && (
-            <button
-              onClick={onGenerate30Initiatives}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 shadow-md hover:shadow-lg transition-all font-semibold text-sm"
-            >
-              <Plus size={18} /> Generate 30 Initiatives
-            </button>
-          )}
-          <button 
-            onClick={() => exportToExcel(initiatives, users, 'full-data-export')}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 shadow-md hover:shadow-lg transition-all font-semibold text-sm"
-          >
-            <FileSpreadsheet size={18} /> Export All Data
-          </button>
-        </div>
       </div>
 
       {/* Slack Integration */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-         <div className="px-6 py-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-slate-200">
-           <h3 className="font-bold text-slate-800 flex items-center gap-2">
-             <div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg">
-               <MessageSquare size={16} className="text-white" />
-             </div>
-             Slack Integration
-           </h3>
-         </div>
-         <div className="p-6">
-         <div className="space-y-4">
-           <div className="flex items-center gap-3">
-             <input 
-               type="checkbox" 
-               id="slack-enabled"
-               checked={config.slack?.enabled || false}
-               onChange={(e) => setConfig((prev: AppConfig) => ({
-                 ...prev,
-                 slack: {
-                   ...prev.slack,
-                   enabled: e.target.checked,
-                   webhookUrl: prev.slack?.webhookUrl || ''
-                 }
-               }))}
-               className="rounded text-blue-600 focus:ring-blue-500"
-             />
-             <label htmlFor="slack-enabled" className="text-sm font-medium text-slate-700 cursor-pointer">
-               Enable Slack notifications
-             </label>
-           </div>
-           
-           {config.slack?.enabled && (
-             <div className="pt-4 border-t border-slate-200">
-               <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                   Webhook URL <span className="text-red-500">*</span>
-                 </label>
-                 <input 
-                   type="text" 
-                   placeholder="https://hooks.slack.com/services/..."
-                   value={config.slack?.webhookUrl || ''}
-                   onChange={(e) => setConfig((prev: AppConfig) => ({
-                     ...prev,
-                     slack: {
-                       ...prev.slack,
-                       webhookUrl: e.target.value,
-                       enabled: prev.slack?.enabled || false
-                     }
-                   }))}
-                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-mono text-xs"
-                 />
-                 <p className="text-xs text-slate-500 mt-1">Slack incoming webhook URL. The webhook determines which channel receives notifications.</p>
-               </div>
-               
-               <div className="mt-4">
-                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-                   <p className="text-xs text-blue-800">
-                     <strong>Note:</strong> Create an incoming webhook in your Slack workspace and configure it to post to your desired channel. 
-                     All notifications will be sent to that channel.
-                   </p>
-                 </div>
-               </div>
-             </div>
-           )}
-         </div>
-         </div>
-      </div>
-      
-      {/* Audit Log */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
-         <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
-           <h3 className="font-bold text-slate-800 flex items-center gap-2">
-             <div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg">
-               <History size={14} className="text-white" />
-             </div>
-             Recent Changes (Audit Log)
-           </h3>
-         </div>
-         <div className="max-h-80 overflow-y-auto custom-scrollbar">
-           <table className="w-full text-left text-sm">
-              <thead className="bg-gradient-to-b from-slate-50 to-white sticky top-0 shadow-sm">
-                <tr>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-600 tracking-wider">Initiative</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-600 tracking-wider">Change</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-600 tracking-wider">By</th>
-                </tr>
-              </thead>
-              <tbody>
-                {changeLog.length === 0 ? (
-                  <tr><td colSpan={3} className="p-4 text-center text-slate-400 text-xs">No recorded changes in this session.</td></tr>
-                ) : changeLog.map(log => (
-                  <tr key={log.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                    <td className="px-4 py-2 truncate max-w-[150px]" title={log.initiativeTitle}>{log.initiativeTitle}</td>
-                    <td className="px-4 py-2 text-xs">
-                      <span className="font-semibold text-slate-700">{log.field}:</span> 
-                      <span className="text-red-500 mx-1">{String(log.oldValue ?? '')}</span>
-                      &rarr;
-                      <span className="text-emerald-500 mx-1">{String(log.newValue ?? '')}</span>
-                    </td>
-                    <td className="px-4 py-2 text-xs text-slate-500">{log.changedBy}</td>
-                  </tr>
-                ))}
-              </tbody>
-           </table>
-         </div>
-      </div>
-
-      {/* Login History Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-teal-50 flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg">
-                <Clock size={16} className="text-white" />
+      <CollapsibleSection
+        id="slack"
+        title="Slack Integration"
+        icon={<div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg"><MessageSquare size={16} className="text-white" /></div>}
+        gradientFrom="from-purple-50"
+        gradientTo="to-indigo-50"
+        isExpanded={expandedSections.has('slack')}
+        onToggle={toggleSection}
+      >
+        <div className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <input 
+                type="checkbox" 
+                id="slack-enabled"
+                checked={config.slack?.enabled || false}
+                onChange={(e) => setConfig((prev: AppConfig) => ({
+                  ...prev,
+                  slack: {
+                    ...prev.slack,
+                    enabled: e.target.checked,
+                    webhookUrl: prev.slack?.webhookUrl || ''
+                  }
+                }))}
+                className="rounded text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="slack-enabled" className="text-sm font-medium text-slate-700 cursor-pointer">
+                Enable Slack notifications
+              </label>
+            </div>
+            
+            {config.slack?.enabled && (
+              <div className="pt-4 border-t border-slate-200">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Webhook URL <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="https://hooks.slack.com/services/..."
+                    value={config.slack?.webhookUrl || ''}
+                    onChange={(e) => setConfig((prev: AppConfig) => ({
+                      ...prev,
+                      slack: {
+                        ...prev.slack,
+                        webhookUrl: e.target.value,
+                        enabled: prev.slack?.enabled || false
+                      }
+                    }))}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Slack incoming webhook URL. The webhook determines which channel receives notifications.</p>
+                </div>
+                
+                <div className="mt-4">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                    <p className="text-xs text-blue-800">
+                      <strong>Note:</strong> Create an incoming webhook in your Slack workspace and configure it to post to your desired channel. 
+                      All notifications will be sent to that channel.
+                    </p>
+                  </div>
+                </div>
               </div>
-              Login History
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 ml-8">Track when users last logged in</p>
+            )}
           </div>
+        </div>
+      </CollapsibleSection>
+      
+      {/* Login History Section */}
+      <CollapsibleSection
+        id="login-history"
+        title="Login History"
+        description="Track when users last logged in"
+        icon={<div className="p-1.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg"><Clock size={16} className="text-white" /></div>}
+        gradientFrom="from-cyan-50"
+        gradientTo="to-teal-50"
+        isExpanded={expandedSections.has('login-history')}
+        onToggle={toggleSection}
+        onFirstExpand={() => { fetchLoginHistory(); markSectionLoaded('login-history'); }}
+        hasLoaded={loadedSections.has('login-history')}
+        headerActions={
           <button
             onClick={fetchLoginHistory}
             disabled={isLoadingHistory}
@@ -919,8 +922,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <RefreshCw size={14} className={isLoadingHistory ? 'animate-spin' : ''} />
             Refresh
           </button>
-        </div>
-        
+        }
+      >
         {/* Error message */}
         {loginHistoryError && (
           <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
@@ -1004,68 +1007,75 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </table>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Error Logs Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
-              <AlertTriangle size={16} className="text-white" />
-            </div>
-            Error Logs
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 ml-8">View and search application error logs for debugging</p>
-        </div>
-        <div className="p-0">
-          <ErrorLogView currentUser={currentUser} users={users} />
-        </div>
-      </div>
+      <CollapsibleSection
+        id="error-logs"
+        title="Error Logs"
+        description="View and search application error logs for debugging"
+        icon={<div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg"><AlertTriangle size={16} className="text-white" /></div>}
+        gradientFrom="from-red-50"
+        gradientTo="to-rose-50"
+        isExpanded={expandedSections.has('error-logs')}
+        onToggle={toggleSection}
+      >
+        {expandedSections.has('error-logs') && (
+          <div className="p-0">
+            <ErrorLogView currentUser={currentUser} users={users} />
+          </div>
+        )}
+      </CollapsibleSection>
 
       {/* Activity Logs Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
-              <Activity size={16} className="text-white" />
-            </div>
-            Activity Logs
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 ml-8">Track user actions and system activities</p>
-        </div>
-        <div className="p-0">
-          <ActivityLogView currentUser={currentUser} users={users} />
-        </div>
-      </div>
+      <CollapsibleSection
+        id="activity-logs"
+        title="Activity Logs"
+        description="Track user actions and system activities"
+        icon={<div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg"><Activity size={16} className="text-white" /></div>}
+        gradientFrom="from-blue-50"
+        gradientTo="to-indigo-50"
+        isExpanded={expandedSections.has('activity-logs')}
+        onToggle={toggleSection}
+      >
+        {expandedSections.has('activity-logs') && (
+          <div className="p-0">
+            <ActivityLogView currentUser={currentUser} users={users} />
+          </div>
+        )}
+      </CollapsibleSection>
 
       {/* Support Center Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-green-50 to-emerald-50">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <div className="p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
-              <MessageSquare size={16} className="text-white" />
-            </div>
-            Support Center
-          </h3>
-          <p className="text-xs text-slate-500 mt-1 ml-8">Manage support tickets and user feedback</p>
-        </div>
-        <div className="p-0">
-          <SupportCenter currentUser={currentUser} users={users} />
-        </div>
-      </div>
+      <CollapsibleSection
+        id="support-center"
+        title="Support Center"
+        description="Manage support tickets and user feedback"
+        icon={<div className="p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg"><MessageSquare size={16} className="text-white" /></div>}
+        gradientFrom="from-green-50"
+        gradientTo="to-emerald-50"
+        isExpanded={expandedSections.has('support-center')}
+        onToggle={toggleSection}
+      >
+        {expandedSections.has('support-center') && (
+          <div className="p-0">
+            <SupportCenter currentUser={currentUser} users={users} />
+          </div>
+        )}
+      </CollapsibleSection>
 
       {/* Backup Management Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg">
-                <Database size={16} className="text-white" />
-              </div>
-              Backup Management
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 ml-8">Create backups, restore data, and manage backup history</p>
-          </div>
+      <CollapsibleSection
+        id="backup-management"
+        title="Backup Management"
+        description="Create backups, restore data, and manage backup history"
+        icon={<div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg"><Database size={16} className="text-white" /></div>}
+        gradientFrom="from-violet-50"
+        gradientTo="to-purple-50"
+        isExpanded={expandedSections.has('backup-management')}
+        onToggle={toggleSection}
+        onFirstExpand={() => { fetchBackups(); markSectionLoaded('backup-management'); }}
+        hasLoaded={loadedSections.has('backup-management')}
+        headerActions={
           <div className="flex items-center gap-2">
             <button
               onClick={createManualBackup}
@@ -1084,8 +1094,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               Refresh
             </button>
           </div>
-        </div>
-        
+        }
+      >
         {/* Status messages */}
         {backupError && (
           <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
@@ -1184,79 +1194,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
           </div>
         )}
-        
-      </div>
-
-      {/* Snapshots Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-blue-50 flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-lg">
-                <FileSpreadsheet size={16} className="text-white" />
-              </div>
-              Snapshots
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 ml-8">View all snapshot tabs created in Google Sheets</p>
-          </div>
-          <button
-            onClick={fetchSnapshots}
-            disabled={isLoadingSnapshots}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <RefreshCw size={14} className={isLoadingSnapshots ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-        </div>
-        
-        {/* Error message */}
-        {snapshotsError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-            <AlertCircle size={16} />
-            {snapshotsError}
-          </div>
-        )}
-        
-        {isLoadingSnapshots ? (
-          <div className="text-center py-8 text-slate-400">
-            <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
-            <p className="text-sm">Loading snapshots...</p>
-          </div>
-        ) : snapshotsError ? (
-          <div className="text-center py-8 text-slate-400">
-            <FileSpreadsheet size={32} className="mx-auto mb-2 text-slate-300" />
-            <p className="text-sm">Unable to load snapshots</p>
-          </div>
-        ) : snapshots.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <FileSpreadsheet size={32} className="mx-auto mb-2 text-slate-300" />
-            <p className="text-sm font-medium text-slate-500">No snapshots found</p>
-            <p className="text-xs text-slate-400 mt-1">Snapshots will appear here when created</p>
-          </div>
-        ) : (
-          <div className="max-h-80 overflow-y-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Snapshot Name</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {snapshots.map((snapshot, index) => (
-                  <tr key={index} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <FileSpreadsheet size={16} className="text-indigo-500" />
-                        <span className="font-medium text-slate-700">{snapshot.title}</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      </CollapsibleSection>
 
       {/* Backup Details Modal */}
       {selectedBackup && (
@@ -1340,21 +1278,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
 
       {/* Trash Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50 flex justify-between items-center">
-          <div>
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
-                <Trash2 size={16} className="text-white" />
-              </div>
-              Trash
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 ml-8">
-              {deletedInitiatives.length} deleted initiative{deletedInitiatives.length !== 1 ? 's' : ''} - restore or permanently remove items
-            </p>
-          </div>
-        </div>
-        
+      <CollapsibleSection
+        id="trash"
+        title="Trash"
+        description={`${deletedInitiatives.length} deleted initiative${deletedInitiatives.length !== 1 ? 's' : ''} - restore or permanently remove items`}
+        icon={<div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg"><Trash2 size={16} className="text-white" /></div>}
+        gradientFrom="from-red-50"
+        gradientTo="to-rose-50"
+        isExpanded={expandedSections.has('trash')}
+        onToggle={toggleSection}
+      >
         {deletedInitiatives.length === 0 ? (
           <div className="text-center py-8 text-slate-400">
             <Trash2 size={32} className="mx-auto mb-2 text-slate-300" />
@@ -1422,18 +1355,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </p>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Bulk Import Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* User Import */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <Users size={18} className="text-blue-600" /> Bulk Import Users
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">Upload Excel/CSV with columns: Email, Name, Role</p>
-          </div>
+      <CollapsibleSection
+        id="bulk-import"
+        title="Bulk Import"
+        description="Import users and tasks from Excel/CSV files"
+        icon={<div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg"><Upload size={16} className="text-white" /></div>}
+        gradientFrom="from-amber-50"
+        gradientTo="to-orange-50"
+        isExpanded={expandedSections.has('bulk-import')}
+        onToggle={toggleSection}
+      >
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* User Import */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <h4 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                  <Users size={16} className="text-blue-600" /> Bulk Import Users
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">Upload Excel/CSV with columns: Email, Name, Role</p>
+              </div>
           
           <div className="p-4 space-y-4">
             <div className="flex items-center gap-3">
@@ -1537,14 +1481,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
         
-        {/* Task Import */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <ClipboardList size={18} className="text-amber-600" /> Bulk Import Tasks
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">Upload workplan Excel with initiative data</p>
-          </div>
+            {/* Task Import */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
+                <h4 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                  <ClipboardList size={16} className="text-amber-600" /> Bulk Import Tasks
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">Upload workplan Excel with initiative data</p>
+              </div>
           
           <div className="p-4 space-y-4">
             <div className="flex items-center gap-3">
@@ -1649,23 +1593,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             )}
           </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* User Management */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-         <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
-           <div>
-             <h3 className="font-bold text-slate-800 flex items-center gap-2">
-               <div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
-                 <Users size={16} className="text-white" />
-               </div>
-               User Management
-             </h3>
-             <p className="text-xs text-slate-500 mt-1 ml-8">Add, edit, or remove users and assign roles.</p>
-           </div>
-         </div>
-         
+      <CollapsibleSection
+        id="user-management"
+        title="User Management"
+        description="Add, edit, or remove users and assign roles"
+        icon={<div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg"><Users size={16} className="text-white" /></div>}
+        gradientFrom="from-blue-50"
+        gradientTo="to-cyan-50"
+        isExpanded={expandedSections.has('user-management')}
+        onToggle={toggleSection}
+      >
          <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
            <div>
              <label className="block text-xs font-medium text-slate-500 mb-1">Full Name</label>
@@ -1773,20 +1716,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              </tbody>
            </table>
          </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Authorization Matrix */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-         <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50">
-           <h3 className="font-bold text-slate-800 flex items-center gap-2">
-             <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg">
-               <Settings size={16} className="text-white" />
-             </div>
-             Authorization Levels Management Center
-           </h3>
-           <p className="text-xs text-slate-500 mt-1 ml-8">Click badges to cycle through permission levels. Organized by category for easier management.</p>
-         </div>
-         
+      <CollapsibleSection
+        id="authorization-matrix"
+        title="Authorization Levels Management Center"
+        description="Click badges to cycle through permission levels. Organized by category for easier management."
+        icon={<div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg"><Shield size={16} className="text-white" /></div>}
+        gradientFrom="from-indigo-50"
+        gradientTo="to-purple-50"
+        isExpanded={expandedSections.has('authorization-matrix')}
+        onToggle={toggleSection}
+      >
          {/* Tabs */}
          <div className="border-b border-slate-200 bg-slate-50">
            <div className="flex">
@@ -1918,19 +1860,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              </tbody>
            </table>
          </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Capacity Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-         <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50">
-           <h3 className="font-bold text-slate-800 flex items-center gap-2">
-             <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg">
-               <Gauge size={16} className="text-white" />
-             </div>
-             Team Capacity Planning
-           </h3>
-           <p className="text-xs text-slate-500 mt-1 ml-8">Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead.</p>
-         </div>
+      <CollapsibleSection
+        id="capacity-planning"
+        title="Team Capacity Planning"
+        description="Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead"
+        icon={<div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg"><Gauge size={16} className="text-white" /></div>}
+        gradientFrom="from-emerald-50"
+        gradientTo="to-teal-50"
+        isExpanded={expandedSections.has('capacity-planning')}
+        onToggle={toggleSection}
+      >
          <table className="w-full text-left text-sm">
            <thead className="bg-slate-50 border-b border-slate-200">
              <tr>
@@ -1989,7 +1931,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              })}
            </tbody>
          </table>
-      </div>
+      </CollapsibleSection>
     </div>
   );
 };

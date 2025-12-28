@@ -271,6 +271,7 @@ export enum WorkflowTrigger {
   OnEtaChange = 'on_eta_change',
   OnEffortChange = 'on_effort_change',
   OnConditionMet = 'on_condition_met',
+  OnCreate = 'on_create',
 }
 
 export enum WorkflowCondition {
@@ -303,6 +304,7 @@ export enum WorkflowAction {
   UpdateEta = 'update_eta',
   UpdateEffort = 'update_effort',
   ExecuteMultiple = 'execute_multiple',
+  SetAssetClass = 'set_asset_class',
 }
 
 export interface WorkflowConditionConfig {

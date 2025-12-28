@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus } from 'lucide-react';
 
-import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, HIERARCHY, migratePermissions } from './constants';
-import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, Priority, UnplannedTag } from './types';
-import { getOwnerName, generateId, parseMentions, logger, generateInitiativeId, canCreateTasks, canViewTab } from './utils';
+import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions } from './constants';
+import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
+import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab } from './utils';
 import { useLocalStorage } from './hooks';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
 import { useAuth, useToast } from './contexts';
@@ -86,8 +86,9 @@ export default function App() {
   }, [initiatives]);
   const [config, setConfig] = useLocalStorage<AppConfig>('portfolio-config', INITIAL_CONFIG);
   
-  // Audit State
+  // Audit State (changeLog is maintained for internal tracking but not displayed in UI)
   const [changeLog, setChangeLog] = useState<ChangeRecord[]>([]);
+  void changeLog; // Used by setChangeLog for internal tracking
   
   // Notifications State - synced with server
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -1051,6 +1052,35 @@ export default function App() {
   const handleSave = (item: Initiative, tradeOffAction?: TradeOffAction) => {
     const today = new Date().toISOString().split('T')[0];
     
+    // Check if this is a new initiative and apply Team-Based Asset Class Assignment workflow
+    const isNewInitiative = !initiatives.some(i => i.id === item.id);
+    if (isNewInitiative) {
+      // Find the Team-Based Asset Class Assignment workflow
+      const assetClassWorkflow = config.workflows?.find(
+        w => w.name === 'Team-Based Asset Class Assignment' && w.enabled
+      );
+      
+      if (assetClassWorkflow) {
+        // Get the current user's team
+        const userTeam = currentUser.team;
+        
+        // Map team to asset class (only for teams that match asset classes)
+        const teamToAssetClass: Record<string, AssetClass> = {
+          'PL': AssetClass.PL,
+          'Auto': AssetClass.Auto,
+          'POS': AssetClass.POS,
+          'Advisory': AssetClass.Advisory,
+        };
+        
+        // Apply asset class if team matches and no explicit asset class was provided
+        // We use a reasonable default check: if the asset class is PL (first option), 
+        // we still apply the workflow since the user might not have explicitly chosen it
+        if (userTeam && teamToAssetClass[userTeam]) {
+          item.l1_assetClass = teamToAssetClass[userTeam];
+        }
+      }
+    }
+    
     if ((item.actualEffort || 0) > 0 && item.status === Status.NotStarted) item.status = Status.InProgress;
     if (item.eta && item.eta < today && item.status !== Status.Done && item.status !== Status.AtRisk) {
       item.status = Status.AtRisk;
@@ -1575,159 +1605,6 @@ export default function App() {
     }
   };
 
-  // Generate 30 initiatives across all types, teams, and statuses
-  const handleGenerate30Initiatives = async () => {
-    setIsDataLoading(true);
-    showInfo('Generating 30 initiatives across all types and teams...');
-    
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const twoWeeks = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const twoMonths = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      const { quarter: currentQ, year: currentYear } = (() => {
-        const now = new Date();
-        const month = now.getMonth();
-        return { quarter: Math.floor(month / 3) + 1, year: now.getFullYear() };
-      })();
-      
-      const quarter = `Q${currentQ} ${currentYear}`;
-      const assetClasses = [AssetClass.PL, AssetClass.Auto, AssetClass.POS, AssetClass.Advisory];
-      const statuses = [Status.NotStarted, Status.InProgress, Status.AtRisk, Status.Done];
-      const priorities = [Priority.P0, Priority.P1, Priority.P2];
-      const workTypes = [WorkType.Planned, WorkType.Unplanned];
-      const initiativeTypes = [InitiativeType.WP, InitiativeType.BAU];
-      const teamLeads = users.filter(u => u.role === Role.TeamLead).map(u => u.id);
-      
-      // Use imported hierarchy data
-      
-      const newInitiatives: Initiative[] = [];
-      
-      // Generate 30 initiatives with good distribution
-      for (let i = 0; i < 30; i++) {
-        const id = generateInitiativeId(quarter, newInitiatives);
-        
-        // Distribute asset classes evenly
-        const assetClass = assetClasses[i % assetClasses.length];
-        
-        // Get hierarchy data for this asset class
-        const hierarchy = HIERARCHY[assetClass];
-        const pillarIndex = Math.floor(i / assetClasses.length) % hierarchy.length;
-        const pillar = hierarchy[pillarIndex];
-        const responsibilityIndex = i % pillar.responsibilities.length;
-        const responsibility = pillar.responsibilities[responsibilityIndex];
-        
-        // Create a target based on the responsibility
-        const target = `${responsibility.split('(')[0].trim()} - Target ${(i % 3) + 1}`;
-        
-        // Distribute statuses, priorities, work types, and initiative types
-        const status = statuses[i % statuses.length];
-        const priority = priorities[i % priorities.length];
-        const workType = workTypes[i % workTypes.length];
-        const initiativeType = initiativeTypes[i % initiativeTypes.length];
-        
-        // Distribute across team leads
-        const ownerId = teamLeads[i % teamLeads.length] || teamLeads[0] || users[0]?.id || 'u_as';
-        
-        // Calculate effort based on status
-        const estimatedEffort = Math.floor(Math.random() * 15) + 2;
-        const actualEffort = status === Status.Done 
-          ? Math.floor(estimatedEffort * 0.8 + Math.random() * estimatedEffort * 0.4)
-          : status === Status.InProgress || status === Status.AtRisk
-          ? Math.floor(Math.random() * estimatedEffort * 0.6)
-          : 0;
-        
-        // Set ETA based on status
-        let eta: string;
-        if (status === Status.Done) {
-          eta = today;
-        } else if (status === Status.AtRisk) {
-          eta = i % 2 === 0 ? today : nextWeek;
-        } else if (status === Status.InProgress) {
-          eta = i % 3 === 0 ? nextWeek : i % 3 === 1 ? twoWeeks : nextMonth;
-        } else {
-          eta = i % 2 === 0 ? nextMonth : twoMonths;
-        }
-        
-        const initiative: Initiative = {
-          id,
-          initiativeType,
-          l1_assetClass: assetClass,
-          l2_pillar: pillar.name,
-          l3_responsibility: responsibility,
-          l4_target: target,
-          title: `${initiativeType} Initiative ${i + 1}: ${assetClass} - ${pillar.name.substring(0, 30)}`,
-          ownerId,
-          quarter,
-          status,
-          priority,
-          estimatedEffort,
-          originalEstimatedEffort: estimatedEffort,
-          actualEffort,
-          eta,
-          originalEta: eta,
-          lastUpdated: today,
-          workType,
-          comments: [],
-          history: []
-        };
-        
-        // Add required fields based on type
-        if (initiativeType === InitiativeType.WP) {
-          initiative.definitionOfDone = `Complete ${target} with all acceptance criteria met`;
-        }
-        
-        if (workType === WorkType.Unplanned) {
-          const tags: UnplannedTag[] = [];
-          if (i % 3 === 0) tags.push(UnplannedTag.RiskItem);
-          if (i % 3 === 1) tags.push(UnplannedTag.PMItem);
-          if (i % 3 === 2) tags.push(UnplannedTag.Both);
-          initiative.unplannedTags = tags;
-        }
-        
-        if (status === Status.AtRisk) {
-          initiative.riskActionLog = `Mitigation plan: Reviewing dependencies and adjusting timeline.`;
-        }
-        
-        // Add tasks for BAU initiatives
-        if (initiativeType === InitiativeType.BAU) {
-          const taskCount = Math.floor(Math.random() * 3) + 2; // 2-4 tasks
-          initiative.tasks = [];
-          for (let j = 0; j < taskCount; j++) {
-            const taskEta = new Date(Date.now() + (j + 1) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const taskEffort = Math.floor(Math.random() * 3) + 1;
-            initiative.tasks.push({
-              id: `task_${id}_${j}`,
-              title: `BAU Task ${j + 1}: ${responsibility.substring(0, 40)}`,
-              estimatedEffort: taskEffort,
-              eta: taskEta,
-              ownerId,
-              status: j === 0 ? (status === Status.Done ? Status.Done : Status.InProgress) : Status.NotStarted,
-              comments: []
-            });
-          }
-        }
-        
-        newInitiatives.push(initiative);
-      }
-      
-      // Clear all existing initiatives and set new ones
-      setInitiatives(newInitiatives);
-      
-      // Update localStorage cache
-      localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(newInitiatives));
-      
-      showSuccess(`Successfully generated and saved 30 initiatives across all types and teams`);
-    } catch (error) {
-      logger.error('Failed to generate 30 initiatives', { context: 'App.handleGenerate30Initiatives', error: error instanceof Error ? error : new Error(String(error)) });
-      showError('Failed to generate 30 initiatives. Please try again.');
-    } finally {
-      setIsDataLoading(false);
-    }
-  };
-
   const resetFilters = () => {
     setFilterAssetClass('');
     setFilterOwners([]);
@@ -1930,7 +1807,6 @@ export default function App() {
 
         {currentView === 'admin' ? (
           <AdminPanel
-            onGenerate30Initiatives={handleGenerate30Initiatives}
             onClearCache={handleClearCache}
             currentUser={currentUser}
             config={config}
@@ -1938,7 +1814,6 @@ export default function App() {
             users={users}
             setUsers={setUsers}
             initiatives={initiatives}
-            changeLog={changeLog}
             deletedInitiatives={initiatives.filter(i => i.status === Status.Deleted)}
             onRestore={handleRestoreInitiative}
             isDataLoading={isDataLoading}
