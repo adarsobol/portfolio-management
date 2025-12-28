@@ -3676,13 +3676,6 @@ app.post('/api/support/feedback', authenticateToken, async (req: AuthenticatedRe
       return;
     }
 
-    const supportStorage = getSupportStorage();
-    if (!supportStorage || !supportStorage.isInitialized()) {
-      console.log('[SUPPORT] Feedback submitted (storage not available):', { type, title, userId, userEmail });
-      res.json({ success: true, stored: false, message: 'Support storage not available' });
-      return;
-    }
-
     const feedback = {
       id: `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
@@ -3696,8 +3689,24 @@ app.post('/api/support/feedback', authenticateToken, async (req: AuthenticatedRe
       screenshot,
     };
 
+    const supportStorage = getSupportStorage();
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      console.log('[SUPPORT] Feedback submitted (storage not available, logging to console):', feedback);
+      console.log('[SUPPORT] User:', userEmail || userId);
+      // In dev mode without GCS, still return success but log to console
+      res.json({ success: true, stored: false, feedback, message: 'Feedback logged (storage not configured)' });
+      return;
+    }
+
     const success = await supportStorage.createFeedback(feedback);
-    res.json({ success, feedback });
+    if (!success) {
+      console.error('[SUPPORT] Failed to store feedback in GCS:', feedback);
+      // Even if storage fails, return success for better UX
+      res.json({ success: true, stored: false, feedback, message: 'Feedback received but storage failed' });
+      return;
+    }
+    
+    res.json({ success: true, stored: true, feedback });
   } catch (error) {
     console.error('Error submitting feedback:', error);
     res.status(500).json({ error: String(error) });
