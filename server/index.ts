@@ -38,10 +38,21 @@ dotenv.config();
 
 console.log('🚀 Starting Portfolio Manager Server...');
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`Port: ${process.env.PORT || 3001}`);
+console.log(`Port: ${process.env.PORT || 8080}`);
+
+const app = express();
+const httpServer = createServer(app);
+const PORT = process.env.PORT || 8080;
+const HOST = '0.0.0.0';
+
+// Start listening IMMEDIATELY to satisfy Cloud Run health checks
+httpServer.listen(Number(PORT), HOST, () => {
+  console.log(`\n🚀 Portfolio Manager API Server running on http://${HOST}:${PORT}`);
+  console.log(`🔌 Socket.IO real-time collaboration enabled`);
+});
 
 // ============================================
-// STORAGE BACKEND INITIALIZATION
+// STORAGE BACKEND INITIALIZATION (In Background)
 // ============================================
 const STORAGE_BACKEND = isGCSEnabled() ? 'gcs' : 'sheets';
 console.log(`Storage backend: ${STORAGE_BACKEND}`);
@@ -83,10 +94,6 @@ if (STORAGE_BACKEND === 'gcs') {
     console.log('GCS config not available, using Sheets backend');
   }
 }
-
-const app = express();
-const httpServer = createServer(app);
-const PORT = process.env.PORT || 3001;
 
 // ============================================
 // SOCKET.IO SETUP FOR REAL-TIME COLLABORATION
@@ -3750,71 +3757,8 @@ if (NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
 // ============================================
 // START SERVER (using httpServer for Socket.IO)
 // ============================================
-// Bind to 0.0.0.0 for Cloud Run compatibility
-const HOST = '0.0.0.0';
-
-try {
-  httpServer.listen(Number(PORT), HOST, () => {
-    console.log(`\n🚀 Portfolio Manager API Server running on http://${HOST}:${PORT}`);
-    console.log(`🔌 Socket.IO real-time collaboration enabled`);
-    console.log(`\nAuth Endpoints:`);
-    console.log(`  POST /api/auth/login          - Authenticate user`);
-    console.log(`  POST /api/auth/register       - Register new user (admin only)`);
-    console.log(`  GET  /api/auth/me             - Get current user`);
-    console.log(`  POST /api/auth/change-password - Change password`);
-    console.log(`  GET  /api/auth/users          - List all users`);
-    console.log(`\nBulk Import Endpoints (Admin only):`);
-    console.log(`  POST /api/users/bulk-import   - Bulk import users from Excel/CSV`);
-    console.log(`  POST /api/sheets/bulk-import  - Bulk import initiatives from Excel/CSV`);
-    console.log(`\nSheets Endpoints (Protected):`);
-    console.log(`  GET  /api/sheets/health       - Check connection`);
-    console.log(`  POST /api/sheets/initiatives  - Upsert initiatives`);
-    console.log(`  POST /api/sheets/changelog    - Append change records`);
-    console.log(`  POST /api/sheets/snapshot     - Create snapshot tab`);
-    console.log(`  GET  /api/sheets/pull         - Pull all data`);
-    console.log(`  POST /api/sheets/push         - Push all data`);
-    console.log(`  GET  /api/sheets/snapshots    - List snapshot tabs`);
-    console.log(`  POST /api/sheets/scheduled-snapshot - Automated weekly snapshot (Cloud Scheduler)`);
-    console.log(`\nNotification Endpoints (Protected):`);
-    console.log(`  GET  /api/notifications/:userId  - Get user notifications`);
-    console.log(`  POST /api/notifications          - Create notification`);
-    console.log(`  PATCH /api/notifications/:id/read - Mark as read`);
-    console.log(`  POST /api/notifications/mark-all-read - Mark all as read`);
-    console.log(`  DELETE /api/notifications        - Clear all notifications`);
-    console.log(`\nBackup & Restore Endpoints (Admin only):`);
-    console.log(`  GET  /api/backups                - List all backups`);
-    console.log(`  GET  /api/backups/:date          - Get backup details`);
-    console.log(`  POST /api/backups/create         - Create manual backup`);
-    console.log(`  POST /api/backups/restore/:date  - Restore from backup`);
-    console.log(`  GET  /api/backups/versions/:file - List object versions`);
-    console.log(`  POST /api/backups/restore-version - Restore specific version`);
-    console.log(`  GET  /api/backups/:date/verify   - Verify backup integrity`);
-    console.log(`  GET  /api/backups/:date/download - Get backup download URLs`);
-    console.log(`\nLogging Endpoints (Admin only):`);
-    console.log(`  POST /api/logs/errors           - Store error log`);
-    console.log(`  GET  /api/logs/errors            - Get error logs`);
-    console.log(`  POST /api/logs/activity          - Store activity log`);
-    console.log(`  GET  /api/logs/activity          - Get activity logs`);
-    console.log(`  GET  /api/logs/search            - Search logs`);
-    console.log(`\nSupport Endpoints:`);
-    console.log(`  POST /api/support/tickets        - Create support ticket`);
-    console.log(`  GET  /api/support/tickets        - Get support tickets (admin)`);
-    console.log(`  PATCH /api/support/tickets/:id  - Update support ticket (admin)`);
-    console.log(`  POST /api/support/feedback       - Submit feedback`);
-    console.log(`  GET  /api/support/feedback       - Get feedback (admin)`);
-    console.log(`\nReal-time Collaboration (Socket.IO):`);
-    console.log(`  - User presence tracking`);
-    console.log(`  - Live initiative updates`);
-    console.log(`  - Collaborative editing indicators`);
-    console.log(`  - Real-time notification push`);
-    console.log(`\nDefault admin credentials:`);
-    console.log(`  Email: adar.sobol@pagaya.com`);
-    console.log(`  Password: admin123`);
-  });
-} catch (error) {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-}
+// Start listening IMMEDIATELY to satisfy Cloud Run health checks
+// (Binding already happened at the top)
 
 // Handle server errors
 httpServer.on('error', (error: NodeJS.ErrnoException) => {
@@ -3833,3 +3777,60 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// Log endpoints after a short delay to keep logs clean during startup
+setTimeout(() => {
+  console.log(`\nAuth Endpoints:`);
+  console.log(`  POST /api/auth/login          - Authenticate user`);
+  console.log(`  POST /api/auth/register       - Register new user (admin only)`);
+  console.log(`  GET  /api/auth/me             - Get current user`);
+  console.log(`  POST /api/auth/change-password - Change password`);
+  console.log(`  GET  /api/auth/users          - List all users`);
+  console.log(`\nBulk Import Endpoints (Admin only):`);
+  console.log(`  POST /api/users/bulk-import   - Bulk import users from Excel/CSV`);
+  console.log(`  POST /api/sheets/bulk-import  - Bulk import initiatives from Excel/CSV`);
+  console.log(`\nSheets Endpoints (Protected):`);
+  console.log(`  GET  /api/sheets/health       - Check connection`);
+  console.log(`  POST /api/sheets/initiatives  - Upsert initiatives`);
+  console.log(`  POST /api/sheets/changelog    - Append change records`);
+  console.log(`  POST /api/sheets/snapshot     - Create snapshot tab`);
+  console.log(`  GET  /api/sheets/pull         - Pull all data`);
+  console.log(`  POST /api/sheets/push         - Push all data`);
+  console.log(`  GET  /api/sheets/snapshots    - List snapshot tabs`);
+  console.log(`  POST /api/sheets/scheduled-snapshot - Automated weekly snapshot (Cloud Scheduler)`);
+  console.log(`\nNotification Endpoints (Protected):`);
+  console.log(`  GET  /api/notifications/:userId  - Get user notifications`);
+  console.log(`  POST /api/notifications          - Create notification`);
+  console.log(`  PATCH /api/notifications/:id/read - Mark as read`);
+  console.log(`  POST /api/notifications/mark-all-read - Mark all as read`);
+  console.log(`  DELETE /api/notifications        - Clear all notifications`);
+  console.log(`\nBackup & Restore Endpoints (Admin only):`);
+  console.log(`  GET  /api/backups                - List all backups`);
+  console.log(`  GET  /api/backups/:date          - Get backup details`);
+  console.log(`  POST /api/backups/create         - Create manual backup`);
+  console.log(`  POST /api/backups/restore/:date  - Restore from backup`);
+  console.log(`  GET  /api/backups/versions/:file - List object versions`);
+  console.log(`  POST /api/backups/restore-version - Restore specific version`);
+  console.log(`  GET  /api/backups/:date/verify   - Verify backup integrity`);
+  console.log(`  GET  /api/backups/:date/download - Get backup download URLs`);
+  console.log(`\nLogging Endpoints (Admin only):`);
+  console.log(`  POST /api/logs/errors           - Store error log`);
+  console.log(`  GET  /api/logs/errors            - Get error logs`);
+  console.log(`  POST /api/logs/activity          - Store activity log`);
+  console.log(`  GET  /api/logs/activity          - Get activity logs`);
+  console.log(`  GET  /api/logs/search            - Search logs`);
+  console.log(`\nSupport Endpoints:`);
+  console.log(`  POST /api/support/tickets        - Create support ticket`);
+  console.log(`  GET  /api/support/tickets        - Get support tickets (admin)`);
+  console.log(`  PATCH /api/support/tickets/:id  - Update support ticket (admin)`);
+  console.log(`  POST /api/support/feedback       - Submit feedback`);
+  console.log(`  GET  /api/support/feedback       - Get feedback (admin)`);
+  console.log(`\nReal-time Collaboration (Socket.IO):`);
+  console.log(`  - User presence tracking`);
+  console.log(`  - Live initiative updates`);
+  console.log(`  - Collaborative editing indicators`);
+  console.log(`  - Real-time notification push`);
+  console.log(`\nDefault admin credentials:`);
+  console.log(`  Email: adar.sobol@pagaya.com`);
+  console.log(`  Password: admin123`);
+}, 1000);
