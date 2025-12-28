@@ -35,6 +35,7 @@ export interface BackupManifest {
   duration: number;
   status: 'success' | 'partial' | 'failed';
   errors?: string[];
+  reporter?: string;
 }
 
 export interface BackupFileInfo {
@@ -387,7 +388,7 @@ export class BackupService {
   /**
    * Create a manual backup snapshot
    */
-  async createManualBackup(label?: string): Promise<BackupManifest> {
+  async createManualBackup(label?: string, reporter?: string): Promise<BackupManifest> {
     await this.ensureInitialized();
     
     const startTime = Date.now();
@@ -405,7 +406,8 @@ export class BackupService {
       totalSize: 0,
       duration: 0,
       status: 'success',
-      errors: []
+      errors: [],
+      reporter: reporter
     };
     
     try {

@@ -18,6 +18,9 @@ import fs from 'fs';
 import { isGCSEnabled, getGCSConfig, initializeGCSStorage, getGCSStorage } from './gcsStorage';
 import { generateInitiativeId } from './idGenerator';
 import { initializeBackupService, getBackupService, isBackupServiceEnabled } from './backupService';
+import { initializeLogStorage, getLogStorage, isLogStorageEnabled } from './logStorage';
+import { initializeSupportStorage, getSupportStorage, isSupportStorageEnabled } from './supportStorage';
+import { ActivityType, SupportTicketStatus, SupportTicketPriority, NotificationType } from '../src/types';
 import {
   validate,
   loginSchema,
@@ -51,6 +54,20 @@ if (STORAGE_BACKEND === 'gcs') {
           initializeBackupService(gcsConfig.bucketName, gcsConfig.projectId);
           console.log('Backup Service initialized');
         }
+        // Initialize log storage
+        initializeLogStorage({
+          bucketName: gcsConfig.bucketName,
+          projectId: gcsConfig.projectId,
+          keyFilename: gcsConfig.keyFilename,
+        });
+        console.log('Log Storage initialized');
+        // Initialize support storage
+        initializeSupportStorage({
+          bucketName: gcsConfig.bucketName,
+          projectId: gcsConfig.projectId,
+          keyFilename: gcsConfig.keyFilename,
+        });
+        console.log('Support Storage initialized');
       } else {
         console.error('Failed to initialize GCS Storage, falling back to Sheets');
       }
@@ -270,6 +287,40 @@ interface AuthenticatedRequest extends Request {
     role: string;
     id: string;
   };
+}
+
+// ============================================
+// ACTIVITY LOGGING HELPER
+// ============================================
+function logActivity(
+  req: AuthenticatedRequest,
+  type: ActivityType,
+  description: string,
+  metadata?: Record<string, unknown>
+): void {
+  const logStorage = getLogStorage();
+  if (!logStorage || !logStorage.isInitialized()) {
+    return; // Silently skip if log storage not available
+  }
+
+  const activityLog = {
+    id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    type,
+    userId: req.user?.id || 'unknown',
+    userEmail: req.user?.email || 'unknown',
+    timestamp: new Date().toISOString(),
+    description,
+    metadata,
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+    sessionId: req.headers['x-session-id'] as string,
+    correlationId: req.headers['x-correlation-id'] as string,
+  };
+
+  // Don't await - log asynchronously to avoid blocking requests
+  logStorage.storeActivityLog(activityLog).catch(err => {
+    console.error('Failed to store activity log:', err);
+  });
 }
 
 // ============================================
@@ -1460,6 +1511,16 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
       }
     }
 
+    // Log activity
+    const createdCount = deduplicated.filter((init: { id: string }) => !rows.find((r: GoogleSpreadsheetRow) => r.get('id') === init.id)).length;
+    const updatedCount = syncedCount - createdCount;
+    if (createdCount > 0) {
+      logActivity(req, ActivityType.CREATE_INITIATIVE, `Created ${createdCount} initiative(s)`, { count: createdCount });
+    }
+    if (updatedCount > 0) {
+      logActivity(req, ActivityType.UPDATE_INITIATIVE, `Updated ${updatedCount} initiative(s)`, { count: updatedCount });
+    }
+
     if (serverNewer.length > 0) {
       console.log(`Synced ${syncedCount} initiatives, ${serverNewer.length} had newer server data`);
       res.json({ 
@@ -1506,9 +1567,13 @@ app.delete('/api/sheets/initiatives/:id', authenticateToken, async (req: Authent
 
     // Soft delete: set status to Deleted and add deletedAt timestamp
     const deletedAt = new Date().toISOString();
+    const initiativeTitle = rowToUpdate.get('title') || id;
     rowToUpdate.set('status', 'Deleted');
     rowToUpdate.set('deletedAt', deletedAt);
     await rowToUpdate.save();
+    
+    // Log activity
+    logActivity(req, ActivityType.DELETE_INITIATIVE, `Deleted initiative: ${initiativeTitle}`, { initiativeId: id, initiativeTitle });
     
     console.log(`Soft deleted initiative ${id} at ${deletedAt}`);
     res.json({ success: true, id, deletedAt });
@@ -2724,7 +2789,7 @@ app.post('/api/backups/create', authenticateToken, async (req: AuthenticatedRequ
     const backupService = getBackupService();
     if (backupService) {
       // GCS-based backup
-      const manifest = await backupService.createManualBackup(label);
+      const manifest = await backupService.createManualBackup(label, req.user.email);
       res.json({ 
         success: manifest.status !== 'failed',
         manifest,
@@ -2991,6 +3056,640 @@ app.post('/api/export/excel', authenticateToken, async (req: AuthenticatedReques
 });
 
 // ============================================
+// LOGGING ENDPOINTS (Admin only)
+// ============================================
+
+// POST /api/logs/errors - Store error log
+app.post('/api/logs/errors', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { message, stack, severity, context, metadata, url, userAgent } = req.body;
+    const userId = req.user?.id;
+    const userEmail = req.user?.email;
+
+    if (!message) {
+      res.status(400).json({ error: 'Message is required' });
+      return;
+    }
+
+    const logStorage = getLogStorage();
+    if (!logStorage || !logStorage.isInitialized()) {
+      // Fallback: just log to console
+      console.error('[ERROR LOG]', { message, stack, severity, userId, userEmail, context, metadata });
+      res.json({ success: true, stored: false, message: 'Log storage not available, logged to console' });
+      return;
+    }
+
+    const errorLog = {
+      id: `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      severity: severity || 'error',
+      message,
+      stack,
+      timestamp: new Date().toISOString(),
+      userId,
+      userEmail,
+      context,
+      metadata,
+      url,
+      userAgent,
+      sessionId: req.headers['x-session-id'] as string,
+      correlationId: req.headers['x-correlation-id'] as string,
+      resolved: false,
+    };
+
+    const success = await logStorage.storeErrorLog(errorLog);
+    res.json({ success, id: errorLog.id });
+  } catch (error) {
+    console.error('Error storing error log:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/logs/errors - Get error logs (admin only)
+app.get('/api/logs/errors', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access logs
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { startDate, endDate, severity, userId } = req.query;
+    const logStorage = getLogStorage();
+
+    if (!logStorage || !logStorage.isInitialized()) {
+      res.json({ logs: [], message: 'Log storage not available' });
+      return;
+    }
+
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+    const sev = severity as string | undefined;
+    const uid = userId as string | undefined;
+
+    const logs = await logStorage.getErrorLogs(start, end, sev as any, uid);
+    res.json({ logs, count: logs.length });
+  } catch (error) {
+    console.error('Error getting error logs:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/logs/activity - Store activity log
+app.post('/api/logs/activity', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { type, description, metadata, initiativeId, taskId } = req.body;
+    const userId = req.user?.id;
+    const userEmail = req.user?.email;
+
+    if (!type || !description) {
+      res.status(400).json({ error: 'Type and description are required' });
+      return;
+    }
+
+    const logStorage = getLogStorage();
+    if (!logStorage || !logStorage.isInitialized()) {
+      // Fallback: just log to console
+      console.log('[ACTIVITY LOG]', { type, description, userId, userEmail, metadata });
+      res.json({ success: true, stored: false, message: 'Log storage not available, logged to console' });
+      return;
+    }
+
+    const activityLog = {
+      id: `activity_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      userId: userId || 'unknown',
+      userEmail: userEmail || 'unknown',
+      timestamp: new Date().toISOString(),
+      description,
+      metadata,
+      initiativeId,
+      taskId,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      sessionId: req.headers['x-session-id'] as string,
+      correlationId: req.headers['x-correlation-id'] as string,
+    };
+
+    const success = await logStorage.storeActivityLog(activityLog);
+    res.json({ success, id: activityLog.id });
+  } catch (error) {
+    console.error('Error storing activity log:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/logs/activity - Get activity logs (admin only)
+app.get('/api/logs/activity', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access logs
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { startDate, endDate, type, userId } = req.query;
+    const logStorage = getLogStorage();
+
+    if (!logStorage || !logStorage.isInitialized()) {
+      res.json({ logs: [], message: 'Log storage not available' });
+      return;
+    }
+
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+    const activityType = type as string | undefined;
+    const uid = userId as string | undefined;
+
+    const logs = await logStorage.getActivityLogs(start, end, activityType as any, uid);
+    res.json({ logs, count: logs.length });
+  } catch (error) {
+    console.error('Error getting activity logs:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/logs/search - Search logs (admin only)
+app.get('/api/logs/search', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access logs
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { query, logType, startDate, endDate, severity, userId } = req.query;
+    const logStorage = getLogStorage();
+
+    if (!logStorage || !logStorage.isInitialized()) {
+      res.json({ logs: [], message: 'Log storage not available' });
+      return;
+    }
+
+    const start = startDate ? new Date(startDate as string) : undefined;
+    const end = endDate ? new Date(endDate as string) : undefined;
+
+    let logs: any[] = [];
+
+    if (logType === 'error' || !logType) {
+      const errorLogs = await logStorage.getErrorLogs(start, end, severity as any, userId as string);
+      logs.push(...errorLogs.map(log => ({ ...log, logType: 'error' })));
+    }
+
+    if (logType === 'activity' || !logType) {
+      const activityLogs = await logStorage.getActivityLogs(start, end, undefined, userId as string);
+      logs.push(...activityLogs.map(log => ({ ...log, logType: 'activity' })));
+    }
+
+    // Filter by query if provided
+    if (query) {
+      const queryStr = (query as string).toLowerCase();
+      logs = logs.filter(log => 
+        log.message?.toLowerCase().includes(queryStr) ||
+        log.description?.toLowerCase().includes(queryStr) ||
+        log.userEmail?.toLowerCase().includes(queryStr) ||
+        log.context?.toLowerCase().includes(queryStr)
+      );
+    }
+
+    // Sort by timestamp (newest first)
+    logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    res.json({ logs, count: logs.length });
+  } catch (error) {
+    console.error('Error searching logs:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// ============================================
+// SUPPORT ENDPOINTS
+// ============================================
+
+// POST /api/support/tickets - Create support ticket
+app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { title, description, priority } = req.body;
+    const userId = req.user?.id;
+    const userEmail = req.user?.email;
+
+    if (!title || !description) {
+      res.status(400).json({ error: 'Title and description are required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      // Fallback: store in memory or log
+      console.log('[SUPPORT] Ticket created (storage not available):', { title, description, userId, userEmail });
+      res.json({ success: true, stored: false, message: 'Support storage not available' });
+      return;
+    }
+
+    const ticket = {
+      id: `ticket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title,
+      description,
+      status: SupportTicketStatus.OPEN,
+      priority: priority || SupportTicketPriority.MEDIUM,
+      createdBy: userId || 'unknown',
+      createdByEmail: userEmail || 'unknown',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      metadata: {},
+      comments: [],
+    };
+
+    const success = await supportStorage.createTicket(ticket);
+    
+    // Log activity
+    logActivity(req, ActivityType.CONFIG_CHANGE, `Created support ticket: ${title}`, { ticketId: ticket.id });
+
+    // Create notification for admin (adar.sobol@pagaya.com)
+    const ADMIN_EMAIL = 'adar.sobol@pagaya.com';
+    const adminNotification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: NotificationType.SupportTicketNew,
+      title: 'New Support Ticket',
+      message: `${userEmail} submitted: ${title}`,
+      initiativeId: ticket.id,
+      initiativeTitle: title,
+      timestamp: new Date().toISOString(),
+      read: false,
+      userId: 'admin',
+      metadata: {
+        ticketId: ticket.id,
+        submittedBy: userEmail,
+        priority: ticket.priority,
+      },
+    };
+
+    // Store and emit notification to admin
+    const gcs = getGCSStorage();
+    if (gcs) {
+      // Find admin user ID by email
+      const doc = await getDoc();
+      if (doc) {
+        const usersSheet = doc.sheetsByTitle['Users'];
+        if (usersSheet) {
+          const rows = await usersSheet.getRows();
+          const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
+          if (adminRow) {
+            const adminUserId = adminRow.get('id');
+            await gcs.addNotification(adminUserId, adminNotification);
+            io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+          }
+        }
+      }
+    } else {
+      // Emit via Socket.IO even without GCS persistence
+      io.emit('notification:received', { userId: 'admin', notification: adminNotification });
+    }
+
+    res.json({ success, ticket });
+  } catch (error) {
+    console.error('Error creating support ticket:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/support/tickets - Get support tickets (admin only)
+app.get('/api/support/tickets', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can view all tickets
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { status } = req.query;
+    const supportStorage = getSupportStorage();
+
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      res.json({ tickets: [], message: 'Support storage not available' });
+      return;
+    }
+
+    const tickets = await supportStorage.getTickets(status as SupportTicketStatus | undefined);
+    res.json({ tickets, count: tickets.length });
+  } catch (error) {
+    console.error('Error getting support tickets:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/support/my-tickets - Get tickets for the current user
+app.get('/api/support/my-tickets', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userEmail = req.user?.email;
+    const userId = req.user?.id;
+
+    if (!userEmail && !userId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      res.json({ tickets: [], message: 'Support storage not available' });
+      return;
+    }
+
+    // Get all tickets and filter by user
+    const allTickets = await supportStorage.getTickets();
+    const userTickets = allTickets.filter(ticket => 
+      ticket.createdByEmail === userEmail || ticket.createdBy === userId
+    );
+
+    res.json({ tickets: userTickets, count: userTickets.length });
+  } catch (error) {
+    console.error('Error getting user tickets:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// PATCH /api/support/tickets/:id - Update support ticket (admin only)
+app.patch('/api/support/tickets/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { id } = req.params;
+    const updates = req.body;
+    const supportStorage = getSupportStorage();
+
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      res.status(503).json({ error: 'Support storage not available' });
+      return;
+    }
+
+    // Get ticket before update to find the creator
+    const tickets = await supportStorage.getTickets();
+    const ticket = tickets.find(t => t.id === id);
+    
+    const success = await supportStorage.updateTicket(id, {
+      ...updates,
+      resolvedBy: req.user?.id,
+      resolvedAt: updates.status === SupportTicketStatus.RESOLVED || updates.status === SupportTicketStatus.CLOSED 
+        ? new Date().toISOString() 
+        : undefined,
+    });
+
+    if (success) {
+      logActivity(req, ActivityType.CONFIG_CHANGE, `Updated support ticket: ${id}`, { ticketId: id, updates });
+      
+      // If status changed, notify the ticket creator
+      if (updates.status && ticket && ticket.createdByEmail) {
+        const statusNotification = {
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: NotificationType.SupportTicketStatusChange,
+          title: 'Ticket Status Updated',
+          message: `Your ticket "${ticket.title}" status changed to ${updates.status}`,
+          initiativeId: id,
+          initiativeTitle: ticket.title,
+          timestamp: new Date().toISOString(),
+          read: false,
+          userId: ticket.createdBy,
+          metadata: {
+            ticketId: id,
+            oldStatus: ticket.status,
+            newStatus: updates.status,
+          },
+        };
+
+        const gcs = getGCSStorage();
+        if (gcs) {
+          await gcs.addNotification(ticket.createdBy, statusNotification);
+        }
+        io.emit('notification:received', { userId: ticket.createdBy, notification: statusNotification });
+      }
+    }
+
+    res.json({ success });
+  } catch (error) {
+    console.error('Error updating support ticket:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/support/tickets/:id - Get a single ticket
+app.get('/api/support/tickets/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const supportStorage = getSupportStorage();
+
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      res.status(503).json({ error: 'Support storage not available' });
+      return;
+    }
+
+    const ticket = await supportStorage.getTicketById(id);
+    if (!ticket) {
+      res.status(404).json({ error: 'Ticket not found' });
+      return;
+    }
+
+    // Check access: admin can see all, users can only see their own
+    if (req.user?.role !== 'Admin' && ticket.createdBy !== req.user?.id && ticket.createdByEmail !== req.user?.email) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    res.json({ ticket });
+  } catch (error) {
+    console.error('Error getting support ticket:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/support/tickets/:id/comments - Add a comment to a ticket
+app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    const userId = req.user?.id;
+    const userEmail = req.user?.email;
+
+    if (!content || content.trim() === '') {
+      res.status(400).json({ error: 'Comment content is required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      res.status(503).json({ error: 'Support storage not available' });
+      return;
+    }
+
+    // Get the ticket to check access and get creator info
+    const ticket = await supportStorage.getTicketById(id);
+    if (!ticket) {
+      res.status(404).json({ error: 'Ticket not found' });
+      return;
+    }
+
+    // Check access: admin can comment on any ticket, users only on their own
+    const isAdmin = req.user?.role === 'Admin';
+    const isOwner = ticket.createdBy === userId || ticket.createdByEmail === userEmail;
+    if (!isAdmin && !isOwner) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const comment = {
+      id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      ticketId: id,
+      authorId: userId || 'unknown',
+      authorEmail: userEmail || 'unknown',
+      content: content.trim(),
+      timestamp: new Date().toISOString(),
+      isInternal: false,
+    };
+
+    const success = await supportStorage.addComment(id, comment);
+
+    if (success) {
+      logActivity(req, ActivityType.CONFIG_CHANGE, `Added comment to ticket: ${id}`, { ticketId: id });
+
+      // Send notification
+      const ADMIN_EMAIL = 'adar.sobol@pagaya.com';
+      
+      if (isAdmin) {
+        // Admin commented - notify ticket creator
+        const creatorNotification = {
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: NotificationType.SupportTicketReply,
+          title: 'New Reply to Your Ticket',
+          message: `Admin replied to your ticket: "${ticket.title}"`,
+          initiativeId: id,
+          initiativeTitle: ticket.title,
+          timestamp: new Date().toISOString(),
+          read: false,
+          userId: ticket.createdBy,
+          metadata: {
+            ticketId: id,
+            commentId: comment.id,
+            commentPreview: content.substring(0, 50),
+          },
+        };
+
+        const gcs = getGCSStorage();
+        if (gcs) {
+          await gcs.addNotification(ticket.createdBy, creatorNotification);
+        }
+        io.emit('notification:received', { userId: ticket.createdBy, notification: creatorNotification });
+      } else {
+        // User commented - notify admin
+        const adminNotification = {
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: NotificationType.SupportTicketReply,
+          title: 'New Comment on Ticket',
+          message: `${userEmail} commented on: "${ticket.title}"`,
+          initiativeId: id,
+          initiativeTitle: ticket.title,
+          timestamp: new Date().toISOString(),
+          read: false,
+          userId: 'admin',
+          metadata: {
+            ticketId: id,
+            commentId: comment.id,
+            commentPreview: content.substring(0, 50),
+          },
+        };
+
+        // Find admin user ID and send notification
+        const gcs = getGCSStorage();
+        if (gcs) {
+          const doc = await getDoc();
+          if (doc) {
+            const usersSheet = doc.sheetsByTitle['Users'];
+            if (usersSheet) {
+              const rows = await usersSheet.getRows();
+              const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
+              if (adminRow) {
+                const adminUserId = adminRow.get('id');
+                await gcs.addNotification(adminUserId, adminNotification);
+                io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+              }
+            }
+          }
+        } else {
+          io.emit('notification:received', { userId: 'admin', notification: adminNotification });
+        }
+      }
+    }
+
+    res.json({ success, comment });
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/support/feedback - Submit feedback
+app.post('/api/support/feedback', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { type, title, description, metadata, screenshot } = req.body;
+    const userId = req.user?.id;
+    const userEmail = req.user?.email;
+
+    if (!type || !title || !description) {
+      res.status(400).json({ error: 'Type, title, and description are required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      console.log('[SUPPORT] Feedback submitted (storage not available):', { type, title, userId, userEmail });
+      res.json({ success: true, stored: false, message: 'Support storage not available' });
+      return;
+    }
+
+    const feedback = {
+      id: `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      title,
+      description,
+      submittedBy: userId || 'unknown',
+      submittedByEmail: userEmail || 'unknown',
+      submittedAt: new Date().toISOString(),
+      status: 'new' as const,
+      metadata: metadata || {},
+      screenshot,
+    };
+
+    const success = await supportStorage.createFeedback(feedback);
+    res.json({ success, feedback });
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// GET /api/support/feedback - Get feedback (admin only)
+app.get('/api/support/feedback', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    if (!supportStorage || !supportStorage.isInitialized()) {
+      res.json({ feedback: [], message: 'Support storage not available' });
+      return;
+    }
+
+    const feedback = await supportStorage.getFeedback();
+    res.json({ feedback, count: feedback.length });
+  } catch (error) {
+    console.error('Error getting feedback:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// ============================================
 // SPA FALLBACK (serve index.html for all non-API routes)
 // ============================================
 // This must be after all API routes
@@ -3054,6 +3753,18 @@ httpServer.listen(PORT, () => {
   console.log(`  POST /api/backups/restore-version - Restore specific version`);
   console.log(`  GET  /api/backups/:date/verify   - Verify backup integrity`);
   console.log(`  GET  /api/backups/:date/download - Get backup download URLs`);
+  console.log(`\nLogging Endpoints (Admin only):`);
+  console.log(`  POST /api/logs/errors           - Store error log`);
+  console.log(`  GET  /api/logs/errors            - Get error logs`);
+  console.log(`  POST /api/logs/activity          - Store activity log`);
+  console.log(`  GET  /api/logs/activity          - Get activity logs`);
+  console.log(`  GET  /api/logs/search            - Search logs`);
+  console.log(`\nSupport Endpoints:`);
+  console.log(`  POST /api/support/tickets        - Create support ticket`);
+  console.log(`  GET  /api/support/tickets        - Get support tickets (admin)`);
+  console.log(`  PATCH /api/support/tickets/:id  - Update support ticket (admin)`);
+  console.log(`  POST /api/support/feedback       - Submit feedback`);
+  console.log(`  GET  /api/support/feedback       - Get feedback (admin)`);
   console.log(`\nReal-time Collaboration (Socket.IO):`);
   console.log(`  - User presence tracking`);
   console.log(`  - Live initiative updates`);

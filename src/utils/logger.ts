@@ -1,7 +1,11 @@
 /**
  * Structured logging utility to replace console.log/error throughout the app
  * Formats logs consistently for easier debugging and production monitoring
+ * Sends errors to backend for persistence and analysis
  */
+
+import { logService } from '../services/logService';
+import { LogSeverity } from '../types';
 
 export enum LogLevel {
   DEBUG = 'debug',
@@ -62,10 +66,15 @@ class Logger {
           console.log(formatted);
       }
 
-      // In production, you could send to an error tracking service here
-      if (level === LogLevel.ERROR && !import.meta.env.DEV) {
-        // TODO: Send to error tracking service (e.g., Sentry)
-        // errorReportingService.reportError(options?.error || new Error(message), { context, metadata });
+      // Send errors to backend for persistence
+      if (level === LogLevel.ERROR) {
+        const severity = options?.error ? LogSeverity.ERROR : LogSeverity.WARN;
+        logService.logError(message, {
+          error: options?.error,
+          context: options?.context,
+          metadata: options?.metadata,
+          severity,
+        });
       }
     }
   }

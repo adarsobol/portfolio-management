@@ -370,6 +370,10 @@ export enum NotificationType {
   NewComment = 'new_comment',
   WeeklyUpdateReminder = 'weekly_update_reminder',
   OverlookedItem = 'overlooked_item',
+  // Support ticket notifications
+  SupportTicketNew = 'support_ticket_new',
+  SupportTicketReply = 'support_ticket_reply',
+  SupportTicketStatusChange = 'support_ticket_status_change',
 }
 
 export interface Notification {
@@ -388,4 +392,213 @@ export interface Notification {
 // Track when user last viewed comments on each initiative
 export interface UserCommentReadState {
   [initiativeId: string]: string; // ISO timestamp of last view
+}
+
+// ============================================
+// ERROR LOGGING & ACTIVITY LOGGING TYPES
+// ============================================
+
+export enum LogSeverity {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARN = 'warn',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
+
+export enum LogCategory {
+  ERROR = 'error',
+  ACTIVITY = 'activity',
+  PERFORMANCE = 'performance',
+  SECURITY = 'security',
+  SYSTEM = 'system'
+}
+
+export interface ErrorLog {
+  id: string;
+  severity: LogSeverity;
+  message: string;
+  stack?: string;
+  timestamp: string; // ISO String
+  userId?: string;
+  userEmail?: string;
+  context?: string;
+  metadata?: Record<string, unknown>;
+  url?: string;
+  userAgent?: string;
+  sessionId?: string;
+  correlationId?: string;
+  resolved?: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+export enum ActivityType {
+  LOGIN = 'login',
+  LOGOUT = 'logout',
+  CREATE_INITIATIVE = 'create_initiative',
+  UPDATE_INITIATIVE = 'update_initiative',
+  DELETE_INITIATIVE = 'delete_initiative',
+  CREATE_TASK = 'create_task',
+  UPDATE_TASK = 'update_task',
+  DELETE_TASK = 'delete_task',
+  EXPORT_DATA = 'export_data',
+  VIEW_CHANGE = 'view_change',
+  FILTER_CHANGE = 'filter_change',
+  SEARCH = 'search',
+  PERMISSION_CHANGE = 'permission_change',
+  CONFIG_CHANGE = 'config_change',
+  BACKUP_CREATE = 'backup_create',
+  BACKUP_RESTORE = 'backup_restore',
+  SNAPSHOT_CREATE = 'snapshot_create',
+  USER_CREATE = 'user_create',
+  USER_UPDATE = 'user_update',
+  USER_DELETE = 'user_delete'
+}
+
+export interface ActivityLog {
+  id: string;
+  type: ActivityType;
+  userId: string;
+  userEmail: string;
+  timestamp: string; // ISO String
+  description: string;
+  metadata?: Record<string, unknown>;
+  initiativeId?: string;
+  taskId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  sessionId?: string;
+  correlationId?: string;
+}
+
+// ============================================
+// SUPPORT & FEEDBACK TYPES
+// ============================================
+
+export enum SupportTicketStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  RESOLVED = 'resolved',
+  CLOSED = 'closed'
+}
+
+export enum SupportTicketPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  URGENT = 'urgent'
+}
+
+export interface SupportTicket {
+  id: string;
+  title: string;
+  description: string;
+  status: SupportTicketStatus;
+  priority: SupportTicketPriority;
+  createdBy: string;
+  createdByEmail: string;
+  createdAt: string; // ISO String
+  updatedAt: string; // ISO String
+  assignedTo?: string;
+  assignedToEmail?: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  metadata?: Record<string, unknown>;
+  attachments?: string[]; // URLs to attachments
+  comments?: SupportTicketComment[];
+}
+
+export interface SupportTicketComment {
+  id: string;
+  ticketId: string;
+  authorId: string;
+  authorEmail: string;
+  content: string;
+  timestamp: string; // ISO String
+  isInternal?: boolean; // Internal admin notes
+}
+
+export interface Feedback {
+  id: string;
+  type: 'bug' | 'feature' | 'improvement' | 'other';
+  title: string;
+  description: string;
+  submittedBy: string;
+  submittedByEmail: string;
+  submittedAt: string; // ISO String
+  status: 'new' | 'reviewed' | 'planned' | 'completed';
+  priority?: SupportTicketPriority;
+  metadata?: Record<string, unknown>;
+  screenshot?: string; // Base64 or URL
+}
+
+export interface BugReport extends Feedback {
+  type: 'bug';
+  stepsToReproduce?: string;
+  expectedBehavior?: string;
+  actualBehavior?: string;
+  browser?: string;
+  os?: string;
+  url?: string;
+  consoleErrors?: string[];
+}
+
+// ============================================
+// MONITORING & ANALYTICS TYPES
+// ============================================
+
+export interface SystemMetrics {
+  timestamp: string; // ISO String
+  errorRate: number; // Errors per minute
+  averageResponseTime: number; // milliseconds
+  activeUsers: number;
+  totalRequests: number;
+  failedRequests: number;
+  syncStatus: 'healthy' | 'degraded' | 'down';
+  storageUsage: {
+    used: number; // bytes
+    total: number; // bytes
+    percentage: number;
+  };
+  memoryUsage?: {
+    used: number; // bytes
+    total: number; // bytes
+    percentage: number;
+  };
+}
+
+export interface PerformanceMetrics {
+  endpoint: string;
+  method: string;
+  averageResponseTime: number; // milliseconds
+  p50: number; // milliseconds
+  p95: number; // milliseconds
+  p99: number; // milliseconds
+  requestCount: number;
+  errorCount: number;
+  timestamp: string; // ISO String
+}
+
+export interface UsageAnalytics {
+  date: string; // ISO date string
+  dailyActiveUsers: number;
+  totalUsers: number;
+  featureUsage: Record<string, number>; // feature -> count
+  viewUsage: Record<ViewType, number>;
+  averageSessionDuration: number; // seconds
+  pageViews: number;
+  uniquePageViews: number;
+}
+
+export interface UserEngagement {
+  userId: string;
+  userEmail: string;
+  lastActive: string; // ISO String
+  totalSessions: number;
+  averageSessionDuration: number; // seconds
+  featuresUsed: string[];
+  initiativesCreated: number;
+  initiativesUpdated: number;
+  commentsPosted: number;
 }

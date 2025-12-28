@@ -1,0 +1,201 @@
+/**
+ * Support Service
+ * Handles support tickets and feedback
+ */
+
+import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority } from '../types';
+import { API_ENDPOINT } from '../config';
+
+class SupportService {
+  async createTicket(
+    title: string,
+    description: string,
+    priority: SupportTicketPriority = SupportTicketPriority.MEDIUM
+  ): Promise<{ success: boolean; ticket?: SupportTicket }> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/tickets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ title, description, priority }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create ticket: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return { success: data.success, ticket: data.ticket };
+    } catch (error) {
+      console.error('Error creating support ticket:', error);
+      return { success: false };
+    }
+  }
+
+  async getTickets(status?: SupportTicketStatus): Promise<SupportTicket[]> {
+    try {
+      const queryParams = status ? `?status=${status}` : '';
+      const response = await fetch(`${API_ENDPOINT}/api/support/tickets${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tickets: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.tickets || [];
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      return [];
+    }
+  }
+
+  async updateTicket(
+    ticketId: string,
+    updates: Partial<SupportTicket>
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update ticket: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success || false;
+    } catch (error) {
+      console.error('Error updating support ticket:', error);
+      return false;
+    }
+  }
+
+  async submitFeedback(
+    type: 'bug' | 'feature' | 'improvement' | 'other',
+    title: string,
+    description: string,
+    metadata?: Record<string, unknown>,
+    screenshot?: string
+  ): Promise<{ success: boolean; feedback?: Feedback }> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ type, title, description, metadata, screenshot }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit feedback: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return { success: data.success, feedback: data.feedback };
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      return { success: false };
+    }
+  }
+
+  async getFeedback(): Promise<Feedback[]> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch feedback: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.feedback || [];
+    } catch (error) {
+      console.error('Error fetching feedback:', error);
+      return [];
+    }
+  }
+
+  async getMyTickets(): Promise<SupportTicket[]> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/my-tickets`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch my tickets: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.tickets || [];
+    } catch (error) {
+      console.error('Error fetching my tickets:', error);
+      return [];
+    }
+  }
+
+  async addComment(
+    ticketId: string,
+    content: string
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/tickets/${ticketId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add comment: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success || false;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      return false;
+    }
+  }
+
+  async getTicket(ticketId: string): Promise<SupportTicket | null> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/tickets/${ticketId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ticket: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.ticket || null;
+    } catch (error) {
+      console.error('Error fetching ticket:', error);
+      return null;
+    }
+  }
+}
+
+export const supportService = new SupportService();
+

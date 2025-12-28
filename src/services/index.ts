@@ -7,6 +7,8 @@ export type { AuthUser, LoginResponse } from './authService';
 export { realtimeService } from './realtimeService';
 export type { UserPresence, EditingIndicator } from './realtimeService';
 export { notificationService } from './notificationService';
+export { logService } from './logService';
+export { supportService } from './supportService';
 
 // Data service abstraction (for GCS migration)
 export { 

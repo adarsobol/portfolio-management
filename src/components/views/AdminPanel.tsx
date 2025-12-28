@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck } from 'lucide-react';
+import { Settings, History, Trash2, Plus, MessageSquare, FileSpreadsheet, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity } from 'lucide-react';
+import { ErrorLogView } from './ErrorLogView';
+import { ActivityLogView } from './ActivityLogView';
+import { SupportCenter } from './SupportCenter';
 import { User, Role, AppConfig, Initiative, ChangeRecord, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
 import { generateId, exportToExcel } from '../../utils';
 import * as XLSX from 'xlsx';
@@ -1001,6 +1004,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </table>
           </div>
         )}
+      </div>
+
+      {/* Error Logs Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
+              <AlertTriangle size={16} className="text-white" />
+            </div>
+            Error Logs
+          </h3>
+          <p className="text-xs text-slate-500 mt-1 ml-8">View and search application error logs for debugging</p>
+        </div>
+        <div className="p-0">
+          <ErrorLogView currentUser={currentUser} users={users} />
+        </div>
+      </div>
+
+      {/* Activity Logs Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
+              <Activity size={16} className="text-white" />
+            </div>
+            Activity Logs
+          </h3>
+          <p className="text-xs text-slate-500 mt-1 ml-8">Track user actions and system activities</p>
+        </div>
+        <div className="p-0">
+          <ActivityLogView currentUser={currentUser} users={users} />
+        </div>
+      </div>
+
+      {/* Support Center Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-green-50 to-emerald-50">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <div className="p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+              <MessageSquare size={16} className="text-white" />
+            </div>
+            Support Center
+          </h3>
+          <p className="text-xs text-slate-500 mt-1 ml-8">Manage support tickets and user feedback</p>
+        </div>
+        <div className="p-0">
+          <SupportCenter currentUser={currentUser} users={users} />
+        </div>
       </div>
 
       {/* Backup Management Section */}

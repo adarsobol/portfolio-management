@@ -30,7 +30,9 @@ export class ErrorBoundary extends Component<Props, State> {
       error,
       metadata: {
         componentStack: errorInfo.componentStack,
-        errorBoundary: true
+        errorBoundary: true,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
       }
     });
 

@@ -5,3 +5,7 @@ export { CalendarView } from './CalendarView';
 export { AdminPanel } from './AdminPanel';
 export { WorkflowsView } from './WorkflowsView';
 export { DependenciesView } from './DependenciesView';
+export { ErrorLogView } from './ErrorLogView';
+export { ActivityLogView } from './ActivityLogView';
+export { SupportCenter } from './SupportCenter';
+export { HelpCenter } from './HelpCenter';

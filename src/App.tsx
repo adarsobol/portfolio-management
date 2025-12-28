@@ -16,7 +16,7 @@ import { FilterBar } from './components/shared/FilterBar';
 import { NotificationMenu } from './components/shared/NotificationMenu';
 import { ExportDropdown } from './components/shared/ExportDropdown';
 import { PresenceIndicator } from './components/shared/PresenceIndicator';
-import { LoadingSpinner } from './components/shared';
+import { LoadingSpinner, SupportWidget } from './components/shared';
 import { MetricsDashboard } from './components/views/MetricsDashboard';
 import { ResourcesDashboard } from './components/views/ResourcesDashboard';
 import { TaskTable } from './components/views/TaskTable';
@@ -2055,6 +2055,9 @@ export default function App() {
         onSave={handleAtRiskReasonSave}
         onCancel={handleAtRiskReasonCancel}
       />
+
+      {/* Support Widget - floating help button */}
+      {isAuthenticated && <SupportWidget />}
 
     </div>
   );

@@ -36,6 +36,7 @@ interface BackupManifest {
   duration: number;
   status: 'success' | 'partial' | 'failed';
   errors?: string[];
+  reporter?: string;
 }
 
 interface BackupFileInfo {
@@ -235,7 +236,7 @@ function getDateString(): string {
 /**
  * Main backup function - creates a daily snapshot of all data
  */
-async function performBackup(): Promise<BackupManifest> {
+async function performBackup(reporter?: string): Promise<BackupManifest> {
   const startTime = Date.now();
   const config = getConfig();
   const storage = new Storage({ projectId: config.projectId });
@@ -247,6 +248,9 @@ async function performBackup(): Promise<BackupManifest> {
   
   console.log(`Starting backup: ${backupId}`);
   console.log(`Backup path: ${backupPath}`);
+  if (reporter) {
+    console.log(`Backup reporter: ${reporter}`);
+  }
   
   const manifest: BackupManifest = {
     id: backupId,
@@ -256,7 +260,8 @@ async function performBackup(): Promise<BackupManifest> {
     totalSize: 0,
     duration: 0,
     status: 'success',
-    errors: []
+    errors: [],
+    reporter: reporter || 'scheduler'
   };
   
   try {
@@ -290,19 +295,35 @@ async function performBackup(): Promise<BackupManifest> {
     
     // Also backup snapshots directory (recent ones)
     console.log('Backing up recent snapshots...');
-    const snapshotFiles = await listFiles(bucket, 'snapshots/');
-    const recentSnapshots = snapshotFiles.slice(0, 10); // Only last 10 snapshots
-    
-    for (const file of recentSnapshots) {
-      try {
-        const fileInfo = await copyFileToBackup(bucket, file, backupPath + 'snapshots/');
-        manifest.files.push(fileInfo);
-        manifest.totalSize += fileInfo.size;
-      } catch (error) {
-        const errorMessage = `Failed to backup snapshot ${file.name}: ${error}`;
-        console.error(errorMessage);
-        manifest.errors!.push(errorMessage);
+    try {
+      const snapshotFiles = await listFiles(bucket, 'snapshots/');
+      console.log(`Found ${snapshotFiles.length} snapshot files`);
+      
+      if (snapshotFiles.length === 0) {
+        console.log('No snapshot files found in snapshots/ directory');
+      } else {
+        const recentSnapshots = snapshotFiles.slice(0, 10); // Only last 10 snapshots
+        console.log(`Backing up ${recentSnapshots.length} recent snapshots`);
+        
+        for (const file of recentSnapshots) {
+          try {
+            console.log(`Backing up snapshot: ${file.name}`);
+            const fileInfo = await copyFileToBackup(bucket, file, backupPath + 'snapshots/');
+            manifest.files.push(fileInfo);
+            manifest.totalSize += fileInfo.size;
+            console.log(`Successfully backed up snapshot: ${file.name}`);
+          } catch (error) {
+            const errorMessage = `Failed to backup snapshot ${file.name}: ${error}`;
+            console.error(errorMessage);
+            manifest.errors!.push(errorMessage);
+          }
+        }
       }
+    } catch (error) {
+      const errorMessage = `Failed to list or backup snapshots: ${error}`;
+      console.error(errorMessage);
+      manifest.errors!.push(errorMessage);
+      // Don't fail the entire backup if snapshot backup fails
     }
     
     // Set status based on errors
@@ -366,7 +387,11 @@ functions.http('backupDaily', async (req, res) => {
   
   try {
     console.log('Backup triggered at', new Date().toISOString());
-    const manifest = await performBackup();
+    
+    // Extract reporter from request body or headers, default to "scheduler"
+    const reporter = req.body?.reporter || req.headers['x-backup-reporter'] || 'scheduler';
+    
+    const manifest = await performBackup(reporter);
     
     if (manifest.status === 'failed') {
       res.status(500).json({
