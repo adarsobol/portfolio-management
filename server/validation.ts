@@ -56,7 +56,7 @@ export const snapshotSchema = z.object({
     id: z.string().optional(),
     timestamp: z.string().optional(),
     initiatives: z.array(initiativeSchema),
-    metadata: z.record(z.any()).optional(),
+    metadata: z.record(z.string(), z.any()).optional(),
   }),
 });
 
