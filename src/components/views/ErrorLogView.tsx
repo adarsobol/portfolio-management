@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Search, Filter, Calendar, User, X, CheckCircle2, RefreshCw, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertTriangle, Search, Calendar, User, CheckCircle2, RefreshCw, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { ErrorLog, LogSeverity, User as UserType } from '../../types';
 import { logService } from '../../services/logService';
 
@@ -8,7 +8,7 @@ interface ErrorLogViewProps {
   users: UserType[];
 }
 
-export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ currentUser, users }) => {
+export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ users }) => {
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,7 +17,6 @@ export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ currentUser, users }
   const [startDate, setStartDate] = useState<Date>(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)); // Last 7 days
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
-  const [resolvedLogs, setResolvedLogs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadErrorLogs();

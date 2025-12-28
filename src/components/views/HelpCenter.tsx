@@ -1,5 +1,5 @@
 import React from 'react';
-import { HelpCircle, Book, Lightbulb, AlertTriangle, Users, Settings } from 'lucide-react';
+import { HelpCircle, Book, AlertTriangle, Users } from 'lucide-react';
 
 export const HelpCenter: React.FC = () => {
   const helpSections = [

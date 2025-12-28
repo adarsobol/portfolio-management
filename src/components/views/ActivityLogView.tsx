@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Search, Filter, Calendar, User, ChevronDown, ChevronUp, RefreshCw, Download } from 'lucide-react';
+import { Activity, Search, Calendar, User, ChevronDown, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { ActivityLog, ActivityType, User as UserType } from '../../types';
 import { logService } from '../../services/logService';
 
@@ -8,7 +8,7 @@ interface ActivityLogViewProps {
   users: UserType[];
 }
 
-export const ActivityLogView: React.FC<ActivityLogViewProps> = ({ currentUser, users }) => {
+export const ActivityLogView: React.FC<ActivityLogViewProps> = ({ users }) => {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

@@ -8,7 +8,7 @@ interface SupportCenterProps {
   users: UserType[];
 }
 
-export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser, users }) => {
+export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | 'all'>('all');
