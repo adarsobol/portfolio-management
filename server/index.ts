@@ -3745,8 +3745,10 @@ if (NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
 // ============================================
 // START SERVER (using httpServer for Socket.IO)
 // ============================================
-httpServer.listen(PORT, () => {
-  console.log(`\n🚀 Portfolio Manager API Server running on http://localhost:${PORT}`);
+// Bind to 0.0.0.0 for Cloud Run compatibility
+const HOST = '0.0.0.0';
+httpServer.listen(Number(PORT), HOST, () => {
+  console.log(`\n🚀 Portfolio Manager API Server running on http://${HOST}:${PORT}`);
   console.log(`🔌 Socket.IO real-time collaboration enabled`);
   console.log(`\nAuth Endpoints:`);
   console.log(`  POST /api/auth/login          - Authenticate user`);
@@ -3801,4 +3803,22 @@ httpServer.listen(PORT, () => {
   console.log(`\nDefault admin credentials:`);
   console.log(`  Email: adar.sobol@pagaya.com`);
   console.log(`  Password: admin123`);
+});
+
+// Handle server errors
+httpServer.on('error', (error: NodeJS.ErrnoException) => {
+  console.error('Server error:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use`);
+  }
+  process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
