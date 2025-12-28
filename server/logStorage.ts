@@ -5,7 +5,7 @@
  */
 
 import { Storage } from '@google-cloud/storage';
-import { ErrorLog, ActivityLog, LogSeverity, ActivityType } from '../src/types';
+import { ErrorLog, ActivityLog, LogSeverity, ActivityType } from '../src/types/index.js';
 
 interface LogStorageConfig {
   bucketName: string;

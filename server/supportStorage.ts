@@ -4,7 +4,7 @@
  */
 
 import { Storage } from '@google-cloud/storage';
-import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority, SupportTicketComment } from '../src/types';
+import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority, SupportTicketComment } from '../src/types/index.js';
 
 interface SupportStorageConfig {
   bucketName: string;

@@ -34,14 +34,16 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+# Install all dependencies for compilation
+RUN npm ci
 
-# Copy server files
+# Copy server and shared types
 COPY server/ ./server/
-COPY tsconfig.json ./
-# Copy shared types (needed by server imports)
 COPY src/types/ ./src/types/
+COPY tsconfig.json tsconfig.server.json ./
+
+# Compile backend
+RUN npm run build:server
 
 # ============================================
 # Stage 3: Production Image
@@ -57,18 +59,13 @@ RUN apk add --no-cache dumb-init
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
-# Copy production dependencies
-COPY --from=backend-builder /app/node_modules ./node_modules
-COPY --from=backend-builder /app/package*.json ./
+# Copy production dependencies only
+COPY package*.json ./
+RUN npm ci --only=production
 
-# Install tsx for running TypeScript
-RUN npm install -g tsx
-
-# Copy server source
-COPY --from=backend-builder /app/server ./server
-COPY --from=backend-builder /app/tsconfig.json ./
-# Copy shared types (needed by server imports)
-COPY --from=backend-builder /app/src/types ./src/types
+# Copy compiled backend
+COPY --from=backend-builder /app/dist-server/server ./server
+COPY --from=backend-builder /app/dist-server/src ./src
 
 # Copy built frontend
 COPY --from=frontend-builder /app/dist ./dist
@@ -86,10 +83,10 @@ ENV PORT=8080
 # Expose port
 EXPOSE 8080
 
-# Health check
+# Health check (updated to use node for faster response if needed, but wget is fine)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/sheets/health || exit 1
 
 # Start with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["tsx", "server/index.ts"]
+CMD ["node", "server/index.js"]

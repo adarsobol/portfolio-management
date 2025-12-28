@@ -15,12 +15,12 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { isGCSEnabled, getGCSConfig, initializeGCSStorage, getGCSStorage } from './gcsStorage';
-import { generateInitiativeId } from './idGenerator';
-import { initializeBackupService, getBackupService, isBackupServiceEnabled } from './backupService';
-import { initializeLogStorage, getLogStorage, isLogStorageEnabled } from './logStorage';
-import { initializeSupportStorage, getSupportStorage, isSupportStorageEnabled } from './supportStorage';
-import { ActivityType, SupportTicketStatus, SupportTicketPriority, NotificationType } from '../src/types';
+import { isGCSEnabled, getGCSConfig, initializeGCSStorage, getGCSStorage } from './gcsStorage.js';
+import { generateInitiativeId } from './idGenerator.js';
+import { initializeBackupService, getBackupService, isBackupServiceEnabled } from './backupService.js';
+import { initializeLogStorage, getLogStorage, isLogStorageEnabled } from './logStorage.js';
+import { initializeSupportStorage, getSupportStorage, isSupportStorageEnabled } from './supportStorage.js';
+import { ActivityType, SupportTicketStatus, SupportTicketPriority, NotificationType } from '../src/types/index.js';
 import {
   validate,
   loginSchema,
@@ -32,7 +32,7 @@ import {
   snapshotSchema,
   slackWebhookSchema,
   bulkImportUsersSchema,
-} from './validation';
+} from './validation.js';
 
 dotenv.config();
 
