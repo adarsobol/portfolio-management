@@ -89,6 +89,8 @@ class SupportService {
     screenshot?: string
   ): Promise<{ success: boolean; feedback?: Feedback }> {
     try {
+      console.log('[FEEDBACK] Submitting feedback:', { type, title, endpoint: `${API_ENDPOINT}/api/support/feedback` });
+      
       const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
         method: 'POST',
         headers: {
@@ -98,14 +100,19 @@ class SupportService {
         body: JSON.stringify({ type, title, description, metadata, screenshot }),
       });
 
+      console.log('[FEEDBACK] Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Failed to submit feedback: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('[FEEDBACK] Error response:', errorText);
+        throw new Error(`Failed to submit feedback: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('[FEEDBACK] Response data:', data);
       return { success: data.success, feedback: data.feedback };
     } catch (error) {
-      console.error('Error submitting feedback:', error);
+      console.error('[FEEDBACK] Exception occurred:', error);
       return { success: false };
     }
   }
