@@ -493,6 +493,40 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
   }
 };
 
+// Optional authentication - doesn't fail, just proceeds without user if invalid
+const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  // DEVELOPMENT MODE: Allow bypass when JWT_SECRET is not set (dev mode)
+  if (NODE_ENV !== 'production' && !JWT_SECRET) {
+    req.user = {
+      id: 'u_as',
+      email: 'adar.sobol@pagaya.com',
+      name: 'Adar Sobol',
+      role: 'Admin'
+    };
+    next();
+    return;
+  }
+
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    // No token - proceed without user (will return empty data for protected resources)
+    next();
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, EFFECTIVE_JWT_SECRET) as { email: string; name: string; role: string; id: string };
+    req.user = decoded;
+    next();
+  } catch {
+    // Invalid token - proceed without user (will return empty data)
+    console.log('[AUTH] Token verification failed, proceeding without user');
+    next();
+  }
+};
+
 // ============================================
 // GOOGLE SHEETS CONNECTION
 // ============================================
@@ -3389,12 +3423,12 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
   }
 });
 
-// GET /api/support/tickets - Get support tickets (admin only)
-app.get('/api/support/tickets', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/support/tickets - Get support tickets (admin only, returns empty if not admin)
+app.get('/api/support/tickets', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Only admins can view all tickets
+    // Only admins can view all tickets - return empty for non-admins (no error)
     if (req.user?.role !== 'Admin') {
-      res.status(403).json({ error: 'Admin access required' });
+      res.json({ tickets: [], message: 'Admin access required to view tickets' });
       return;
     }
 
@@ -3738,11 +3772,12 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/support/feedback - Get feedback (admin only)
-app.get('/api/support/feedback', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+// GET /api/support/feedback - Get feedback (admin only, returns empty if not admin)
+app.get('/api/support/feedback', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    // Only admins can view feedback - return empty for non-admins (no error)
     if (req.user?.role !== 'Admin') {
-      res.status(403).json({ error: 'Admin access required' });
+      res.json({ feedback: [], message: 'Admin access required to view feedback' });
       return;
     }
 
