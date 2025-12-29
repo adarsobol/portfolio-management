@@ -5,6 +5,7 @@
 
 import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority } from '../types';
 import { API_ENDPOINT } from '../config';
+import { authService } from './authService';
 
 class SupportService {
   async createTicket(
@@ -17,7 +18,7 @@ class SupportService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          ...authService.getAuthHeader(),
         },
         body: JSON.stringify({ title, description, priority }),
       });
@@ -37,12 +38,12 @@ class SupportService {
   async getTickets(status?: SupportTicketStatus): Promise<SupportTicket[]> {
     try {
       console.log('[TICKETS GET] Fetching tickets...');
-      const token = localStorage.getItem('token');
-      console.log('[TICKETS GET] Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'none');
+      const token = authService.getToken();
+      console.log('[TICKETS GET] Token from authService:', token ? `${token.substring(0, 20)}...` : 'none');
       const queryParams = status ? `?status=${status}` : '';
       const response = await fetch(`${API_ENDPOINT}/api/support/tickets${queryParams}`, {
         headers: {
-          'Authorization': `Bearer ${token || ''}`,
+          ...authService.getAuthHeader(),
         },
       });
 
@@ -69,7 +70,7 @@ class SupportService {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          ...authService.getAuthHeader(),
         },
         body: JSON.stringify(updates),
       });
@@ -100,7 +101,7 @@ class SupportService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          ...authService.getAuthHeader(),
         },
         body: JSON.stringify({ type, title, description, metadata, screenshot }),
       });
@@ -125,11 +126,11 @@ class SupportService {
   async getFeedback(): Promise<Feedback[]> {
     try {
       console.log('[FEEDBACK GET] Fetching feedback...');
-      const token = localStorage.getItem('token');
-      console.log('[FEEDBACK GET] Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'none');
+      const token = authService.getToken();
+      console.log('[FEEDBACK GET] Token from authService:', token ? `${token.substring(0, 20)}...` : 'none');
       const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
         headers: {
-          'Authorization': `Bearer ${token || ''}`,
+          ...authService.getAuthHeader(),
         },
       });
 
@@ -151,7 +152,7 @@ class SupportService {
     try {
       const response = await fetch(`${API_ENDPOINT}/api/support/my-tickets`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          ...authService.getAuthHeader(),
         },
       });
 
@@ -176,7 +177,7 @@ class SupportService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          ...authService.getAuthHeader(),
         },
         body: JSON.stringify({ content }),
       });
@@ -197,7 +198,7 @@ class SupportService {
     try {
       const response = await fetch(`${API_ENDPOINT}/api/support/tickets/${ticketId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          ...authService.getAuthHeader(),
         },
       });
 
