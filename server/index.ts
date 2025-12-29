@@ -3426,8 +3426,11 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
 // GET /api/support/tickets - Get support tickets (admin only, returns empty if not admin)
 app.get('/api/support/tickets', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    console.log('[TICKETS GET] User:', req.user?.email, 'Role:', req.user?.role);
+    
     // Only admins can view all tickets - return empty for non-admins (no error)
     if (req.user?.role !== 'Admin') {
+      console.log('[TICKETS GET] Not admin, returning empty');
       res.json({ tickets: [], message: 'Admin access required to view tickets' });
       return;
     }
@@ -3438,9 +3441,11 @@ app.get('/api/support/tickets', optionalAuthenticateToken, async (req: Authentic
 
     if (supportStorage && supportStorage.isInitialized()) {
       tickets = await supportStorage.getTickets(status as SupportTicketStatus | undefined);
+      console.log('[TICKETS GET] From GCS:', tickets.length, 'items');
     } else {
       // Use memory fallback
       tickets = memoryStorage.getTickets(status as SupportTicketStatus | undefined);
+      console.log('[TICKETS GET] From memory:', tickets.length, 'items');
     }
     
     res.json({ tickets, count: tickets.length });
@@ -3770,8 +3775,11 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
 // GET /api/support/feedback - Get feedback (admin only, returns empty if not admin)
 app.get('/api/support/feedback', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    console.log('[FEEDBACK GET] User:', req.user?.email, 'Role:', req.user?.role);
+    
     // Only admins can view feedback - return empty for non-admins (no error)
     if (req.user?.role !== 'Admin') {
+      console.log('[FEEDBACK GET] Not admin, returning empty');
       res.json({ feedback: [], message: 'Admin access required to view feedback' });
       return;
     }
@@ -3781,9 +3789,11 @@ app.get('/api/support/feedback', optionalAuthenticateToken, async (req: Authenti
     
     if (supportStorage && supportStorage.isInitialized()) {
       feedback = await supportStorage.getFeedback();
+      console.log('[FEEDBACK GET] From GCS:', feedback.length, 'items');
     } else {
       // Use memory fallback
       feedback = memoryStorage.getFeedback();
+      console.log('[FEEDBACK GET] From memory:', feedback.length, 'items');
     }
     
     res.json({ feedback, count: feedback.length });
