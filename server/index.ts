@@ -3708,6 +3708,32 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
     if (!supportStorage || !supportStorage.isInitialized()) {
       console.log('[SUPPORT] Feedback submitted (storage not available, logging to console):', feedback);
       console.log('[SUPPORT] User:', userEmail || userId || 'anonymous');
+      
+      // Still notify admins even without storage
+      try {
+        const gcs = getGCSStorage();
+        if (gcs) {
+          const allUsers = await gcs.getUsers();
+          const admins = allUsers.filter(u => u.role === 'Admin');
+          
+          const notification = {
+            id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'info' as const,
+            title: `New ${feedback.type} feedback submitted`,
+            message: feedback.title,
+            timestamp: new Date().toISOString(),
+            read: false,
+          };
+          
+          for (const admin of admins) {
+            await gcs.addNotification(admin.id, notification);
+            io.emit('notification:received', { userId: admin.id, notification });
+          }
+        }
+      } catch (notifError) {
+        console.error('[SUPPORT] Failed to send admin notifications:', notifError);
+      }
+      
       // In dev mode without GCS, still return success but log to console
       res.json({ success: true, stored: false, feedback, message: 'Feedback logged (storage not configured)' });
       return;
@@ -3719,6 +3745,32 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
       // Even if storage fails, return success for better UX
       res.json({ success: true, stored: false, feedback, message: 'Feedback received but storage failed' });
       return;
+    }
+    
+    // Notify all admins about new feedback
+    try {
+      const gcs = getGCSStorage();
+      if (gcs) {
+        const allUsers = await gcs.getUsers();
+        const admins = allUsers.filter(u => u.role === 'Admin');
+        
+        const notification = {
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: 'info' as const,
+          title: `New ${feedback.type} feedback submitted`,
+          message: feedback.title,
+          timestamp: new Date().toISOString(),
+          read: false,
+        };
+        
+        for (const admin of admins) {
+          await gcs.addNotification(admin.id, notification);
+          io.emit('notification:received', { userId: admin.id, notification });
+        }
+      }
+    } catch (notifError) {
+      console.error('[SUPPORT] Failed to send admin notifications:', notifError);
+      // Don't fail the request if notification fails
     }
     
     res.json({ success: true, stored: true, feedback });
