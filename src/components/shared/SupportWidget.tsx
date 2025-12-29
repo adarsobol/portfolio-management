@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, X, Bug, MessageSquare, Ticket, Clock, CheckCircle2, AlertCircle, Send, ChevronLeft, RefreshCw, TrendingUp, CheckCircle } from 'lucide-react';
+import { HelpCircle, X, Bug, MessageSquare, Ticket, Clock, CheckCircle2, AlertCircle, Send, ChevronLeft, RefreshCw, TrendingUp } from 'lucide-react';
 import { FeedbackModal } from '../modals/FeedbackModal';
 import { SupportTicket, SupportTicketStatus, SupportTicketComment, Feedback, FeedbackComment } from '../../types';
 import { supportService } from '../../services/supportService';

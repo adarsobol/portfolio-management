@@ -3,7 +3,7 @@
  * Handles support tickets and feedback
  */
 
-import { SupportTicket, Feedback, FeedbackComment, SupportTicketStatus, SupportTicketPriority } from '../types';
+import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority } from '../types';
 import { API_ENDPOINT } from '../config';
 import { authService } from './authService';
 

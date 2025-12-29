@@ -216,6 +216,20 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
               <option value={SupportTicketStatus.CLOSED}>Closed</option>
             </select>
           )}
+          {activeTab === 'feedback' && (
+            <select
+              value={feedbackStatusFilter}
+              onChange={(e) => setFeedbackStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Statuses</option>
+              <option value="new">New</option>
+              <option value="in-progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+              <option value="duplicate">Duplicate</option>
+            </select>
+          )}
           <button
             onClick={loadData}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
