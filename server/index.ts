@@ -3671,11 +3671,13 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
     let userId: string | undefined;
     let userEmail: string | undefined;
     const token = req.headers.authorization?.replace('Bearer ', '');
-    if (token) {
+    if (token && JWT_SECRET) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
-        userId = decoded.id;
-        userEmail = decoded.email;
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded && typeof decoded === 'object' && 'id' in decoded && 'email' in decoded) {
+          userId = decoded.id as string;
+          userEmail = decoded.email as string;
+        }
       } catch (err) {
         // Token invalid/expired, but that's okay - proceed as anonymous
         console.log('[FEEDBACK] Token verification failed, proceeding as anonymous');
