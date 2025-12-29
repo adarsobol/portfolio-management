@@ -534,10 +534,14 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
   }
 
   const authHeader = req.headers['authorization'];
+  console.log('[AUTH] Authorization header present:', !!authHeader);
+  
   const token = authHeader && authHeader.split(' ')[1];
+  console.log('[AUTH] Token extracted:', !!token, token ? `${token.substring(0, 20)}...` : 'none');
 
   if (!token) {
     // No token - proceed without user (will return empty data for protected resources)
+    console.log('[AUTH] No token provided, proceeding without user');
     next();
     return;
   }
@@ -545,10 +549,11 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
   try {
     const decoded = jwt.verify(token, EFFECTIVE_JWT_SECRET) as { email: string; name: string; role: string; id: string };
     req.user = decoded;
+    console.log('[AUTH] Token verified successfully, user:', decoded.email, 'role:', decoded.role);
     next();
-  } catch {
+  } catch (error) {
     // Invalid token - proceed without user (will return empty data)
-    console.log('[AUTH] Token verification failed, proceeding without user');
+    console.error('[AUTH] Token verification failed:', error instanceof Error ? error.message : String(error));
     next();
   }
 };

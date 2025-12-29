@@ -37,10 +37,12 @@ class SupportService {
   async getTickets(status?: SupportTicketStatus): Promise<SupportTicket[]> {
     try {
       console.log('[TICKETS GET] Fetching tickets...');
+      const token = localStorage.getItem('token');
+      console.log('[TICKETS GET] Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'none');
       const queryParams = status ? `?status=${status}` : '';
       const response = await fetch(`${API_ENDPOINT}/api/support/tickets${queryParams}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${token || ''}`,
         },
       });
 
@@ -123,9 +125,11 @@ class SupportService {
   async getFeedback(): Promise<Feedback[]> {
     try {
       console.log('[FEEDBACK GET] Fetching feedback...');
+      const token = localStorage.getItem('token');
+      console.log('[FEEDBACK GET] Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'none');
       const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${token || ''}`,
         },
       });
 
