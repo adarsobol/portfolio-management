@@ -19,7 +19,7 @@ import { isGCSEnabled, getGCSConfig, initializeGCSStorage, getGCSStorage } from 
 import { generateInitiativeId } from './idGenerator.js';
 import { initializeBackupService, getBackupService, isBackupServiceEnabled } from './backupService.js';
 import { initializeLogStorage, getLogStorage, isLogStorageEnabled } from './logStorage.js';
-import { initializeSupportStorage, getSupportStorage, isSupportStorageEnabled } from './supportStorage.js';
+import { initializeSupportStorage, getSupportStorage, isSupportStorageEnabled, memoryStorage } from './supportStorage.js';
 import { ActivityType, SupportTicketStatus, SupportTicketPriority, NotificationType } from '../src/types/index.js';
 import {
   validate,
@@ -3434,13 +3434,15 @@ app.get('/api/support/tickets', optionalAuthenticateToken, async (req: Authentic
 
     const { status } = req.query;
     const supportStorage = getSupportStorage();
+    let tickets: any[] = [];
 
-    if (!supportStorage || !supportStorage.isInitialized()) {
-      res.json({ tickets: [], message: 'Support storage not available' });
-      return;
+    if (supportStorage && supportStorage.isInitialized()) {
+      tickets = await supportStorage.getTickets(status as SupportTicketStatus | undefined);
+    } else {
+      // Use memory fallback
+      tickets = memoryStorage.getTickets(status as SupportTicketStatus | undefined);
     }
-
-    const tickets = await supportStorage.getTickets(status as SupportTicketStatus | undefined);
+    
     res.json({ tickets, count: tickets.length });
   } catch (error) {
     console.error('Error getting support tickets:', error);
@@ -3739,33 +3741,26 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
     };
 
     const supportStorage = getSupportStorage();
-    if (!supportStorage || !supportStorage.isInitialized()) {
-      console.log('[SUPPORT] Feedback submitted (storage not available, logging to console):', feedback);
-      console.log('[SUPPORT] User:', userEmail || userId || 'anonymous');
-      
-      // Broadcast feedback event via Socket.IO for real-time updates
-      io.emit('feedback:submitted', { feedback });
-      
-      // In dev mode without GCS, still return success but log to console
-      res.json({ success: true, stored: false, feedback, message: 'Feedback logged (storage not configured)' });
-      return;
-    }
-
-    const success = await supportStorage.createFeedback(feedback);
-    if (!success) {
-      console.error('[SUPPORT] Failed to store feedback in GCS:', feedback);
-      // Broadcast feedback event via Socket.IO for real-time updates
-      io.emit('feedback:submitted', { feedback });
-      // Even if storage fails, return success for better UX
-      res.json({ success: true, stored: false, feedback, message: 'Feedback received but storage failed' });
-      return;
+    let stored = false;
+    
+    if (supportStorage && supportStorage.isInitialized()) {
+      // Use GCS storage
+      stored = await supportStorage.createFeedback(feedback);
+      if (stored) {
+        console.log('[SUPPORT] Feedback stored in GCS:', feedback.id);
+      } else {
+        console.error('[SUPPORT] Failed to store feedback in GCS, using memory fallback');
+        stored = memoryStorage.createFeedback(feedback);
+      }
+    } else {
+      // Use in-memory fallback
+      stored = memoryStorage.createFeedback(feedback);
     }
     
     // Broadcast feedback event via Socket.IO for real-time updates
     io.emit('feedback:submitted', { feedback });
-    console.log('[SUPPORT] Feedback stored successfully:', feedback.id);
     
-    res.json({ success: true, stored: true, feedback });
+    res.json({ success: true, stored, feedback });
   } catch (error) {
     console.error('Error submitting feedback:', error);
     res.status(500).json({ error: String(error) });
@@ -3782,12 +3777,15 @@ app.get('/api/support/feedback', optionalAuthenticateToken, async (req: Authenti
     }
 
     const supportStorage = getSupportStorage();
-    if (!supportStorage || !supportStorage.isInitialized()) {
-      res.json({ feedback: [], message: 'Support storage not available' });
-      return;
+    let feedback: any[] = [];
+    
+    if (supportStorage && supportStorage.isInitialized()) {
+      feedback = await supportStorage.getFeedback();
+    } else {
+      // Use memory fallback
+      feedback = memoryStorage.getFeedback();
     }
-
-    const feedback = await supportStorage.getFeedback();
+    
     res.json({ feedback, count: feedback.length });
   } catch (error) {
     console.error('Error getting feedback:', error);

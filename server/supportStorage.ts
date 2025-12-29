@@ -285,3 +285,68 @@ export function isSupportStorageEnabled(): boolean {
   return supportStorageInstance?.isInitialized() ?? false;
 }
 
+// ============================================
+// IN-MEMORY FALLBACK STORAGE
+// ============================================
+// Used when GCS is not configured - stores in memory for session duration
+const inMemoryFeedback: Feedback[] = [];
+const inMemoryTickets: SupportTicket[] = [];
+
+export const memoryStorage = {
+  createFeedback: (feedback: Feedback): boolean => {
+    inMemoryFeedback.push(feedback);
+    console.log('[MEMORY] Feedback stored in memory:', feedback.id);
+    return true;
+  },
+  
+  getFeedback: (): Feedback[] => {
+    return [...inMemoryFeedback].sort((a, b) => 
+      new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+  },
+  
+  createTicket: (ticket: SupportTicket): boolean => {
+    inMemoryTickets.push(ticket);
+    console.log('[MEMORY] Ticket stored in memory:', ticket.id);
+    return true;
+  },
+  
+  getTickets: (status?: SupportTicketStatus): SupportTicket[] => {
+    let tickets = [...inMemoryTickets];
+    if (status) {
+      tickets = tickets.filter(t => t.status === status);
+    }
+    return tickets.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  },
+  
+  getTicketById: (id: string): SupportTicket | null => {
+    return inMemoryTickets.find(t => t.id === id) || null;
+  },
+  
+  updateTicket: (ticketId: string, updates: Partial<SupportTicket>): boolean => {
+    const index = inMemoryTickets.findIndex(t => t.id === ticketId);
+    if (index === -1) return false;
+    inMemoryTickets[index] = {
+      ...inMemoryTickets[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    return true;
+  },
+  
+  addComment: (ticketId: string, comment: SupportTicketComment): boolean => {
+    const index = inMemoryTickets.findIndex(t => t.id === ticketId);
+    if (index === -1) return false;
+    if (!inMemoryTickets[index].comments) {
+      inMemoryTickets[index].comments = [];
+    }
+    inMemoryTickets[index].comments!.push(comment);
+    inMemoryTickets[index].updatedAt = new Date().toISOString();
+    return true;
+  },
+  
+  isInitialized: (): boolean => true,
+};
+
