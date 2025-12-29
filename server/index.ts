@@ -3452,6 +3452,8 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
     const gcs = getGCSStorage();
     let adminUserId: string | null = null;
     
+    console.log('[NOTIFICATION] Creating notification for admin, ticket:', ticket.id, 'title:', title);
+    
     if (gcs) {
       // Find admin user ID by email
       const doc = await getDoc();
@@ -3462,21 +3464,39 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
           const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
           if (adminRow) {
             adminUserId = adminRow.get('id');
+            console.log('[NOTIFICATION] Found admin user ID:', adminUserId, 'for email:', ADMIN_EMAIL);
             if (adminUserId) {
               adminNotification.userId = adminUserId; // Update notification with actual user ID
-              await gcs.addNotification(adminUserId, adminNotification);
+              const stored = await gcs.addNotification(adminUserId, adminNotification);
+              console.log('[NOTIFICATION] Stored notification for admin:', stored, 'notification ID:', adminNotification.id);
               io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+              console.log('[NOTIFICATION] Emitted Socket.IO notification to userId:', adminUserId);
             }
+          } else {
+            console.warn('[NOTIFICATION] Admin row not found in Users sheet for email:', ADMIN_EMAIL);
           }
+        } else {
+          console.warn('[NOTIFICATION] Users sheet not found');
         }
+      } else {
+        console.warn('[NOTIFICATION] Could not get Google Sheets doc');
       }
+    } else {
+      console.warn('[NOTIFICATION] GCS storage not available');
     }
     
     // Always emit via Socket.IO (even if GCS lookup failed, try to find admin user ID from request context)
     if (!adminUserId) {
-      // Try to get admin user ID from the authenticated request if available
-      // For now, emit to all connected clients and let frontend filter
+      // If we couldn't find admin user ID, still emit but log a warning
+      console.warn('[NOTIFICATION] Admin user ID not found, emitting with email:', ADMIN_EMAIL);
+      // Store notification with email as userId (fallback)
+      if (gcs) {
+        adminNotification.userId = ADMIN_EMAIL;
+        const stored = await gcs.addNotification(ADMIN_EMAIL, adminNotification);
+        console.log('[NOTIFICATION] Stored notification with email as userId:', stored);
+      }
       io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
+      console.log('[NOTIFICATION] Emitted Socket.IO notification to email:', ADMIN_EMAIL);
     }
 
     res.json({ success, ticket });
