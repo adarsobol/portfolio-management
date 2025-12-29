@@ -232,13 +232,17 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
                       <span>Submitted by: {item.submittedByEmail}</span>
                       <span>Submitted: {formatDate(item.submittedAt)}</span>
                     </div>
-                    {item.metadata && Object.keys(item.metadata).length > 0 && (
-                      <div className="mt-2 p-2 bg-slate-50 rounded text-xs">
-                        <span className="font-semibold text-slate-700">Metadata:</span>
-                        {item.metadata.browser && <div className="text-slate-600">Browser: {String(item.metadata.browser as any)}</div>}
-                        {item.metadata.url && <div className="text-slate-600">URL: {String(item.metadata.url as any)}</div>}
-                      </div>
-                    )}
+                    {item.metadata && Object.keys(item.metadata).length > 0 && (() => {
+                      const browser = item.metadata?.browser as string | undefined;
+                      const url = item.metadata?.url as string | undefined;
+                      return (
+                        <div className="mt-2 p-2 bg-slate-50 rounded text-xs">
+                          <span className="font-semibold text-slate-700">Metadata:</span>
+                          {browser && <div className="text-slate-600">Browser: {browser}</div>}
+                          {url && <div className="text-slate-600">URL: {url}</div>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
