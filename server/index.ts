@@ -535,9 +535,11 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
 
   const authHeader = req.headers['authorization'];
   console.log('[AUTH] Authorization header present:', !!authHeader);
+  console.log('[AUTH] Authorization header value (first 30 chars):', authHeader ? `${authHeader.substring(0, 30)}...` : 'none');
   
   const token = authHeader && authHeader.split(' ')[1];
   console.log('[AUTH] Token extracted:', !!token, token ? `${token.substring(0, 20)}...` : 'none');
+  console.log('[AUTH] Split result:', authHeader ? authHeader.split(' ') : 'no header');
 
   if (!token) {
     // No token - proceed without user (will return empty data for protected resources)
