@@ -36,6 +36,7 @@ class SupportService {
 
   async getTickets(status?: SupportTicketStatus): Promise<SupportTicket[]> {
     try {
+      console.log('[TICKETS GET] Fetching tickets...');
       const queryParams = status ? `?status=${status}` : '';
       const response = await fetch(`${API_ENDPOINT}/api/support/tickets${queryParams}`, {
         headers: {
@@ -43,11 +44,13 @@ class SupportService {
         },
       });
 
+      console.log('[TICKETS GET] Response status:', response.status);
       if (!response.ok) {
         throw new Error(`Failed to fetch tickets: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('[TICKETS GET] Response data:', data);
       return data.tickets || [];
     } catch (error) {
       console.error('Error fetching support tickets:', error);
@@ -119,17 +122,20 @@ class SupportService {
 
   async getFeedback(): Promise<Feedback[]> {
     try {
+      console.log('[FEEDBACK GET] Fetching feedback...');
       const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
         },
       });
 
+      console.log('[FEEDBACK GET] Response status:', response.status);
       if (!response.ok) {
         throw new Error(`Failed to fetch feedback: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('[FEEDBACK GET] Response data:', data);
       return data.feedback || [];
     } catch (error) {
       console.error('Error fetching feedback:', error);
