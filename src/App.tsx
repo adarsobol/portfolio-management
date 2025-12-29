@@ -127,13 +127,33 @@ export default function App() {
 
   // Load notifications from server
   useEffect(() => {
-    if (!isAuthenticated || !currentUser?.id || notificationsLoaded) return;
+    console.log('[APP] Notification useEffect triggered:', {
+      isAuthenticated,
+      currentUserId: currentUser?.id,
+      currentUserEmail: currentUser?.email,
+      notificationsLoaded
+    });
+    
+    if (!isAuthenticated || !currentUser?.id || notificationsLoaded) {
+      console.log('[APP] Skipping notification load:', {
+        reason: !isAuthenticated ? 'not authenticated' : !currentUser?.id ? 'no user id' : 'already loaded'
+      });
+      return;
+    }
 
     const loadNotifications = async () => {
       try {
         console.log('[APP] Loading notifications for user:', currentUser.id, 'email:', currentUser.email);
         const serverNotifications = await notificationService.fetchNotifications(currentUser.id);
         console.log('[APP] Loaded notifications from server:', serverNotifications.length, 'notifications');
+        if (serverNotifications.length > 0) {
+          console.log('[APP] Notification details:', serverNotifications.map(n => ({
+            id: n.id,
+            title: n.title,
+            userId: n.userId,
+            type: n.type
+          })));
+        }
         setNotifications(serverNotifications);
       } catch (error) {
         console.error('[APP] Failed to load notifications:', error);

@@ -16,7 +16,11 @@ class NotificationService {
    */
   async fetchNotifications(userId: string): Promise<Notification[]> {
     try {
-      const response = await fetch(`${API_ENDPOINT}/api/notifications/${userId}`, {
+      console.log('[NOTIFICATION SERVICE] Fetching notifications for userId:', userId);
+      const url = `${API_ENDPOINT}/api/notifications/${userId}`;
+      console.log('[NOTIFICATION SERVICE] URL:', url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -24,8 +28,11 @@ class NotificationService {
         }
       });
 
+      console.log('[NOTIFICATION SERVICE] Response status:', response.status, response.statusText);
+
       if (!response.ok) {
         const error = await response.json();
+        console.error('[NOTIFICATION SERVICE] Error response:', error);
         logger.error('Failed to fetch notifications', { 
           context: 'NotificationService.fetchNotifications', 
           error: new Error(error.error || 'Unknown error') 
@@ -34,8 +41,11 @@ class NotificationService {
       }
 
       const data = await response.json();
+      console.log('[NOTIFICATION SERVICE] Received data:', data);
+      console.log('[NOTIFICATION SERVICE] Notifications count:', data.notifications?.length || 0);
       return data.notifications || [];
     } catch (error) {
+      console.error('[NOTIFICATION SERVICE] Exception:', error);
       logger.error('Error fetching notifications', { 
         context: 'NotificationService.fetchNotifications', 
         error: error instanceof Error ? error : new Error(String(error)) 

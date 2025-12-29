@@ -3761,6 +3761,7 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
         };
 
         // Find admin user ID and send notification
+        console.log('[NOTIFICATION] Creating notification for admin comment, ticket:', id, 'title:', ticket.title);
         const gcs = getGCSStorage();
         let adminUserId: string | null = null;
         
@@ -3773,14 +3774,25 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
               const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
               if (adminRow) {
                 adminUserId = adminRow.get('id');
+                console.log('[NOTIFICATION] Found admin user ID for comment:', adminUserId, 'for email:', ADMIN_EMAIL);
                 if (adminUserId) {
                   adminNotification.userId = adminUserId; // Update notification with actual user ID
-                  await gcs.addNotification(adminUserId, adminNotification);
+                  const stored = await gcs.addNotification(adminUserId, adminNotification);
+                  console.log('[NOTIFICATION] Stored comment notification for admin:', stored, 'notification ID:', adminNotification.id);
                   io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+                  console.log('[NOTIFICATION] Emitted Socket.IO comment notification to userId:', adminUserId);
                 }
+              } else {
+                console.warn('[NOTIFICATION] Admin row not found for comment notification');
               }
+            } else {
+              console.warn('[NOTIFICATION] Users sheet not found for comment notification');
             }
+          } else {
+            console.warn('[NOTIFICATION] Could not get Google Sheets doc for comment notification');
           }
+        } else {
+          console.warn('[NOTIFICATION] GCS storage not available for comment notification');
         }
         
         // Always emit via Socket.IO (even if GCS lookup failed)
@@ -3788,12 +3800,13 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
           // If we couldn't find admin user ID, still emit but log a warning
           console.warn('[NOTIFICATION] Admin user ID not found for comment notification, emitting with email:', ADMIN_EMAIL);
           // Store notification with email as userId (fallback)
-          const gcs = getGCSStorage();
           if (gcs) {
             adminNotification.userId = ADMIN_EMAIL;
-            await gcs.addNotification(ADMIN_EMAIL, adminNotification);
+            const stored = await gcs.addNotification(ADMIN_EMAIL, adminNotification);
+            console.log('[NOTIFICATION] Stored comment notification with email as userId:', stored);
           }
           io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
+          console.log('[NOTIFICATION] Emitted Socket.IO comment notification to email:', ADMIN_EMAIL);
         }
       }
     }
