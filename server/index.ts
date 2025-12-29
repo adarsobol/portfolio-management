@@ -103,23 +103,35 @@ if (STORAGE_BACKEND === 'gcs') {
 
 // Always try to initialize support storage with GCS if available (even if main backend is Sheets)
 // This ensures support tickets/feedback persist across Cloud Run instances
+console.log('[INIT] Checking if GCS is enabled for support storage...');
+console.log('[INIT] isGCSEnabled():', isGCSEnabled());
+
 if (isGCSEnabled()) {
   const gcsConfig = getGCSConfig();
+  console.log('[INIT] GCS config:', gcsConfig ? {
+    bucketName: gcsConfig.bucketName,
+    hasProjectId: !!gcsConfig.projectId,
+    hasKeyFilename: !!gcsConfig.keyFilename
+  } : 'null');
+  
   if (gcsConfig) {
     try {
-      initializeSupportStorage({
+      console.log('[INIT] Calling initializeSupportStorage...');
+      const storage = initializeSupportStorage({
         bucketName: gcsConfig.bucketName,
         projectId: gcsConfig.projectId,
         keyFilename: gcsConfig.keyFilename,
       });
-      console.log('Support Storage initialized with GCS (independent of main storage backend)');
+      console.log('[INIT] Support Storage initialized with GCS (independent of main storage backend), isInitialized:', storage.isInitialized());
     } catch (error) {
-      console.error('Failed to initialize Support Storage with GCS:', error);
-      console.log('Support Storage will use in-memory fallback');
+      console.error('[INIT] Failed to initialize Support Storage with GCS:', error);
+      console.log('[INIT] Support Storage will use in-memory fallback');
     }
+  } else {
+    console.log('[INIT] GCS config is null, Support Storage will use in-memory fallback');
   }
 } else {
-  console.log('GCS not configured, Support Storage will use in-memory fallback');
+  console.log('[INIT] GCS not enabled, Support Storage will use in-memory fallback');
 }
 
 // ============================================

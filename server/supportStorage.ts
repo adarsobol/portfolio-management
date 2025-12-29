@@ -381,11 +381,18 @@ class SupportStorageService {
 let supportStorageInstance: SupportStorageService | null = null;
 
 export function initializeSupportStorage(config: SupportStorageConfig): SupportStorageService {
+  console.log('[SUPPORT_STORAGE] initializeSupportStorage called with config:', {
+    bucketName: config.bucketName,
+    hasProjectId: !!config.projectId,
+    hasKeyFilename: !!config.keyFilename
+  });
   supportStorageInstance = new SupportStorageService(config);
+  console.log('[SUPPORT_STORAGE] Instance created, initialized:', supportStorageInstance.isInitialized());
   return supportStorageInstance;
 }
 
 export function getSupportStorage(): SupportStorageService | null {
+  console.log('[SUPPORT_STORAGE] getSupportStorage called, instance exists:', !!supportStorageInstance);
   return supportStorageInstance;
 }
 
