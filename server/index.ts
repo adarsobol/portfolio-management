@@ -3664,12 +3664,25 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
   }
 });
 
-// POST /api/support/feedback - Submit feedback
-app.post('/api/support/feedback', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+// POST /api/support/feedback - Submit feedback (public endpoint - no auth required)
+app.post('/api/support/feedback', async (req: Request, res: Response) => {
   try {
+    // Try to get user info from token if provided, but don't require it
+    let userId: string | undefined;
+    let userEmail: string | undefined;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
+        userId = decoded.id;
+        userEmail = decoded.email;
+      } catch (err) {
+        // Token invalid/expired, but that's okay - proceed as anonymous
+        console.log('[FEEDBACK] Token verification failed, proceeding as anonymous');
+      }
+    }
+
     const { type, title, description, metadata, screenshot } = req.body;
-    const userId = req.user?.id;
-    const userEmail = req.user?.email;
 
     if (!type || !title || !description) {
       res.status(400).json({ error: 'Type, title, and description are required' });
@@ -3681,8 +3694,8 @@ app.post('/api/support/feedback', authenticateToken, async (req: AuthenticatedRe
       type,
       title,
       description,
-      submittedBy: userId || 'unknown',
-      submittedByEmail: userEmail || 'unknown',
+      submittedBy: userId || 'anonymous',
+      submittedByEmail: userEmail || 'anonymous',
       submittedAt: new Date().toISOString(),
       status: 'new' as const,
       metadata: metadata || {},
@@ -3692,7 +3705,7 @@ app.post('/api/support/feedback', authenticateToken, async (req: AuthenticatedRe
     const supportStorage = getSupportStorage();
     if (!supportStorage || !supportStorage.isInitialized()) {
       console.log('[SUPPORT] Feedback submitted (storage not available, logging to console):', feedback);
-      console.log('[SUPPORT] User:', userEmail || userId);
+      console.log('[SUPPORT] User:', userEmail || userId || 'anonymous');
       // In dev mode without GCS, still return success but log to console
       res.json({ success: true, stored: false, feedback, message: 'Feedback logged (storage not configured)' });
       return;
