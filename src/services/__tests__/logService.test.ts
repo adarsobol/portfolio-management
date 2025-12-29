@@ -202,6 +202,10 @@ describe('LogService', () => {
       );
       expect(queueCall).toBeDefined();
       
+      if (!queueCall) {
+        throw new Error('queueCall should be defined');
+      }
+      
       const queue = JSON.parse(queueCall[1]);
       expect(queue.length).toBeGreaterThanOrEqual(1);
       expect(queue[0].data.message).toBe('Offline error');
