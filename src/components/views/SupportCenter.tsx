@@ -235,8 +235,8 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
                     {item.metadata && Object.keys(item.metadata).length > 0 && (
                       <div className="mt-2 p-2 bg-slate-50 rounded text-xs">
                         <span className="font-semibold text-slate-700">Metadata:</span>
-                        {item.metadata.browser && <div className="text-slate-600">Browser: {item.metadata.browser}</div>}
-                        {item.metadata.url && <div className="text-slate-600">URL: {item.metadata.url}</div>}
+                        {item.metadata.browser && <div className="text-slate-600">Browser: {String(item.metadata.browser)}</div>}
+                        {item.metadata.url && <div className="text-slate-600">URL: {String(item.metadata.url)}</div>}
                       </div>
                     )}
                   </div>
