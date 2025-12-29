@@ -4,7 +4,7 @@
  */
 
 import { Storage } from '@google-cloud/storage';
-import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority, SupportTicketComment } from '../src/types/index.js';
+import { SupportTicket, Feedback, FeedbackComment, SupportTicketStatus, SupportTicketPriority, SupportTicketComment } from '../src/types/index.js';
 
 interface SupportStorageConfig {
   bucketName: string;
@@ -212,6 +212,77 @@ class SupportStorageService {
     }
   }
 
+  async updateFeedback(feedbackId: string, updates: Partial<Feedback>): Promise<boolean> {
+    if (!this.initialized || !this.storage) {
+      return false;
+    }
+
+    try {
+      const bucket = this.storage.bucket(this.bucketName);
+      const filePath = this.getFeedbackPath();
+      const file = bucket.file(filePath);
+
+      const [contents] = await file.download();
+      const feedbackList: Feedback[] = JSON.parse(contents.toString());
+
+      const index = feedbackList.findIndex(f => f.id === feedbackId);
+      if (index === -1) {
+        return false;
+      }
+
+      feedbackList[index] = {
+        ...feedbackList[index],
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await file.save(JSON.stringify(feedbackList, null, 2), {
+        contentType: 'application/json',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update feedback:', error);
+      return false;
+    }
+  }
+
+  async addFeedbackComment(feedbackId: string, comment: FeedbackComment): Promise<boolean> {
+    if (!this.initialized || !this.storage) {
+      return false;
+    }
+
+    try {
+      const bucket = this.storage.bucket(this.bucketName);
+      const filePath = this.getFeedbackPath();
+      const file = bucket.file(filePath);
+
+      const [contents] = await file.download();
+      const feedbackList: Feedback[] = JSON.parse(contents.toString());
+
+      const index = feedbackList.findIndex(f => f.id === feedbackId);
+      if (index === -1) {
+        return false;
+      }
+
+      if (!feedbackList[index].comments) {
+        feedbackList[index].comments = [];
+      }
+
+      feedbackList[index].comments!.push(comment);
+      feedbackList[index].updatedAt = new Date().toISOString();
+
+      await file.save(JSON.stringify(feedbackList, null, 2), {
+        contentType: 'application/json',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to add comment to feedback:', error);
+      return false;
+    }
+  }
+
   async addComment(ticketId: string, comment: SupportTicketComment): Promise<boolean> {
     if (!this.initialized || !this.storage) {
       return false;
@@ -303,6 +374,28 @@ export const memoryStorage = {
     return [...inMemoryFeedback].sort((a, b) => 
       new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     );
+  },
+  
+  updateFeedback: (feedbackId: string, updates: Partial<Feedback>): boolean => {
+    const index = inMemoryFeedback.findIndex(f => f.id === feedbackId);
+    if (index === -1) return false;
+    inMemoryFeedback[index] = {
+      ...inMemoryFeedback[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    return true;
+  },
+  
+  addFeedbackComment: (feedbackId: string, comment: FeedbackComment): boolean => {
+    const index = inMemoryFeedback.findIndex(f => f.id === feedbackId);
+    if (index === -1) return false;
+    if (!inMemoryFeedback[index].comments) {
+      inMemoryFeedback[index].comments = [];
+    }
+    inMemoryFeedback[index].comments!.push(comment);
+    inMemoryFeedback[index].updatedAt = new Date().toISOString();
+    return true;
   },
   
   createTicket: (ticket: SupportTicket): boolean => {

@@ -20,6 +20,7 @@ import { generateInitiativeId } from './idGenerator.js';
 import { initializeBackupService, getBackupService, isBackupServiceEnabled } from './backupService.js';
 import { initializeLogStorage, getLogStorage, isLogStorageEnabled } from './logStorage.js';
 import { initializeSupportStorage, getSupportStorage, isSupportStorageEnabled, memoryStorage } from './supportStorage.js';
+import { FeedbackComment } from '../src/types/index.js';
 import { ActivityType, SupportTicketStatus, SupportTicketPriority, NotificationType } from '../src/types/index.js';
 import {
   validate,
@@ -3805,18 +3806,11 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/support/feedback - Get feedback (admin only, returns empty if not admin)
+// GET /api/support/feedback - Get feedback (admins see all, users see their own)
 app.get('/api/support/feedback', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     console.log('[FEEDBACK GET] User:', req.user?.email, 'Role:', req.user?.role);
     
-    // Only admins can view feedback - return empty for non-admins (no error)
-    if (req.user?.role !== 'Admin') {
-      console.log('[FEEDBACK GET] Not admin, returning empty');
-      res.json({ feedback: [], message: 'Admin access required to view feedback' });
-      return;
-    }
-
     const supportStorage = getSupportStorage();
     let feedback: any[] = [];
     
@@ -3829,9 +3823,171 @@ app.get('/api/support/feedback', optionalAuthenticateToken, async (req: Authenti
       console.log('[FEEDBACK GET] From memory:', feedback.length, 'items');
     }
     
+    // Filter feedback based on user role
+    if (req.user?.role === 'Admin') {
+      // Admins see all feedback
+      console.log('[FEEDBACK GET] Admin access - returning all feedback');
+    } else if (req.user?.id || req.user?.email) {
+      // Non-admins can only see their own feedback
+      const userId = req.user.id;
+      const userEmail = req.user.email;
+      feedback = feedback.filter(f => 
+        f.submittedBy === userId || 
+        f.submittedByEmail === userEmail
+      );
+      console.log('[FEEDBACK GET] User access - returning', feedback.length, 'items for', userEmail);
+    } else {
+      // No user info - return empty
+      console.log('[FEEDBACK GET] No user info - returning empty');
+      feedback = [];
+    }
+    
     res.json({ feedback, count: feedback.length });
   } catch (error) {
     console.error('Error getting feedback:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// PATCH /api/support/feedback/:id - Update feedback status (admin or owner)
+app.patch('/api/support/feedback/:id', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, assignedTo, assignedToEmail } = req.body;
+
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    let feedback: any = null;
+
+    // Get the feedback to check ownership
+    if (supportStorage && supportStorage.isInitialized()) {
+      const allFeedback = await supportStorage.getFeedback();
+      feedback = allFeedback.find(f => f.id === id);
+    } else {
+      const allFeedback = memoryStorage.getFeedback();
+      feedback = allFeedback.find(f => f.id === id);
+    }
+
+    if (!feedback) {
+      res.status(404).json({ error: 'Feedback not found' });
+      return;
+    }
+
+    // Check permissions: admin can update any, users can only update their own
+    const isOwner = feedback.submittedBy === req.user.id || feedback.submittedByEmail === req.user.email;
+    const isAdmin = req.user.role === 'Admin';
+
+    if (!isAdmin && !isOwner) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Users can only update status to 'resolved' or 'closed', admins can set any status
+    const updates: any = { updatedAt: new Date().toISOString() };
+    if (status) {
+      if (isAdmin || (isOwner && (status === 'resolved' || status === 'closed'))) {
+        updates.status = status;
+      } else {
+        res.status(403).json({ error: 'Users can only mark feedback as resolved or closed' });
+        return;
+      }
+    }
+    if (assignedTo && isAdmin) {
+      updates.assignedTo = assignedTo;
+    }
+    if (assignedToEmail && isAdmin) {
+      updates.assignedToEmail = assignedToEmail;
+    }
+
+    let success = false;
+    if (supportStorage && supportStorage.isInitialized()) {
+      success = await supportStorage.updateFeedback(id, updates);
+    } else {
+      success = memoryStorage.updateFeedback(id, updates);
+    }
+
+    if (!success) {
+      res.status(500).json({ error: 'Failed to update feedback' });
+      return;
+    }
+
+    res.json({ success: true, feedback: { ...feedback, ...updates } });
+  } catch (error) {
+    console.error('Error updating feedback:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// POST /api/support/feedback/:id/comments - Add comment to feedback
+app.post('/api/support/feedback/:id/comments', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (!content || !content.trim()) {
+      res.status(400).json({ error: 'Comment content is required' });
+      return;
+    }
+
+    const supportStorage = getSupportStorage();
+    let feedback: any = null;
+
+    // Get the feedback to check ownership
+    if (supportStorage && supportStorage.isInitialized()) {
+      const allFeedback = await supportStorage.getFeedback();
+      feedback = allFeedback.find(f => f.id === id);
+    } else {
+      const allFeedback = memoryStorage.getFeedback();
+      feedback = allFeedback.find(f => f.id === id);
+    }
+
+    if (!feedback) {
+      res.status(404).json({ error: 'Feedback not found' });
+      return;
+    }
+
+    // Check permissions: admin can comment on any, users can only comment on their own
+    const isOwner = feedback.submittedBy === req.user.id || feedback.submittedByEmail === req.user.email;
+    const isAdmin = req.user.role === 'Admin';
+
+    if (!isAdmin && !isOwner) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const comment: FeedbackComment = {
+      id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      content: content.trim(),
+      authorId: req.user.id,
+      authorEmail: req.user.email,
+      timestamp: new Date().toISOString(),
+      isAdmin: isAdmin,
+    };
+
+    let success = false;
+    if (supportStorage && supportStorage.isInitialized()) {
+      success = await supportStorage.addFeedbackComment(id, comment);
+    } else {
+      success = memoryStorage.addFeedbackComment(id, comment);
+    }
+
+    if (!success) {
+      res.status(500).json({ error: 'Failed to add comment' });
+      return;
+    }
+
+    res.json({ success: true, comment });
+  } catch (error) {
+    console.error('Error adding comment to feedback:', error);
     res.status(500).json({ error: String(error) });
   }
 });

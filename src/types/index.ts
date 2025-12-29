@@ -521,18 +521,31 @@ export interface SupportTicketComment {
   isInternal?: boolean; // Internal admin notes
 }
 
+export interface FeedbackComment {
+  id: string;
+  content: string;
+  authorId: string;
+  authorEmail: string;
+  timestamp: string; // ISO String
+  isAdmin: boolean;
+}
+
 export interface Feedback {
   id: string;
-  type: 'bug' | 'feature' | 'improvement' | 'other';
+  type: 'bug' | 'improvement';
   title: string;
   description: string;
   submittedBy: string;
   submittedByEmail: string;
   submittedAt: string; // ISO String
-  status: 'new' | 'reviewed' | 'planned' | 'completed';
+  status: 'new' | 'in-progress' | 'resolved' | 'closed' | 'duplicate';
   priority?: SupportTicketPriority;
   metadata?: Record<string, unknown>;
   screenshot?: string; // Base64 or URL
+  comments?: FeedbackComment[];
+  assignedTo?: string;
+  assignedToEmail?: string;
+  updatedAt?: string; // ISO String
 }
 
 export interface BugReport extends Feedback {
@@ -544,6 +557,7 @@ export interface BugReport extends Feedback {
   os?: string;
   url?: string;
   consoleErrors?: string[];
+  // These fields are now in metadata, but kept for backward compatibility
 }
 
 // ============================================

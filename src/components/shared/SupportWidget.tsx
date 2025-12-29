@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, X, Bug, MessageSquare, Ticket, Clock, CheckCircle2, AlertCircle, Send, ChevronLeft, RefreshCw } from 'lucide-react';
+import { HelpCircle, X, Bug, MessageSquare, Ticket, Clock, CheckCircle2, AlertCircle, Send, ChevronLeft, RefreshCw, TrendingUp, CheckCircle } from 'lucide-react';
 import { FeedbackModal } from '../modals/FeedbackModal';
-import { SupportTicket, SupportTicketStatus, SupportTicketComment } from '../../types';
+import { SupportTicket, SupportTicketStatus, SupportTicketComment, Feedback, FeedbackComment } from '../../types';
 import { supportService } from '../../services/supportService';
 
-type WidgetView = 'menu' | 'my-tickets' | 'ticket-detail';
+type WidgetView = 'menu' | 'my-tickets' | 'ticket-detail' | 'my-feedback' | 'feedback-detail';
 
 export const SupportWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,10 +14,14 @@ export const SupportWidget: React.FC = () => {
   
   // My tickets state
   const [myTickets, setMyTickets] = useState<SupportTicket[]>([]);
+  const [myFeedback, setMyFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [newFeedbackComment, setNewFeedbackComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [submittingFeedbackComment, setSubmittingFeedbackComment] = useState(false);
 
   const loadMyTickets = async () => {
     setLoading(true);
@@ -31,9 +35,23 @@ export const SupportWidget: React.FC = () => {
     }
   };
 
+  const loadMyFeedback = async () => {
+    setLoading(true);
+    try {
+      const feedback = await supportService.getMyFeedback();
+      setMyFeedback(feedback);
+    } catch (error) {
+      console.error('Failed to load feedback:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (view === 'my-tickets') {
       loadMyTickets();
+    } else if (view === 'my-feedback') {
+      loadMyFeedback();
     }
   }, [view]);
 
@@ -41,7 +59,9 @@ export const SupportWidget: React.FC = () => {
     setIsOpen(false);
     setView('menu');
     setSelectedTicket(null);
+    setSelectedFeedback(null);
     setNewComment('');
+    setNewFeedbackComment('');
   };
 
   const handleOpenBugReport = () => {
@@ -112,6 +132,46 @@ export const SupportWidget: React.FC = () => {
     }
   };
 
+  const getFeedbackStatusColor = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'bg-blue-100 text-blue-700';
+      case 'in-progress':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'resolved':
+        return 'bg-green-100 text-green-700';
+      case 'closed':
+        return 'bg-slate-100 text-slate-700';
+      case 'duplicate':
+        return 'bg-orange-100 text-orange-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
+
+  const handleAddFeedbackComment = async () => {
+    if (!selectedFeedback || !newFeedbackComment.trim()) return;
+
+    setSubmittingFeedbackComment(true);
+    try {
+      const success = await supportService.addFeedbackComment(selectedFeedback.id, newFeedbackComment.trim());
+      if (success) {
+        setNewFeedbackComment('');
+        await loadMyFeedback();
+        // Reload the selected feedback from the updated list
+        const updatedFeedbackList = await supportService.getMyFeedback();
+        const updatedFeedback = updatedFeedbackList.find(f => f.id === selectedFeedback.id);
+        if (updatedFeedback) {
+          setSelectedFeedback(updatedFeedback);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to add feedback comment:', error);
+    } finally {
+      setSubmittingFeedbackComment(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -157,6 +217,8 @@ export const SupportWidget: React.FC = () => {
               {view === 'menu' && 'Need Help?'}
               {view === 'my-tickets' && 'My Tickets'}
               {view === 'ticket-detail' && 'Ticket Details'}
+              {view === 'my-feedback' && 'My Feedback'}
+              {view === 'feedback-detail' && 'Feedback Details'}
             </h3>
             <button
               onClick={handleClose}
@@ -198,6 +260,16 @@ export const SupportWidget: React.FC = () => {
                   <div>
                     <div className="font-medium text-slate-900">My Tickets</div>
                     <div className="text-xs text-slate-500">View your submitted tickets</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setView('my-feedback')}
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <TrendingUp className="w-5 h-5 text-green-500" />
+                  <div>
+                    <div className="font-medium text-slate-900">My Feedback</div>
+                    <div className="text-xs text-slate-500">View your feedback submissions</div>
                   </div>
                 </button>
               </div>
@@ -309,6 +381,144 @@ export const SupportWidget: React.FC = () => {
                       <button
                         onClick={handleAddComment}
                         disabled={submittingComment || !newComment.trim()}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {view === 'my-feedback' && (
+              <div className="p-2">
+                <div className="flex items-center justify-between mb-2 px-2">
+                  <span className="text-xs text-slate-500">{myFeedback.length} feedback item(s)</span>
+                  <button
+                    onClick={loadMyFeedback}
+                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                  </button>
+                </div>
+                {loading ? (
+                  <div className="text-center py-8 text-slate-400">Loading...</div>
+                ) : myFeedback.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                    <p className="text-sm">No feedback yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {myFeedback.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setSelectedFeedback(item);
+                          setView('feedback-detail');
+                        }}
+                        className="w-full text-left p-3 bg-white border border-slate-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {item.type === 'bug' ? (
+                                <Bug className="w-4 h-4 text-red-500" />
+                              ) : (
+                                <TrendingUp className="w-4 h-4 text-blue-500" />
+                              )}
+                              <span className="text-xs font-semibold text-slate-600">{item.type}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${getFeedbackStatusColor(item.status || 'new')}`}>
+                                {item.status || 'new'}
+                              </span>
+                            </div>
+                            <div className="font-medium text-slate-900 text-sm mb-1">{item.title}</div>
+                            <div className="text-xs text-slate-500">{formatDate(item.submittedAt)}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'feedback-detail' && selectedFeedback && (
+              <div className="p-4">
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {selectedFeedback.type === 'bug' ? (
+                      <Bug className="w-5 h-5 text-red-500" />
+                    ) : (
+                      <TrendingUp className="w-5 h-5 text-blue-500" />
+                    )}
+                    <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-700">
+                      {selectedFeedback.type}
+                    </span>
+                    <span className={`text-xs px-2 py-1 rounded ${getFeedbackStatusColor(selectedFeedback.status || 'new')}`}>
+                      {selectedFeedback.status || 'new'}
+                    </span>
+                  </div>
+                  <h4 className="font-semibold text-slate-900 mb-2">{selectedFeedback.title}</h4>
+                  <p className="text-sm text-slate-600 mb-3">{selectedFeedback.description}</p>
+                  <div className="text-xs text-slate-500">
+                    Submitted: {formatDate(selectedFeedback.submittedAt)}
+                  </div>
+                  {selectedFeedback.assignedToEmail && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      Assigned to: {selectedFeedback.assignedToEmail}
+                    </div>
+                  )}
+                </div>
+
+                {/* Comments */}
+                <div className="border-t border-slate-200 pt-4">
+                  <h5 className="text-sm font-semibold text-slate-700 mb-3">Comments</h5>
+                  {selectedFeedback.comments && selectedFeedback.comments.length > 0 ? (
+                    <div className="space-y-3 mb-4">
+                      {selectedFeedback.comments.map((comment: FeedbackComment) => (
+                        <div
+                          key={comment.id}
+                          className={`p-3 rounded-lg ${
+                            comment.isAdmin
+                              ? 'bg-blue-50'
+                              : 'bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-slate-700">
+                              {comment.isAdmin ? 'Admin' : 'You'}
+                            </span>
+                            <span className="text-xs text-slate-400">{formatDate(comment.timestamp)}</span>
+                          </div>
+                          <p className="text-sm text-slate-600">{comment.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 mb-4">No comments yet</p>
+                  )}
+
+                  {/* Add Comment */}
+                  {(selectedFeedback.status !== 'closed' && selectedFeedback.status !== 'duplicate') && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newFeedbackComment}
+                        onChange={(e) => setNewFeedbackComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddFeedbackComment();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleAddFeedbackComment}
+                        disabled={submittingFeedbackComment || !newFeedbackComment.trim()}
                         className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Send className="w-4 h-4" />

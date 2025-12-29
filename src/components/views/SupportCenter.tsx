@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle, Bug, TrendingUp } from 'lucide-react';
-import { SupportTicket, SupportTicketStatus, SupportTicketComment, User as UserType, Feedback } from '../../types';
+import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle, Bug, TrendingUp, CheckCircle } from 'lucide-react';
+import { SupportTicket, SupportTicketStatus, SupportTicketComment, User as UserType, Feedback, FeedbackComment } from '../../types';
 import { supportService } from '../../services/supportService';
 
 interface SupportCenterProps {
@@ -16,13 +16,17 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | 'all'>('all');
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string | 'all'>('all');
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
   const [newComment, setNewComment] = useState<{ [ticketId: string]: string }>({});
+  const [newFeedbackComment, setNewFeedbackComment] = useState<{ [feedbackId: string]: string }>({});
   const [submittingComment, setSubmittingComment] = useState<string | null>(null);
+  const [submittingFeedbackComment, setSubmittingFeedbackComment] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
-  }, [statusFilter, activeTab]);
+  }, [statusFilter, feedbackStatusFilter, activeTab]);
 
   const loadData = async () => {
     setLoading(true);
@@ -120,9 +124,75 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
     }
   };
 
-  const filteredTickets = tickets;
-  const totalCount = activeTab === 'all' ? tickets.length + feedback.length :
-                     activeTab === 'tickets' ? tickets.length : feedback.length;
+  const getFeedbackStatusIcon = (status: string) => {
+    switch (status) {
+      case 'new':
+        return <AlertCircle className="w-4 h-4 text-blue-500" />;
+      case 'in-progress':
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'resolved':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'closed':
+        return <XCircle className="w-4 h-4 text-slate-500" />;
+      case 'duplicate':
+        return <MessageSquare className="w-4 h-4 text-orange-500" />;
+      default:
+        return <AlertCircle className="w-4 h-4 text-slate-500" />;
+    }
+  };
+
+  const getFeedbackStatusColor = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'bg-blue-100 text-blue-700';
+      case 'in-progress':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'resolved':
+        return 'bg-green-100 text-green-700';
+      case 'closed':
+        return 'bg-slate-100 text-slate-700';
+      case 'duplicate':
+        return 'bg-orange-100 text-orange-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
+
+  const handleFeedbackStatusChange = async (feedbackId: string, newStatus: string) => {
+    const success = await supportService.updateFeedback(feedbackId, { status: newStatus });
+    if (success) {
+      loadData();
+    }
+  };
+
+  const handleAddFeedbackComment = async (feedbackId: string) => {
+    const content = newFeedbackComment[feedbackId];
+    if (!content || content.trim() === '') return;
+
+    setSubmittingFeedbackComment(feedbackId);
+    try {
+      const success = await supportService.addFeedbackComment(feedbackId, content.trim());
+      if (success) {
+        setNewFeedbackComment({ ...newFeedbackComment, [feedbackId]: '' });
+        await loadData();
+      }
+    } catch (error) {
+      console.error('Failed to add feedback comment:', error);
+    } finally {
+      setSubmittingFeedbackComment(null);
+    }
+  };
+
+  const filteredTickets = statusFilter === 'all' 
+    ? tickets 
+    : tickets.filter(t => t.status === statusFilter);
+
+  const filteredFeedback = feedbackStatusFilter === 'all'
+    ? feedback
+    : feedback.filter(f => (f.status || 'new') === feedbackStatusFilter);
+
+  const totalCount = activeTab === 'all' ? filteredTickets.length + filteredFeedback.length :
+                     activeTab === 'tickets' ? filteredTickets.length : filteredFeedback.length;
 
   return (
     <div className="p-6 space-y-4">
@@ -205,7 +275,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
       ) : (
         <div className="space-y-2">
           {/* Feedback Items */}
-          {(activeTab === 'feedback' || activeTab === 'all') && feedback.map((item) => (
+          {(activeTab === 'feedback' || activeTab === 'all') && filteredFeedback.map((item) => (
             <div
               key={item.id}
               className={`bg-white rounded-lg shadow border-l-4 ${getFeedbackColor(item.type).split(' ').pop()}`}
@@ -221,12 +291,25 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
                       <span className="px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-700">
                         Feedback
                       </span>
+                      {getFeedbackStatusIcon(item.status || 'new')}
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getFeedbackStatusColor(item.status || 'new')}`}>
+                        {item.status || 'new'}
+                      </span>
+                      {item.comments && item.comments.length > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-slate-500">
+                          <MessageCircle className="w-3 h-3" />
+                          {item.comments.length}
+                        </span>
+                      )}
                     </div>
                     <h3 className="font-semibold text-slate-900 mb-1">{item.title}</h3>
                     <p className="text-sm text-slate-600 mb-2">{item.description}</p>
                     <div className="flex items-center gap-4 text-xs text-slate-500">
                       <span>Submitted by: {item.submittedByEmail}</span>
                       <span>Submitted: {formatDate(item.submittedAt)}</span>
+                      {item.assignedToEmail && (
+                        <span>Assigned to: {item.assignedToEmail}</span>
+                      )}
                     </div>
                     {item.metadata && Object.keys(item.metadata).length > 0 && (() => {
                       const browser = item.metadata?.browser as string | undefined;
@@ -240,8 +323,111 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
                       );
                     })()}
                   </div>
+                  <div className="flex flex-col gap-2 ml-4">
+                    {(currentUser.role === 'Admin' || item.submittedBy === currentUser.id || item.submittedByEmail === currentUser.email) && (
+                      <select
+                        value={item.status || 'new'}
+                        onChange={(e) => {
+                          // Users can only set to resolved or closed
+                          if (currentUser.role !== 'Admin' && e.target.value !== 'resolved' && e.target.value !== 'closed') {
+                            return;
+                          }
+                          handleFeedbackStatusChange(item.id, e.target.value);
+                        }}
+                        className="px-3 py-1 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
+                        disabled={currentUser.role !== 'Admin' && item.status !== 'new' && item.status !== 'in-progress'}
+                      >
+                        <option value="new">New</option>
+                        {currentUser.role === 'Admin' && <option value="in-progress">In Progress</option>}
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                        {currentUser.role === 'Admin' && <option value="duplicate">Duplicate</option>}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => setExpandedFeedbackId(expandedFeedbackId === item.id ? null : item.id)}
+                      className="flex items-center gap-1 px-3 py-1 text-xs text-slate-600 hover:text-slate-800 border border-slate-300 rounded hover:bg-slate-50"
+                    >
+                      {expandedFeedbackId === item.id ? (
+                        <>
+                          <ChevronUp className="w-3 h-3" />
+                          Hide
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-3 h-3" />
+                          Details
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {/* Expanded Section with Comments */}
+              {expandedFeedbackId === item.id && (
+                <div className="border-t border-slate-200 p-4 bg-slate-50">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4" />
+                    Comments ({item.comments?.length || 0})
+                  </h4>
+                  
+                  {/* Comment Thread */}
+                  {item.comments && item.comments.length > 0 ? (
+                    <div className="space-y-3 mb-4">
+                      {item.comments.map((comment: FeedbackComment) => (
+                        <div
+                          key={comment.id}
+                          className={`p-3 rounded-lg ${
+                            comment.isAdmin
+                              ? 'bg-blue-50 border-l-2 border-blue-300'
+                              : 'bg-white border-l-2 border-green-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-slate-700">
+                              {comment.isAdmin 
+                                ? `Admin (${comment.authorEmail})`
+                                : `User (${comment.authorEmail})`
+                              }
+                            </span>
+                            <span className="text-xs text-slate-400">{formatDate(comment.timestamp)}</span>
+                          </div>
+                          <p className="text-sm text-slate-600">{comment.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 mb-4">No comments yet</p>
+                  )}
+
+                  {/* Add Comment Form */}
+                  {(item.status !== 'closed' && item.status !== 'duplicate') && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newFeedbackComment[item.id] || ''}
+                        onChange={(e) => setNewFeedbackComment({ ...newFeedbackComment, [item.id]: e.target.value })}
+                        placeholder="Add a comment..."
+                        className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddFeedbackComment(item.id)}
+                      />
+                      <button
+                        onClick={() => handleAddFeedbackComment(item.id)}
+                        disabled={submittingFeedbackComment === item.id || !newFeedbackComment[item.id]?.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <Send className="w-4 h-4" />
+                        Send
+                      </button>
+                    </div>
+                  )}
+                  
+                  {(item.status === 'closed' || item.status === 'duplicate') && (
+                    <p className="text-xs text-slate-400 italic">This feedback is {item.status}. Reopen it to add comments.</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
 

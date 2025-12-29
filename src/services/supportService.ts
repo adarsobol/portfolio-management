@@ -3,7 +3,7 @@
  * Handles support tickets and feedback
  */
 
-import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority } from '../types';
+import { SupportTicket, Feedback, FeedbackComment, SupportTicketStatus, SupportTicketPriority } from '../types';
 import { API_ENDPOINT } from '../config';
 import { authService } from './authService';
 
@@ -212,6 +212,60 @@ class SupportService {
       console.error('Error fetching ticket:', error);
       return null;
     }
+  }
+
+  async updateFeedback(
+    feedbackId: string,
+    updates: { status?: string; assignedTo?: string; assignedToEmail?: string }
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/feedback/${feedbackId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authService.getAuthHeader(),
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update feedback: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success || false;
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      return false;
+    }
+  }
+
+  async addFeedbackComment(feedbackId: string, content: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/support/feedback/${feedbackId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authService.getAuthHeader(),
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add comment: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success || false;
+    } catch (error) {
+      console.error('Error adding feedback comment:', error);
+      return false;
+    }
+  }
+
+  async getMyFeedback(): Promise<Feedback[]> {
+    // Uses the same endpoint as getFeedback, but filters on server side
+    return this.getFeedback();
   }
 }
 
