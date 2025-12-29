@@ -131,9 +131,12 @@ export default function App() {
 
     const loadNotifications = async () => {
       try {
+        console.log('[APP] Loading notifications for user:', currentUser.id, 'email:', currentUser.email);
         const serverNotifications = await notificationService.fetchNotifications(currentUser.id);
+        console.log('[APP] Loaded notifications from server:', serverNotifications.length, 'notifications');
         setNotifications(serverNotifications);
       } catch (error) {
+        console.error('[APP] Failed to load notifications:', error);
         logger.error('Failed to load notifications from server', { 
           context: 'App.loadNotifications', 
           error: error instanceof Error ? error : new Error(String(error)) 
@@ -234,10 +237,22 @@ export default function App() {
 
       // Subscribe to real-time notifications
       const unsubNotification = realtimeService.onNotificationReceived(({ notification }) => {
+        console.log('[APP] Received notification via Socket.IO:', {
+          notificationId: notification.id,
+          notificationTitle: notification.title,
+          notificationUserId: notification.userId,
+          currentUserId: currentUser.id,
+          currentUserEmail: currentUser.email
+        });
+        
         // Add the notification to local state (it's already been filtered for current user)
         setNotifications(prev => {
           // Avoid duplicates
-          if (prev.find(n => n.id === notification.id)) return prev;
+          if (prev.find(n => n.id === notification.id)) {
+            console.log('[APP] Notification already exists, skipping:', notification.id);
+            return prev;
+          }
+          console.log('[APP] Adding notification to state, new count:', prev.length + 1);
           return [notification, ...prev];
         });
       });

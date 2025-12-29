@@ -2378,22 +2378,29 @@ app.get('/api/notifications/:userId', authenticateToken, async (req: Authenticat
 
     const gcs = getGCSStorage();
     if (gcs) {
+      console.log('[NOTIFICATION GET] Fetching notifications for userId:', userId, 'req.user.id:', req.user?.id, 'req.user.email:', req.user?.email);
+      
       // Try loading by userId first, then by email if userId is an email
       let notifications = await gcs.loadNotifications(userId);
+      console.log('[NOTIFICATION GET] Loaded', notifications.length, 'notifications by userId:', userId);
       
       // If no notifications found and userId looks like an email, try loading by user ID
       if (notifications.length === 0 && userId.includes('@') && req.user?.id) {
         notifications = await gcs.loadNotifications(req.user.id);
+        console.log('[NOTIFICATION GET] Loaded', notifications.length, 'notifications by user ID:', req.user.id);
       }
       
       // Also try loading by email if we have user email and userId is an ID
       if (notifications.length === 0 && !userId.includes('@') && req.user?.email) {
         notifications = await gcs.loadNotifications(req.user.email);
+        console.log('[NOTIFICATION GET] Loaded', notifications.length, 'notifications by email:', req.user.email);
       }
       
+      console.log('[NOTIFICATION GET] Returning', notifications.length, 'notifications');
       res.json({ notifications });
     } else {
       // Fallback: return empty array if GCS not available
+      console.warn('[NOTIFICATION GET] GCS storage not available');
       res.json({ notifications: [] });
     }
   } catch (error) {
