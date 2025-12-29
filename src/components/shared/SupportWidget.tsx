@@ -10,7 +10,7 @@ export const SupportWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<WidgetView>('menu');
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'improvement' | 'other'>('other');
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'improvement'>('improvement');
   
   // My tickets state
   const [myTickets, setMyTickets] = useState<SupportTicket[]>([]);
@@ -51,7 +51,7 @@ export const SupportWidget: React.FC = () => {
   };
 
   const handleOpenFeedback = () => {
-    setFeedbackType('feature');
+    setFeedbackType('improvement');
     setFeedbackModalOpen(true);
     handleClose();
   };
@@ -327,7 +327,7 @@ export const SupportWidget: React.FC = () => {
         isOpen={feedbackModalOpen}
         onClose={() => {
           setFeedbackModalOpen(false);
-          setFeedbackType('other');
+          setFeedbackType('improvement');
         }}
         type={feedbackType}
       />

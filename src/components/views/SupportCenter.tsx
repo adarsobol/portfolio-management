@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle, Bug, Lightbulb, Info } from 'lucide-react';
+import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle, Bug, TrendingUp } from 'lucide-react';
 import { SupportTicket, SupportTicketStatus, SupportTicketComment, User as UserType, Feedback } from '../../types';
 import { supportService } from '../../services/supportService';
 
@@ -102,12 +102,10 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
     switch (type) {
       case 'bug':
         return <Bug className="w-4 h-4 text-red-500" />;
-      case 'feature':
-        return <Lightbulb className="w-4 h-4 text-yellow-500" />;
       case 'improvement':
-        return <MessageSquare className="w-4 h-4 text-blue-500" />;
+        return <TrendingUp className="w-4 h-4 text-blue-500" />;
       default:
-        return <Info className="w-4 h-4 text-slate-500" />;
+        return <MessageSquare className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -115,8 +113,6 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
     switch (type) {
       case 'bug':
         return 'bg-red-100 text-red-700 border-red-500';
-      case 'feature':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-500';
       case 'improvement':
         return 'bg-blue-100 text-blue-700 border-blue-500';
       default:

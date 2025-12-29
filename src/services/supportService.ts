@@ -82,7 +82,7 @@ class SupportService {
   }
 
   async submitFeedback(
-    type: 'bug' | 'feature' | 'improvement' | 'other',
+    type: 'bug' | 'improvement',
     title: string,
     description: string,
     metadata?: Record<string, unknown>,

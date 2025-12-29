@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { X, Send, Bug, Lightbulb, MessageSquare, AlertCircle } from 'lucide-react';
+import { X, Send, Bug, TrendingUp } from 'lucide-react';
 import { supportService } from '../../services/supportService';
 import { useToast } from '../../contexts';
 
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  type?: 'bug' | 'feature' | 'improvement' | 'other';
+  type?: 'bug' | 'improvement';
 }
 
-export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, type: initialType = 'other' }) => {
-  const [type, setType] = useState<'bug' | 'feature' | 'improvement' | 'other'>(initialType);
+export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, type: initialType = 'improvement' }) => {
+  const [type, setType] = useState<'bug' | 'improvement'>(initialType);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [stepsToReproduce, setStepsToReproduce] = useState('');
@@ -79,12 +79,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, t
           {/* Type Selection */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
-                { value: 'bug', label: 'Bug', icon: Bug },
-                { value: 'feature', label: 'Feature', icon: Lightbulb },
-                { value: 'improvement', label: 'Improvement', icon: MessageSquare },
-                { value: 'other', label: 'Other', icon: AlertCircle },
+                { value: 'bug', label: 'Bug Report', icon: Bug },
+                { value: 'improvement', label: 'Improvement', icon: TrendingUp },
               ].map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
