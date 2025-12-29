@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle } from 'lucide-react';
-import { SupportTicket, SupportTicketStatus, SupportTicketComment, User as UserType } from '../../types';
+import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle, Bug, Lightbulb, Info } from 'lucide-react';
+import { SupportTicket, SupportTicketStatus, SupportTicketComment, User as UserType, Feedback } from '../../types';
 import { supportService } from '../../services/supportService';
 
 interface SupportCenterProps {
@@ -8,8 +8,12 @@ interface SupportCenterProps {
   users: UserType[];
 }
 
+type ViewTab = 'tickets' | 'feedback' | 'all';
+
 export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => {
+  const [activeTab, setActiveTab] = useState<ViewTab>('all');
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | 'all'>('all');
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
@@ -17,16 +21,22 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
   const [submittingComment, setSubmittingComment] = useState<string | null>(null);
 
   useEffect(() => {
-    loadTickets();
-  }, [statusFilter]);
+    loadData();
+  }, [statusFilter, activeTab]);
 
-  const loadTickets = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const allTickets = await supportService.getTickets(statusFilter === 'all' ? undefined : statusFilter);
-      setTickets(allTickets);
+      if (activeTab === 'tickets' || activeTab === 'all') {
+        const allTickets = await supportService.getTickets(statusFilter === 'all' ? undefined : statusFilter);
+        setTickets(allTickets);
+      }
+      if (activeTab === 'feedback' || activeTab === 'all') {
+        const allFeedback = await supportService.getFeedback();
+        setFeedback(allFeedback);
+      }
     } catch (error) {
-      console.error('Failed to load support tickets:', error);
+      console.error('Failed to load support data:', error);
     } finally {
       setLoading(false);
     }
@@ -35,7 +45,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
   const handleStatusChange = async (ticketId: string, newStatus: SupportTicketStatus) => {
     const success = await supportService.updateTicket(ticketId, { status: newStatus });
     if (success) {
-      loadTickets();
+      loadData();
     }
   };
 
@@ -48,7 +58,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
       const success = await supportService.addComment(ticketId, content.trim());
       if (success) {
         setNewComment({ ...newComment, [ticketId]: '' });
-        await loadTickets();
+        await loadData();
       }
     } catch (error) {
       console.error('Failed to add comment:', error);
@@ -88,7 +98,35 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getFeedbackIcon = (type: string) => {
+    switch (type) {
+      case 'bug':
+        return <Bug className="w-4 h-4 text-red-500" />;
+      case 'feature':
+        return <Lightbulb className="w-4 h-4 text-yellow-500" />;
+      case 'improvement':
+        return <MessageSquare className="w-4 h-4 text-blue-500" />;
+      default:
+        return <Info className="w-4 h-4 text-slate-500" />;
+    }
+  };
+
+  const getFeedbackColor = (type: string) => {
+    switch (type) {
+      case 'bug':
+        return 'bg-red-100 text-red-700 border-red-500';
+      case 'feature':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-500';
+      case 'improvement':
+        return 'bg-blue-100 text-blue-700 border-blue-500';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-500';
+    }
+  };
+
   const filteredTickets = tickets;
+  const totalCount = activeTab === 'all' ? tickets.length + feedback.length :
+                     activeTab === 'tickets' ? tickets.length : feedback.length;
 
   return (
     <div className="p-6 space-y-4">
@@ -96,22 +134,24 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
         <div className="flex items-center gap-3">
           <MessageSquare className="w-6 h-6 text-blue-600" />
           <h1 className="text-2xl font-bold text-slate-900">Support Center</h1>
-          <span className="text-sm text-slate-500">({filteredTickets.length} tickets)</span>
+          <span className="text-sm text-slate-500">({totalCount} items)</span>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as SupportTicketStatus | 'all')}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Statuses</option>
-            <option value={SupportTicketStatus.OPEN}>Open</option>
-            <option value={SupportTicketStatus.IN_PROGRESS}>In Progress</option>
-            <option value={SupportTicketStatus.RESOLVED}>Resolved</option>
-            <option value={SupportTicketStatus.CLOSED}>Closed</option>
-          </select>
+          {activeTab === 'tickets' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as SupportTicketStatus | 'all')}
+              className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Statuses</option>
+              <option value={SupportTicketStatus.OPEN}>Open</option>
+              <option value={SupportTicketStatus.IN_PROGRESS}>In Progress</option>
+              <option value={SupportTicketStatus.RESOLVED}>Resolved</option>
+              <option value={SupportTicketStatus.CLOSED}>Closed</option>
+            </select>
+          )}
           <button
-            onClick={loadTickets}
+            onClick={loadData}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
@@ -120,19 +160,93 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+            activeTab === 'all'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          All ({tickets.length + feedback.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('tickets')}
+          className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+            activeTab === 'tickets'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Support Tickets ({tickets.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('feedback')}
+          className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+            activeTab === 'feedback'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          Feedback ({feedback.length})
+        </button>
+      </div>
+
       {loading ? (
         <div className="text-center py-12">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-600">Loading support tickets...</p>
+          <p className="text-slate-600">Loading support data...</p>
         </div>
-      ) : filteredTickets.length === 0 ? (
+      ) : (activeTab === 'tickets' && filteredTickets.length === 0) || 
+         (activeTab === 'feedback' && feedback.length === 0) ||
+         (activeTab === 'all' && filteredTickets.length === 0 && feedback.length === 0) ? (
         <div className="text-center py-12 bg-white rounded-lg shadow">
           <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-600">No support tickets found</p>
+          <p className="text-slate-600">No {activeTab === 'all' ? 'support items' : activeTab} found</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredTickets.map((ticket) => (
+          {/* Feedback Items */}
+          {(activeTab === 'feedback' || activeTab === 'all') && feedback.map((item) => (
+            <div
+              key={item.id}
+              className={`bg-white rounded-lg shadow border-l-4 ${getFeedbackColor(item.type).split(' ').pop()}`}
+            >
+              <div className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      {getFeedbackIcon(item.type)}
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getFeedbackColor(item.type).split('border-')[0]}`}>
+                        {item.type}
+                      </span>
+                      <span className="px-2 py-1 rounded text-xs font-semibold bg-purple-100 text-purple-700">
+                        Feedback
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-slate-900 mb-1">{item.title}</h3>
+                    <p className="text-sm text-slate-600 mb-2">{item.description}</p>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span>Submitted by: {item.submittedByEmail}</span>
+                      <span>Submitted: {formatDate(item.submittedAt)}</span>
+                    </div>
+                    {item.metadata && Object.keys(item.metadata).length > 0 && (
+                      <div className="mt-2 p-2 bg-slate-50 rounded text-xs">
+                        <span className="font-semibold text-slate-700">Metadata:</span>
+                        {item.metadata.browser && <div className="text-slate-600">Browser: {item.metadata.browser}</div>}
+                        {item.metadata.url && <div className="text-slate-600">URL: {item.metadata.url}</div>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Support Tickets */}
+          {(activeTab === 'tickets' || activeTab === 'all') && filteredTickets.map((ticket) => (
             <div
               key={ticket.id}
               className="bg-white rounded-lg shadow border-l-4 border-blue-500"
