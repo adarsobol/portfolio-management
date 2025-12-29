@@ -113,7 +113,13 @@ class RealtimeService {
     // Handle real-time notifications
     this.socket.on('notification:received', (data: { userId: string; notification: Notification }) => {
       // Only trigger callback if notification is for the current user
-      if (this.currentUser && data.userId === this.currentUser.id) {
+      // Match by user ID or email (for backward compatibility)
+      if (this.currentUser && (
+        data.userId === this.currentUser.id || 
+        data.userId === this.currentUser.email ||
+        data.notification.userId === this.currentUser.id ||
+        data.notification.userId === this.currentUser.email
+      )) {
         this.notificationCallbacks.forEach(cb => cb(data));
       }
     });

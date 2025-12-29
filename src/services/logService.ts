@@ -1,18 +1,114 @@
 /**
  * Log Service
  * Sends error logs and activity logs to the backend API
+ * 
+ * Features:
+ * - Retry mechanism with exponential backoff
+ * - Offline queue with localStorage persistence
+ * - Immediate sending for critical errors
+ * - Batching for performance
  */
 
 import { ErrorLog, ActivityLog, LogSeverity, ActivityType } from '../types';
 import { API_ENDPOINT } from '../config';
+
+const OFFLINE_QUEUE_KEY = 'portfolio-offline-log-queue';
+const MAX_OFFLINE_QUEUE_SIZE = 100;
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY = 1000; // 1 second
+
+interface QueuedLog {
+  type: 'error' | 'activity';
+  data: Partial<ErrorLog> | Partial<ActivityLog>;
+  retryCount: number;
+  timestamp: string;
+}
 
 class LogService {
   private batchQueue: Array<{ type: 'error' | 'activity'; data: any }> = [];
   private batchTimeout: NodeJS.Timeout | null = null;
   private readonly BATCH_DELAY = 2000; // 2 seconds
   private readonly MAX_BATCH_SIZE = 10;
+  private isProcessingOfflineQueue = false;
+  private onlineListener: (() => void) | null = null;
 
-  private async sendErrorLog(errorLog: Partial<ErrorLog>): Promise<boolean> {
+  constructor() {
+    // Set up online listener to process offline queue when connection restored
+    if (typeof window !== 'undefined') {
+      this.onlineListener = () => this.processOfflineQueue();
+      window.addEventListener('online', this.onlineListener);
+      
+      // Process any existing offline queue on startup
+      setTimeout(() => this.processOfflineQueue(), 5000);
+    }
+  }
+
+  /**
+   * Check if browser is online
+   */
+  private isOnline(): boolean {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  }
+
+  /**
+   * Get offline queue from localStorage
+   */
+  private getOfflineQueue(): QueuedLog[] {
+    try {
+      const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Save offline queue to localStorage
+   */
+  private saveOfflineQueue(queue: QueuedLog[]): void {
+    try {
+      // Limit queue size to prevent localStorage overflow
+      const trimmedQueue = queue.slice(-MAX_OFFLINE_QUEUE_SIZE);
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(trimmedQueue));
+    } catch (error) {
+      console.warn('Failed to save offline log queue:', error);
+    }
+  }
+
+  /**
+   * Add a log to the offline queue
+   */
+  private addToOfflineQueue(log: QueuedLog): void {
+    const queue = this.getOfflineQueue();
+    queue.push(log);
+    this.saveOfflineQueue(queue);
+  }
+
+  /**
+   * Sleep for a specified duration
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Send error log with retry mechanism
+   */
+  private async sendErrorLogWithRetry(
+    errorLog: Partial<ErrorLog>,
+    retryCount = 0
+  ): Promise<boolean> {
+    // If offline, queue for later
+    if (!this.isOnline()) {
+      this.addToOfflineQueue({
+        type: 'error',
+        data: errorLog,
+        retryCount: 0,
+        timestamp: new Date().toISOString(),
+      });
+      return false;
+    }
+
     try {
       const response = await fetch(`${API_ENDPOINT}/api/logs/errors`, {
         method: 'POST',
@@ -26,24 +122,55 @@ class LogService {
           severity: errorLog.severity || 'error',
           context: errorLog.context,
           metadata: errorLog.metadata,
-          url: window.location.href,
-          userAgent: navigator.userAgent,
+          url: typeof window !== 'undefined' ? window.location.href : '',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
         }),
       });
 
       if (!response.ok) {
-        console.warn('Failed to send error log to backend:', response.statusText);
-        return false;
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       return true;
     } catch (error) {
-      console.warn('Error sending error log:', error);
+      // Retry with exponential backoff
+      if (retryCount < MAX_RETRIES) {
+        const delay = BASE_RETRY_DELAY * Math.pow(2, retryCount);
+        console.warn(`Error log send failed, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        await this.sleep(delay);
+        return this.sendErrorLogWithRetry(errorLog, retryCount + 1);
+      }
+
+      // Max retries exceeded, add to offline queue
+      console.warn('Max retries exceeded for error log, queuing for later:', error);
+      this.addToOfflineQueue({
+        type: 'error',
+        data: errorLog,
+        retryCount: MAX_RETRIES,
+        timestamp: new Date().toISOString(),
+      });
       return false;
     }
   }
 
-  private async sendActivityLog(activityLog: Partial<ActivityLog>): Promise<boolean> {
+  /**
+   * Send activity log with retry mechanism
+   */
+  private async sendActivityLogWithRetry(
+    activityLog: Partial<ActivityLog>,
+    retryCount = 0
+  ): Promise<boolean> {
+    // If offline, queue for later
+    if (!this.isOnline()) {
+      this.addToOfflineQueue({
+        type: 'activity',
+        data: activityLog,
+        retryCount: 0,
+        timestamp: new Date().toISOString(),
+      });
+      return false;
+    }
+
     try {
       const response = await fetch(`${API_ENDPOINT}/api/logs/activity`, {
         method: 'POST',
@@ -61,33 +188,103 @@ class LogService {
       });
 
       if (!response.ok) {
-        console.warn('Failed to send activity log to backend:', response.statusText);
-        return false;
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       return true;
     } catch (error) {
-      console.warn('Error sending activity log:', error);
+      // Retry with exponential backoff
+      if (retryCount < MAX_RETRIES) {
+        const delay = BASE_RETRY_DELAY * Math.pow(2, retryCount);
+        console.warn(`Activity log send failed, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        await this.sleep(delay);
+        return this.sendActivityLogWithRetry(activityLog, retryCount + 1);
+      }
+
+      // Max retries exceeded, add to offline queue
+      console.warn('Max retries exceeded for activity log, queuing for later:', error);
+      this.addToOfflineQueue({
+        type: 'activity',
+        data: activityLog,
+        retryCount: MAX_RETRIES,
+        timestamp: new Date().toISOString(),
+      });
       return false;
     }
   }
 
+  /**
+   * Process offline queue when back online
+   */
+  async processOfflineQueue(): Promise<void> {
+    if (this.isProcessingOfflineQueue || !this.isOnline()) {
+      return;
+    }
+
+    this.isProcessingOfflineQueue = true;
+    const queue = this.getOfflineQueue();
+
+    if (queue.length === 0) {
+      this.isProcessingOfflineQueue = false;
+      return;
+    }
+
+    console.info(`Processing ${queue.length} queued logs from offline storage`);
+    const failedLogs: QueuedLog[] = [];
+
+    for (const log of queue) {
+      let success = false;
+      if (log.type === 'error') {
+        success = await this.sendErrorLogWithRetry(log.data as Partial<ErrorLog>, 0);
+      } else {
+        success = await this.sendActivityLogWithRetry(log.data as Partial<ActivityLog>, 0);
+      }
+
+      if (!success) {
+        // Keep failed logs for next attempt, but increment retry count
+        log.retryCount++;
+        if (log.retryCount < MAX_RETRIES * 2) {
+          failedLogs.push(log);
+        }
+      }
+
+      // Small delay between processing to avoid overwhelming the server
+      await this.sleep(100);
+    }
+
+    // Save any remaining failed logs back to queue
+    this.saveOfflineQueue(failedLogs);
+    this.isProcessingOfflineQueue = false;
+
+    if (failedLogs.length > 0) {
+      console.warn(`${failedLogs.length} logs still failed, will retry later`);
+    } else if (queue.length > 0) {
+      console.info('All queued logs processed successfully');
+    }
+  }
+
+  /**
+   * Flush the batch queue
+   */
   private flushBatch(): void {
     if (this.batchQueue.length === 0) return;
 
     const batch = [...this.batchQueue];
     this.batchQueue = [];
 
-    // Send each log individually (could be optimized to batch on backend)
+    // Send each log with retry mechanism
     batch.forEach(({ type, data }) => {
       if (type === 'error') {
-        this.sendErrorLog(data).catch(() => {});
+        this.sendErrorLogWithRetry(data).catch(() => {});
       } else {
-        this.sendActivityLog(data).catch(() => {});
+        this.sendActivityLogWithRetry(data).catch(() => {});
       }
     });
   }
 
+  /**
+   * Log an error (batched, with retry)
+   */
   logError(
     message: string,
     options?: {
@@ -125,6 +322,39 @@ class LogService {
     }
   }
 
+  /**
+   * Log a critical error immediately (no batching, for crashes)
+   * Use this in Error Boundaries or for unrecoverable errors
+   */
+  async logCriticalError(
+    message: string,
+    options?: {
+      error?: Error;
+      context?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ): Promise<boolean> {
+    const errorLog: Partial<ErrorLog> = {
+      message,
+      stack: options?.error?.stack,
+      severity: LogSeverity.CRITICAL,
+      context: options?.context,
+      metadata: {
+        ...options?.metadata,
+        errorMessage: options?.error?.message,
+        errorName: options?.error?.name,
+        critical: true,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    // Send immediately with retry, don't batch
+    return this.sendErrorLogWithRetry(errorLog);
+  }
+
+  /**
+   * Log an activity (batched, with retry)
+   */
   logActivity(
     type: ActivityType,
     description: string,
@@ -156,6 +386,31 @@ class LogService {
         this.batchTimeout = null;
       }, this.BATCH_DELAY);
     }
+  }
+
+  /**
+   * Force flush all pending logs (useful before page unload)
+   */
+  forceFlush(): void {
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
+    this.flushBatch();
+  }
+
+  /**
+   * Get count of queued offline logs
+   */
+  getOfflineQueueCount(): number {
+    return this.getOfflineQueue().length;
+  }
+
+  /**
+   * Clear the offline queue (use with caution)
+   */
+  clearOfflineQueue(): void {
+    localStorage.removeItem(OFFLINE_QUEUE_KEY);
   }
 
   async getErrorLogs(params?: {
@@ -282,7 +537,25 @@ class LogService {
       return [];
     }
   }
+
+  /**
+   * Cleanup - remove event listener
+   */
+  destroy(): void {
+    if (this.onlineListener && typeof window !== 'undefined') {
+      window.removeEventListener('online', this.onlineListener);
+    }
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+    }
+  }
 }
 
 export const logService = new LogService();
 
+// Flush logs before page unload to prevent data loss
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    logService.forceFlush();
+  });
+}

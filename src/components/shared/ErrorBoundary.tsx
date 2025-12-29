@@ -25,7 +25,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    logger.error('ErrorBoundary caught an error', {
+    // Use critical logging for immediate sending (no batching)
+    // This ensures the error is captured even if the app becomes unresponsive
+    logger.critical('ErrorBoundary caught an error', {
       context: 'ErrorBoundary',
       error,
       metadata: {
@@ -34,6 +36,9 @@ export class ErrorBoundary extends Component<Props, State> {
         url: window.location.href,
         userAgent: navigator.userAgent,
       }
+    }).catch(err => {
+      // If critical logging fails, fall back to console
+      console.error('Failed to send critical error to backend:', err);
     });
 
     // Call custom error handler if provided

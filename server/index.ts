@@ -3430,6 +3430,8 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
 
     // Store and emit notification to admin
     const gcs = getGCSStorage();
+    let adminUserId: string | null = null;
+    
     if (gcs) {
       // Find admin user ID by email
       const doc = await getDoc();
@@ -3439,15 +3441,22 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
           const rows = await usersSheet.getRows();
           const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
           if (adminRow) {
-            const adminUserId = adminRow.get('id');
-            await gcs.addNotification(adminUserId, adminNotification);
-            io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+            adminUserId = adminRow.get('id');
+            if (adminUserId) {
+              adminNotification.userId = adminUserId; // Update notification with actual user ID
+              await gcs.addNotification(adminUserId, adminNotification);
+              io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+            }
           }
         }
       }
-    } else {
-      // Emit via Socket.IO even without GCS persistence
-      io.emit('notification:received', { userId: 'admin', notification: adminNotification });
+    }
+    
+    // Always emit via Socket.IO (even if GCS lookup failed, try to find admin user ID from request context)
+    if (!adminUserId) {
+      // Try to get admin user ID from the authenticated request if available
+      // For now, emit to all connected clients and let frontend filter
+      io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
     }
 
     res.json({ success, ticket });
@@ -3690,6 +3699,7 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
         if (gcs) {
           await gcs.addNotification(ticket.createdBy, creatorNotification);
         }
+        // Emit notification - frontend will filter by userId
         io.emit('notification:received', { userId: ticket.createdBy, notification: creatorNotification });
       } else {
         // User commented - notify admin
@@ -3712,6 +3722,8 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
 
         // Find admin user ID and send notification
         const gcs = getGCSStorage();
+        let adminUserId: string | null = null;
+        
         if (gcs) {
           const doc = await getDoc();
           if (doc) {
@@ -3720,14 +3732,20 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
               const rows = await usersSheet.getRows();
               const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
               if (adminRow) {
-                const adminUserId = adminRow.get('id');
-                await gcs.addNotification(adminUserId, adminNotification);
-                io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+                adminUserId = adminRow.get('id');
+                if (adminUserId) {
+                  adminNotification.userId = adminUserId; // Update notification with actual user ID
+                  await gcs.addNotification(adminUserId, adminNotification);
+                  io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
+                }
               }
             }
           }
-        } else {
-          io.emit('notification:received', { userId: 'admin', notification: adminNotification });
+        }
+        
+        // Always emit via Socket.IO (even if GCS lookup failed)
+        if (!adminUserId) {
+          io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
         }
       }
     }

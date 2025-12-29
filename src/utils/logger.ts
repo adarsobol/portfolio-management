@@ -94,6 +94,36 @@ class Logger {
   error(message: string, options?: { context?: string; metadata?: Record<string, unknown>; error?: Error }): void {
     this.log(LogLevel.ERROR, message, options);
   }
+
+  /**
+   * Log a critical error that is sent immediately (not batched)
+   * Use this for unrecoverable errors like ErrorBoundary catches
+   */
+  async critical(message: string, options?: { 
+    context?: string; 
+    metadata?: Record<string, unknown>; 
+    error?: Error 
+  }): Promise<void> {
+    const entry: LogEntry = {
+      level: LogLevel.ERROR,
+      message,
+      timestamp: new Date().toISOString(),
+      ...options
+    };
+
+    // Always log critical errors to console
+    console.error(this.formatLog(entry));
+
+    // Send immediately to backend (no batching)
+    await logService.logCriticalError(message, {
+      error: options?.error,
+      context: options?.context,
+      metadata: {
+        ...options?.metadata,
+        critical: true,
+      },
+    });
+  }
 }
 
 export const logger = new Logger();
