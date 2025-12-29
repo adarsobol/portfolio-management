@@ -3893,11 +3893,17 @@ app.get('/api/support/feedback', optionalAuthenticateToken, async (req: Authenti
     const supportStorage = getSupportStorage();
     let feedback: any[] = [];
     
+    console.log('[FEEDBACK GET] Storage check:', {
+      hasSupportStorage: !!supportStorage,
+      isInitialized: supportStorage?.isInitialized() || false
+    });
+    
     if (supportStorage && supportStorage.isInitialized()) {
       feedback = await supportStorage.getFeedback();
       console.log('[FEEDBACK GET] From GCS:', feedback.length, 'items');
     } else {
       // Use memory fallback
+      console.warn('[FEEDBACK GET] GCS not initialized, using memory fallback (data will be lost on restart)');
       feedback = memoryStorage.getFeedback();
       console.log('[FEEDBACK GET] From memory:', feedback.length, 'items');
     }

@@ -20,14 +20,21 @@ class SupportStorageService {
   constructor(config: SupportStorageConfig) {
     this.bucketName = config.bucketName;
     
+    console.log('[SUPPORT_STORAGE] Initializing with config:', {
+      bucketName: config.bucketName,
+      hasProjectId: !!config.projectId,
+      hasKeyFilename: !!config.keyFilename
+    });
+    
     try {
       this.storage = new Storage({
         projectId: config.projectId,
         keyFilename: config.keyFilename,
       });
       this.initialized = true;
+      console.log('[SUPPORT_STORAGE] Successfully initialized GCS storage');
     } catch (error) {
-      console.error('Failed to initialize GCS for support storage:', error);
+      console.error('[SUPPORT_STORAGE] Failed to initialize GCS for support storage:', error);
       this.initialized = false;
     }
   }
@@ -361,6 +368,11 @@ class SupportStorageService {
   }
 
   isInitialized(): boolean {
+    console.log('[SUPPORT_STORAGE] isInitialized check:', {
+      initialized: this.initialized,
+      hasStorage: !!this.storage,
+      bucketName: this.bucketName
+    });
     return this.initialized;
   }
 }
