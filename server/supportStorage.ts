@@ -212,6 +212,31 @@ class SupportStorageService {
     }
   }
 
+  async getFeedbackById(feedbackId: string): Promise<Feedback | null> {
+    if (!this.initialized || !this.storage) {
+      return null;
+    }
+
+    try {
+      const bucket = this.storage.bucket(this.bucketName);
+      const filePath = this.getFeedbackPath();
+      const file = bucket.file(filePath);
+
+      const [exists] = await file.exists();
+      if (!exists) {
+        return null;
+      }
+
+      const [contents] = await file.download();
+      const feedbackList: Feedback[] = JSON.parse(contents.toString());
+
+      return feedbackList.find(f => f.id === feedbackId) || null;
+    } catch (error) {
+      console.error('Failed to get feedback by ID:', error);
+      return null;
+    }
+  }
+
   async updateFeedback(feedbackId: string, updates: Partial<Feedback>): Promise<boolean> {
     if (!this.initialized || !this.storage) {
       return false;
@@ -374,6 +399,10 @@ export const memoryStorage = {
     return [...inMemoryFeedback].sort((a, b) => 
       new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     );
+  },
+  
+  getFeedbackById: (feedbackId: string): Feedback | null => {
+    return inMemoryFeedback.find(f => f.id === feedbackId) || null;
   },
   
   updateFeedback: (feedbackId: string, updates: Partial<Feedback>): boolean => {

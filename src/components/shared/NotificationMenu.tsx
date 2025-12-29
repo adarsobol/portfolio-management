@@ -8,7 +8,8 @@ interface NotificationMenuProps {
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
   onNotificationClick: (notification: Notification) => void;
-  currentUserId: string; // Add current user ID to filter notifications
+  currentUserId: string;
+  currentUserEmail?: string; // Add email for matching notifications
 }
 
 export const NotificationMenu: React.FC<NotificationMenuProps> = ({
@@ -17,7 +18,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   onMarkAllAsRead,
   onClearAll,
   onNotificationClick,
-  currentUserId
+  currentUserId,
+  currentUserEmail
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
@@ -35,11 +37,13 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   }, [isOpen]);
 
   // Filter notifications to show relevant notifications for current user:
-  // 1. Direct notifications (mentions, etc.) where userId matches currentUserId
+  // 1. Direct notifications (mentions, etc.) where userId matches currentUserId or email
   // 2. Owner notifications - user owns the initiative that was changed/commented on
   const userNotifications = notifications.filter(n => 
     n.userId === currentUserId ||
-    n.metadata?.ownerId === currentUserId
+    (currentUserEmail && n.userId === currentUserEmail) ||
+    n.metadata?.ownerId === currentUserId ||
+    (currentUserEmail && n.metadata?.ownerId === currentUserEmail)
   );
   
   const unreadCount = userNotifications.filter(n => !n.read).length;

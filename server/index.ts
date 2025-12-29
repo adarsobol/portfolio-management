@@ -3881,13 +3881,11 @@ app.patch('/api/support/feedback/:id', optionalAuthenticateToken, async (req: Au
     const supportStorage = getSupportStorage();
     let feedback: any = null;
 
-    // Get the feedback to check ownership
+    // Get the feedback to check ownership (optimized - don't load all feedback)
     if (supportStorage && supportStorage.isInitialized()) {
-      const allFeedback = await supportStorage.getFeedback();
-      feedback = allFeedback.find(f => f.id === id);
+      feedback = await supportStorage.getFeedbackById(id);
     } else {
-      const allFeedback = memoryStorage.getFeedback();
-      feedback = allFeedback.find(f => f.id === id);
+      feedback = memoryStorage.getFeedbackById(id);
     }
 
     if (!feedback) {
@@ -3959,13 +3957,11 @@ app.post('/api/support/feedback/:id/comments', optionalAuthenticateToken, async 
     const supportStorage = getSupportStorage();
     let feedback: any = null;
 
-    // Get the feedback to check ownership
+    // Get the feedback to check ownership (optimized - don't load all feedback)
     if (supportStorage && supportStorage.isInitialized()) {
-      const allFeedback = await supportStorage.getFeedback();
-      feedback = allFeedback.find(f => f.id === id);
+      feedback = await supportStorage.getFeedbackById(id);
     } else {
-      const allFeedback = memoryStorage.getFeedback();
-      feedback = allFeedback.find(f => f.id === id);
+      feedback = memoryStorage.getFeedbackById(id);
     }
 
     if (!feedback) {
