@@ -2369,15 +2369,28 @@ app.get('/api/notifications/:userId', authenticateToken, async (req: Authenticat
   try {
     const { userId } = req.params;
     
-    // Users can only access their own notifications
-    if (req.user?.id !== userId && req.user?.role !== 'Admin') {
+    // Users can only access their own notifications (check by both ID and email)
+    const isOwnNotifications = req.user?.id === userId || req.user?.email === userId;
+    if (!isOwnNotifications && req.user?.role !== 'Admin') {
       res.status(403).json({ error: 'Cannot access other users notifications' });
       return;
     }
 
     const gcs = getGCSStorage();
     if (gcs) {
-      const notifications = await gcs.loadNotifications(userId);
+      // Try loading by userId first, then by email if userId is an email
+      let notifications = await gcs.loadNotifications(userId);
+      
+      // If no notifications found and userId looks like an email, try loading by user ID
+      if (notifications.length === 0 && userId.includes('@') && req.user?.id) {
+        notifications = await gcs.loadNotifications(req.user.id);
+      }
+      
+      // Also try loading by email if we have user email and userId is an ID
+      if (notifications.length === 0 && !userId.includes('@') && req.user?.email) {
+        notifications = await gcs.loadNotifications(req.user.email);
+      }
+      
       res.json({ notifications });
     } else {
       // Fallback: return empty array if GCS not available
@@ -3745,6 +3758,14 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
         
         // Always emit via Socket.IO (even if GCS lookup failed)
         if (!adminUserId) {
+          // If we couldn't find admin user ID, still emit but log a warning
+          console.warn('[NOTIFICATION] Admin user ID not found for comment notification, emitting with email:', ADMIN_EMAIL);
+          // Store notification with email as userId (fallback)
+          const gcs = getGCSStorage();
+          if (gcs) {
+            adminNotification.userId = ADMIN_EMAIL;
+            await gcs.addNotification(ADMIN_EMAIL, adminNotification);
+          }
           io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
         }
       }
