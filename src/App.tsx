@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus } from 'lucide-react';
 
-import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions } from './constants';
+import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab } from './utils';
 import { useLocalStorage, useVersionCheck } from './hooks';
@@ -1103,19 +1103,14 @@ export default function App() {
         const owner = users.find(u => u.id === item.ownerId);
         const ownerTeam = owner?.team;
         
-        // Map team to asset class (only for teams that match asset classes)
-        const teamToAssetClass: Record<string, AssetClass> = {
-          'PL': AssetClass.PL,
-          'Auto': AssetClass.Auto,
-          'POS': AssetClass.POS,
-          'Advisory': AssetClass.Advisory,
-        };
+        // Use shared utility to map team to asset class
+        const mappedAssetClass = getAssetClassFromTeam(ownerTeam);
         
         // Apply asset class if owner's team matches and no explicit asset class was provided
-        // We use a reasonable default check: if the asset class is PL (first option), 
-        // we still apply the workflow since the user might not have explicitly chosen it
-        if (ownerTeam && teamToAssetClass[ownerTeam]) {
-          item.l1_assetClass = teamToAssetClass[ownerTeam];
+        // Note: This is a backup check - the modal's useEffect should handle this in real-time
+        // but we keep this as a safety net for edge cases
+        if (mappedAssetClass && (!item.l1_assetClass || item.l1_assetClass === AssetClass.PL)) {
+          item.l1_assetClass = mappedAssetClass;
         }
       }
     }

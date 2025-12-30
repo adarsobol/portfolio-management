@@ -64,6 +64,23 @@ export interface HierarchyNode {
   responsibilities: string[];
 }
 
+/**
+ * Map team name to corresponding AssetClass
+ * Returns undefined if team doesn't map to an asset class
+ */
+export const getAssetClassFromTeam = (team: string | undefined): AssetClass | undefined => {
+  if (!team) return undefined;
+  
+  const teamToAssetClass: Record<string, AssetClass> = {
+    'PL': AssetClass.PL,
+    'Auto': AssetClass.Auto,
+    'POS': AssetClass.POS,
+    'Advisory': AssetClass.Advisory,
+  };
+  
+  return teamToAssetClass[team];
+};
+
 export const HIERARCHY: Record<AssetClass, HierarchyNode[]> = {
   [AssetClass.PL]: [
     {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Initiative, User, Role, Status, Priority, WorkType, UnplannedTag, AssetClass, PermissionKey, PermissionValue, TradeOffAction, Dependency, DependencyTeam, InitiativeType, Task, AppConfig
 } from '../../types';
-import { HIERARCHY, QUARTERS, DEPENDENCY_TEAM_CATEGORIES } from '../../constants';
+import { HIERARCHY, QUARTERS, DEPENDENCY_TEAM_CATEGORIES, getAssetClassFromTeam } from '../../constants';
 import { 
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
@@ -133,6 +133,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const commentInputRef = useRef<HTMLInputElement>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Track if asset class was manually changed (to prevent auto-override)
+  const assetClassManuallySetRef = useRef<boolean>(false);
 
   // Accordion State
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -235,11 +238,15 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         setMode('single'); // Always single mode when editing
         setTasks(initiativeToEdit.tasks || []);
         setEffortOverride(false); // Reset override when editing
+        // Reset manual flag when editing (editing mode doesn't use auto-assignment)
+        assetClassManuallySetRef.current = false;
       } else {
         const defaultData = getDefaultFormData();
         setFormData(defaultData);
         setTasks([]);
         setEffortOverride(false);
+        // Reset manual flag for new initiatives
+        assetClassManuallySetRef.current = false;
       }
       setErrors({});
       setActiveTab('details');
@@ -279,7 +286,11 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (isEditMode) return;
     
     // Only apply if owner is selected
-    if (!formData.ownerId) return;
+    if (!formData.ownerId) {
+      // Reset manual flag when owner is cleared
+      assetClassManuallySetRef.current = false;
+      return;
+    }
 
     // Check if workflow is enabled
     const assetClassWorkflow = config.workflows?.find(
@@ -292,35 +303,35 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     const selectedUser = users.find(u => u.id === formData.ownerId);
     if (!selectedUser || !selectedUser.team) return;
 
-    // Map team to asset class
-    const teamToAssetClass: Record<string, AssetClass> = {
-      'PL': AssetClass.PL,
-      'Auto': AssetClass.Auto,
-      'POS': AssetClass.POS,
-      'Advisory': AssetClass.Advisory,
-    };
-
-    const mappedAssetClass = teamToAssetClass[selectedUser.team];
+    // Use shared utility to map team to asset class
+    const mappedAssetClass = getAssetClassFromTeam(selectedUser.team);
     if (!mappedAssetClass) return;
 
-    // Only auto-assign if asset class hasn't been manually set (or is default PL)
-    // If current asset class is PL (default), we still apply the workflow
-    const currentAssetClass = formData.l1_assetClass || AssetClass.PL;
-    
-    // Apply asset class if team matches
-    if (mappedAssetClass !== currentAssetClass) {
-      const pillars = HIERARCHY[mappedAssetClass];
-      const defaultPillar = pillars[0]?.name || '';
-      const defaultResp = pillars[0]?.responsibilities[0] || '';
+    // Only auto-assign if asset class hasn't been manually set
+    // Respect user's manual selection
+    if (assetClassManuallySetRef.current) return;
 
-      setFormData(prev => ({
-        ...prev,
-        l1_assetClass: mappedAssetClass,
-        l2_pillar: defaultPillar,
-        l3_responsibility: defaultResp
-      }));
-    }
-  }, [formData.ownerId, isEditMode, config.workflows, users]);
+    // Use functional setState to avoid stale closure issues
+    setFormData(prev => {
+      const currentAssetClass = prev.l1_assetClass || AssetClass.PL;
+      
+      // Only apply if different from current
+      if (mappedAssetClass !== currentAssetClass) {
+        const pillars = HIERARCHY[mappedAssetClass];
+        const defaultPillar = pillars[0]?.name || '';
+        const defaultResp = pillars[0]?.responsibilities[0] || '';
+
+        return {
+          ...prev,
+          l1_assetClass: mappedAssetClass,
+          l2_pillar: defaultPillar,
+          l3_responsibility: defaultResp
+        };
+      }
+      
+      return prev;
+    });
+  }, [formData.ownerId, formData.l1_assetClass, isEditMode, config.workflows, users]);
 
   // ============================================================================
   // DERIVED DATA
@@ -442,6 +453,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   };
 
   const handleAssetClassChange = (newClass: AssetClass) => {
+    // Mark that asset class was manually changed (prevents auto-override)
+    assetClassManuallySetRef.current = true;
+    
     const pillars = HIERARCHY[newClass];
     const defaultPillar = pillars[0]?.name || '';
     const defaultResp = pillars[0]?.responsibilities[0] || '';
