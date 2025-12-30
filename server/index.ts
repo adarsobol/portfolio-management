@@ -1057,6 +1057,15 @@ app.get('/api/auth/users', authenticateToken, async (req: AuthenticatedRequest, 
       return;
     }
 
+    // Ensure headers are up-to-date (adds missing columns like team)
+    await usersSheet.loadHeaderRow().catch(() => {});
+    const currentHeaders = usersSheet.headerValues || [];
+    const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
+    if (missingHeaders.length > 0) {
+      console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+      await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
+    }
+
     const rows = await usersSheet.getRows();
     const users = rows.map((r: GoogleSpreadsheetRow) => ({
       id: r.get('id'),
@@ -1102,6 +1111,17 @@ app.put('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest, r
     if (!usersSheet) {
       res.status(404).json({ error: 'Users sheet not found' });
       return;
+    }
+
+    // Ensure headers are up-to-date (adds missing columns like team)
+    await usersSheet.loadHeaderRow().catch(() => {});
+    const currentHeaders = usersSheet.headerValues || [];
+    const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
+    if (missingHeaders.length > 0) {
+      console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+      await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
+      // Reload rows after header update to get the new column structure
+      await usersSheet.loadHeaderRow().catch(() => {});
     }
 
     const rows = await usersSheet.getRows();

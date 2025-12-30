@@ -871,6 +871,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
       const data = await response.json();
 
+      if (response.status === 404) {
+        // User doesn't exist in backend (likely a fallback user from USERS constant)
+        // Just remove from local state - no need to refresh from API
+        setUsers(users.filter(u => u.id !== id));
+        setIsDeletingUser(null);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete user');
       }
