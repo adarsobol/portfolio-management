@@ -17,10 +17,10 @@ const METRIC_TOOLTIPS: Record<string, { title: string; description: string; form
     thresholds: 'Shows total effort invested in BAU initiatives and percentage of allocated buffer used'
   },
   capacityLoad: {
-    title: 'Capacity Load',
-    description: 'Shows how much of the team\'s total capacity is allocated to initiatives (estimated effort vs available capacity).',
-    formula: 'Load % = (Total Estimated Effort / Total Capacity) × 100',
-    thresholds: 'Green: ≤100%  |  Red: >100% (overallocated)'
+    title: 'Capacity Load (Quarterly)',
+    description: 'Shows how much of the team\'s total quarterly capacity is allocated to initiatives (estimated effort vs available capacity per quarter).',
+    formula: 'Load % = (Total Estimated Effort / Total Quarterly Capacity) × 100',
+    thresholds: 'Green: ≤100%  |  Red: >100% (overallocated for quarter)'
   },
   workMix: {
     title: 'Work Type Mix',
@@ -241,7 +241,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <div className="space-y-3 flex-1 flex flex-col justify-end">
           <div className="flex justify-between text-xs text-slate-500 font-medium">
             <span>Assigned: <strong className="text-slate-700">{metrics.totalEst}w</strong></span>
-            <span>Total Cap: <strong className="text-slate-700">{metrics.totalCapacity}w</strong></span>
+            <span>Total Cap (Q): <strong className="text-slate-700">{metrics.totalCapacity}w</strong></span>
           </div>
           <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
              <div 

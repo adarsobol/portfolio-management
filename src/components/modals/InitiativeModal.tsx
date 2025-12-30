@@ -7,7 +7,8 @@ import {
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks } from '../../utils';
+import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative } from '../../utils';
+import { weeksToDays, daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
 import { slackService } from '../../services';
 
 // ============================================================================
@@ -105,10 +106,13 @@ interface InitiativeModalProps {
   users: User[];
   allInitiatives: Initiative[];
   onDelete?: (id: string) => void;
+  effortDisplayUnit?: 'weeks' | 'days';
+  setEffortDisplayUnit?: (unit: 'weeks' | 'days') => void;
 }
 
 const InitiativeModal: React.FC<InitiativeModalProps> = ({
-  isOpen, onClose, onSave, currentUser, initiativeToEdit, rolePermissions, config, users, allInitiatives, onDelete
+  isOpen, onClose, onSave, currentUser, initiativeToEdit, rolePermissions, config, users, allInitiatives, onDelete,
+  effortDisplayUnit = 'weeks', setEffortDisplayUnit
 }) => {
   const isEditMode = !!initiativeToEdit;
   const permissions = rolePermissions[currentUser.role];
@@ -365,8 +369,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const isReadOnly = !canEdit();
 
   const canDelete = (): boolean => {
-    // Only Admin or Director (Group Lead) can delete
-    return currentUser.role === Role.Admin || currentUser.role === Role.DirectorGroup;
+    if (!initiativeToEdit) return false;
+    // Use permission system to check if user can delete this initiative
+    return canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id);
   };
 
   const handleDelete = () => {
@@ -1596,7 +1601,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {/* Planned Effort */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Planned Effort (weeks) <span className="text-red-500">*</span>
+                        Planned Effort ({effortDisplayUnit === 'days' ? 'days' : 'weeks'}) <span className="text-red-500">*</span>
                       </label>
                       {isBAU && !effortOverride ? (
                         <div className="px-3 py-2 text-base font-mono text-slate-700 bg-slate-100 border border-slate-300 rounded-lg">
@@ -1606,10 +1611,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => handleChange('estimatedEffort', Math.max(0, Number(formData.estimatedEffort || 0) - 0.25))}
+                            onClick={() => {
+                              const currentWeeks = formData.estimatedEffort || 0;
+                              const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                              handleChange('estimatedEffort', Math.max(0, currentWeeks - decrement));
+                            }}
                             disabled={isReadOnly || (isBAU && !effortOverride)}
                             className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                            title="Decrease by 0.25"
+                            title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                           >
                             <ArrowDown size={14} />
                           </button>
@@ -1617,9 +1626,17 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             disabled={isReadOnly || (isBAU && !effortOverride)}
                             type="number"
                             min="0"
-                            step="0.25"
-                            value={formData.estimatedEffort || 0}
-                            onChange={(e) => handleChange('estimatedEffort', parseFloat(e.target.value) || 0)}
+                            step={effortDisplayUnit === 'days' ? '1' : '0.25'}
+                            value={effortDisplayUnit === 'days' 
+                              ? weeksToDays(formData.estimatedEffort || 0).toFixed(1)
+                              : (formData.estimatedEffort || 0).toFixed(2)}
+                            onChange={(e) => {
+                              const inputValue = parseFloat(e.target.value) || 0;
+                              const weeksValue = effortDisplayUnit === 'days' 
+                                ? daysToWeeks(inputValue)
+                                : inputValue;
+                              handleChange('estimatedEffort', weeksValue);
+                            }}
                             className={`w-20 px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                               errors.estimatedEffort ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
                             }`}
@@ -1627,10 +1644,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           />
                           <button
                             type="button"
-                            onClick={() => handleChange('estimatedEffort', Number(formData.estimatedEffort || 0) + 0.25)}
+                            onClick={() => {
+                              const currentWeeks = formData.estimatedEffort || 0;
+                              const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                              handleChange('estimatedEffort', currentWeeks + increment);
+                            }}
                             disabled={isReadOnly || (isBAU && !effortOverride)}
                             className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                            title="Increase by 0.25"
+                            title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                           >
                             <ArrowUp size={14} />
                           </button>
@@ -1644,15 +1665,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {/* Actual Effort */}
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Actual Effort (weeks)
+                        Actual Effort ({effortDisplayUnit === 'days' ? 'days' : 'weeks'})
                       </label>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => handleChange('actualEffort', Math.max(0, Number(formData.actualEffort || 0) - 0.25))}
+                          onClick={() => {
+                            const currentWeeks = formData.actualEffort || 0;
+                            const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            handleChange('actualEffort', Math.max(0, currentWeeks - decrement));
+                          }}
                           disabled={isReadOnly}
                           className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                          title="Decrease by 0.25"
+                          title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                         >
                           <ArrowDown size={14} />
                         </button>
@@ -1660,23 +1685,66 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           disabled={isReadOnly}
                           type="number"
                           min="0"
-                          step="0.25"
-                          value={formData.actualEffort || 0}
-                          onChange={(e) => handleChange('actualEffort', parseFloat(e.target.value) || 0)}
+                          step={effortDisplayUnit === 'days' ? '1' : '0.25'}
+                          value={effortDisplayUnit === 'days'
+                            ? weeksToDays(formData.actualEffort || 0).toFixed(1)
+                            : (formData.actualEffort || 0).toFixed(2)}
+                          onChange={(e) => {
+                            const inputValue = parseFloat(e.target.value) || 0;
+                            const weeksValue = effortDisplayUnit === 'days'
+                              ? daysToWeeks(inputValue)
+                              : inputValue;
+                            handleChange('actualEffort', weeksValue);
+                          }}
                           className="w-20 px-2 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           placeholder="0.0"
                         />
                         <button
                           type="button"
-                          onClick={() => handleChange('actualEffort', Number(formData.actualEffort || 0) + 0.25)}
+                          onClick={() => {
+                            const currentWeeks = formData.actualEffort || 0;
+                            const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            handleChange('actualEffort', currentWeeks + increment);
+                          }}
                           disabled={isReadOnly}
                           className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                          title="Increase by 0.25"
+                          title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                         >
                           <ArrowUp size={14} />
                         </button>
                       </div>
                     </div>
+                  
+                  {/* Effort Unit Toggle */}
+                  {setEffortDisplayUnit && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs text-slate-500">Display unit:</span>
+                      <div className="flex items-center gap-1 border border-slate-300 rounded-lg p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setEffortDisplayUnit('days')}
+                          className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                            effortDisplayUnit === 'days' 
+                              ? 'bg-blue-600 text-white' 
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          D
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEffortDisplayUnit('weeks')}
+                          className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                            effortDisplayUnit === 'weeks' 
+                              ? 'bg-blue-600 text-white' 
+                              : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          W
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   </div>
 
                   {/* Completion & ETA - 2 Column Layout */}

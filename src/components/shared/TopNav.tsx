@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown } from 'lucide-react';
-import { User as UserType, ViewType, AppConfig } from '../../types';
+import { useLocation } from 'react-router-dom';
+import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, AlertTriangle } from 'lucide-react';
+import { User as UserType, ViewType, AppConfig, Role } from '../../types';
 import { canViewTab, canAccessAdmin } from '../../utils';
+import { ValidationResult } from '../../services/weeklyEffortValidation';
 
 interface TopNavProps {
   currentView: ViewType;
@@ -11,6 +13,7 @@ interface TopNavProps {
   onLogout: () => void;
   isTeamLeadView: boolean;
   onToggleTeamLeadView: () => void;
+  weeklyEffortFlags?: Map<string, ValidationResult>;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({ 
@@ -20,11 +23,29 @@ export const TopNav: React.FC<TopNavProps> = ({
   config,
   onLogout,
   isTeamLeadView,
-  onToggleTeamLeadView
+  onToggleTeamLeadView,
+  weeklyEffortFlags
 }) => {
+  const location = useLocation();
   const canAccessWorkplanHealth = canViewTab(config, currentUser.role, 'accessWorkplanHealth');
   const canAccessAdminPanel = canAccessAdmin(config, currentUser.role);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  
+  // Check if current user has an active weekly effort flag
+  const hasEffortWarning = currentUser.role === Role.TeamLead && weeklyEffortFlags?.has(currentUser.id);
+  
+  // Determine active view from location
+  const getActiveView = (): ViewType => {
+    if (location.pathname === '/admin') return 'admin';
+    if (location.pathname === '/timeline') return 'timeline';
+    if (location.pathname === '/workflows') return 'workflows';
+    if (location.pathname === '/dependencies') return 'dependencies';
+    if (location.pathname === '/resources') return 'resources';
+    if (location.pathname.startsWith('/item/')) return 'all';
+    return 'all'; // Default
+  };
+  
+  const activeView = getActiveView();
   
   const NavButton = ({ 
     view, 
@@ -40,7 +61,7 @@ export const TopNav: React.FC<TopNavProps> = ({
     <button 
       onClick={() => setCurrentView(view)} 
       className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all font-medium text-xs ${
-        currentView === view 
+        activeView === view 
           ? `bg-gradient-to-r ${activeGradient} text-white shadow-lg` 
           : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
       }`}
@@ -88,7 +109,15 @@ export const TopNav: React.FC<TopNavProps> = ({
             className="w-7 h-7 rounded-lg ring-2 ring-slate-700 shadow-lg"
           />
           <div className="hidden sm:block text-left">
-            <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+              {hasEffortWarning && (
+                <div className="relative" title="Weekly effort exceeded threshold">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                </div>
+              )}
+            </div>
             <p className="text-[10px] text-slate-500 truncate font-medium">{currentUser.role}</p>
           </div>
           <ChevronDown size={12} className={`text-slate-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />

@@ -4,6 +4,7 @@ import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserC
 import { StatusBadge, PriorityBadge } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
 import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
+import { weeksToDays, daysToWeeks, formatEffort } from '../../utils/effortConverter';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
@@ -24,6 +25,7 @@ interface TaskTableProps {
   onDeleteInitiative?: (id: string) => void;
   // At Risk reason modal props
   onOpenAtRiskModal?: (initiative: Initiative) => void;
+  effortDisplayUnit?: 'weeks' | 'days';
 }
 
 interface GroupedInitiatives {
@@ -48,7 +50,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onAddComment,
   onMarkCommentRead,
   onDeleteInitiative: _onDeleteInitiative,
-  onOpenAtRiskModal
+  onOpenAtRiskModal,
+  effortDisplayUnit = 'weeks'
 }) => {
   void _onDeleteInitiative; // Reserved for delete functionality
   // Use allInitiatives if provided, otherwise fall back to filteredInitiatives
@@ -588,19 +591,29 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleInlineUpdate(item.id, 'actualEffort', Math.max(0, (item.actualEffort || 0) - 0.25));
+                    const currentWeeks = item.actualEffort || 0;
+                    const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    handleInlineUpdate(item.id, 'actualEffort', Math.max(0, currentWeeks - decrement));
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title="Decrease by 0.25"
+                  title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                 >
                   <ArrowDown size={12} />
                 </button>
                 <input 
                   type="number"
                   min="0"
-                  step="0.25"
-                  value={item.actualEffort}
-                  onChange={(e) => handleInlineUpdate(item.id, 'actualEffort', parseFloat(e.target.value) || 0)}
+                  step={effortDisplayUnit === 'days' ? '1' : '0.25'}
+                  value={effortDisplayUnit === 'days'
+                    ? weeksToDays(item.actualEffort || 0).toFixed(1)
+                    : (item.actualEffort || 0).toFixed(2)}
+                  onChange={(e) => {
+                    const inputValue = parseFloat(e.target.value) || 0;
+                    const weeksValue = effortDisplayUnit === 'days'
+                      ? daysToWeeks(inputValue)
+                      : inputValue;
+                    handleInlineUpdate(item.id, 'actualEffort', weeksValue);
+                  }}
                   className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   title="Actual Effort"
                 />
@@ -609,10 +622,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleInlineUpdate(item.id, 'actualEffort', (item.actualEffort || 0) + 0.25);
+                    const currentWeeks = item.actualEffort || 0;
+                    const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    handleInlineUpdate(item.id, 'actualEffort', currentWeeks + increment);
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title="Increase by 0.25"
+                  title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                 >
                   <ArrowUp size={12} />
                 </button>
@@ -624,19 +639,29 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleInlineUpdate(item.id, 'estimatedEffort', Math.max(0, (item.estimatedEffort || 0) - 0.25));
+                    const currentWeeks = item.estimatedEffort || 0;
+                    const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    handleInlineUpdate(item.id, 'estimatedEffort', Math.max(0, currentWeeks - decrement));
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title="Decrease by 0.25"
+                  title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                 >
                   <ArrowDown size={12} />
                 </button>
                 <input 
                   type="number"
                   min="0"
-                  step="0.25"
-                  value={item.estimatedEffort}
-                  onChange={(e) => handleInlineUpdate(item.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                  step={effortDisplayUnit === 'days' ? '1' : '0.25'}
+                  value={effortDisplayUnit === 'days' 
+                    ? weeksToDays(item.estimatedEffort || 0).toFixed(1)
+                    : (item.estimatedEffort || 0).toFixed(2)}
+                  onChange={(e) => {
+                    const inputValue = parseFloat(e.target.value) || 0;
+                    const weeksValue = effortDisplayUnit === 'days' 
+                      ? daysToWeeks(inputValue)
+                      : inputValue;
+                    handleInlineUpdate(item.id, 'estimatedEffort', weeksValue);
+                  }}
                   className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   title="Planned Effort"
                 />
@@ -645,10 +670,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleInlineUpdate(item.id, 'estimatedEffort', (item.estimatedEffort || 0) + 0.25);
+                    const currentWeeks = item.estimatedEffort || 0;
+                    const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    handleInlineUpdate(item.id, 'estimatedEffort', currentWeeks + increment);
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title="Increase by 0.25"
+                  title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                 >
                   <ArrowUp size={12} />
                 </button>
@@ -1425,7 +1452,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <SortableHeader label="Owner" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
-              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">Effort (act/plan)</th>
+              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">
+                Effort (act/plan) {effortDisplayUnit === 'days' ? '(d)' : '(w)'}
+              </th>
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
               <SortableHeader label="ETA / Update" sortKey="eta" />
             </tr>

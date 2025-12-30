@@ -224,8 +224,8 @@ export type PermissionValue = TabAccessLevel | TaskManagementScope;
 
 export interface AppConfig {
   bauBufferSuggestion: number; // Percentage
-  teamCapacities: Record<string, number>; // ownerId -> capacity (weeks)
-  teamBuffers: Record<string, number>; // ownerId -> buffer weeks (reserved for BAU/unplanned)
+  teamCapacities: Record<string, number>; // ownerId -> capacity (weeks per quarter)
+  teamBuffers: Record<string, number>; // ownerId -> buffer weeks (reserved for BAU/unplanned, per quarter)
   // Support both old and new permission structures for migration
   rolePermissions: Record<Role, Record<PermissionKey, PermissionValue>>;
   // Legacy permissions for backward compatibility (will be migrated)
@@ -236,6 +236,11 @@ export interface AppConfig {
   };
   workflows?: Workflow[];
   healthHistory?: HealthSnapshot[]; // Weekly health score snapshots for trend tracking
+  weeklyEffortValidation?: {
+    enabled: boolean;
+    thresholdPercent: number; // Default: 15
+    quarterStartDate?: string; // ISO date string for current quarter start
+  };
 }
 
 export interface Snapshot {
@@ -373,6 +378,7 @@ export enum NotificationType {
   NewComment = 'new_comment',
   WeeklyUpdateReminder = 'weekly_update_reminder',
   OverlookedItem = 'overlooked_item',
+  WeeklyEffortExceeded = 'weekly_effort_exceeded',
   // Support ticket notifications
   SupportTicketNew = 'support_ticket_new',
   SupportTicketReply = 'support_ticket_reply',

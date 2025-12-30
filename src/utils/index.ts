@@ -269,6 +269,29 @@ export const canDeleteTasks = (config: AppConfig, role: Role): boolean => {
 };
 
 /**
+ * Check if user can delete a specific initiative
+ * @param config - App configuration
+ * @param role - User's role
+ * @param initiativeOwnerId - ID of the initiative owner
+ * @param currentUserId - ID of the current user
+ * @returns true if user can delete the initiative
+ */
+export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwnerId: string, currentUserId: string): boolean => {
+  const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
+  
+  if (deleteScope === 'yes') {
+    // Can delete any initiative
+    return true;
+  } else if (deleteScope === 'own') {
+    // Can delete only own initiatives
+    return initiativeOwnerId === currentUserId;
+  }
+  
+  // Cannot delete
+  return false;
+};
+
+/**
  * Check if user can access admin panel
  */
 export const canAccessAdmin = (config: AppConfig, role: Role): boolean => {

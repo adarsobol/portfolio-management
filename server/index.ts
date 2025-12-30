@@ -2847,6 +2847,160 @@ app.get('/api/admin/login-history', authenticateToken, async (req: Authenticated
   }
 });
 
+// POST /api/admin/weekly-effort-validation - Get weekly effort validation results for all Team Leads (admin only)
+app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access this endpoint
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    // Get all initiatives
+    let initiativesSheet = doc.sheetsByTitle['Initiatives'];
+    if (!initiativesSheet) {
+      res.json({ results: [], message: 'No initiatives found' });
+      return;
+    }
+
+    await initiativesSheet.loadHeaderRow();
+    const rows = await initiativesSheet.getRows();
+    const initiatives = rows.map((r: GoogleSpreadsheetRow) => {
+      const row: any = {};
+      initiativesSheet.headerValues.forEach((header: string) => {
+        row[header] = r.get(header);
+      });
+      return row;
+    });
+
+    // Get config (weeklyEffortValidation settings)
+    let configSheet = doc.sheetsByTitle['Config'];
+    let config: any = { weeklyEffortValidation: { enabled: true, thresholdPercent: 15 } };
+    if (configSheet) {
+      await configSheet.loadHeaderRow();
+      const configRows = await configSheet.getRows();
+      if (configRows.length > 0) {
+        const configRow = configRows[0];
+        try {
+          const configData = configRow.get('config');
+          if (configData) {
+            config = JSON.parse(configData);
+          }
+        } catch (e) {
+          console.error('Error parsing config:', e);
+        }
+      }
+    }
+
+    // Get all Team Lead users
+    let usersSheet = doc.sheetsByTitle['Users'];
+    if (!usersSheet) {
+      res.json({ results: [], message: 'No users found' });
+      return;
+    }
+
+    await usersSheet.loadHeaderRow();
+    const userRows = await usersSheet.getRows();
+    const teamLeadIds = userRows
+      .map((r: GoogleSpreadsheetRow) => ({
+        id: r.get('id'),
+        role: r.get('role')
+      }))
+      .filter((u: any) => u.role === 'Team Lead')
+      .map((u: any) => u.id);
+
+    // Calculate validation results for each Team Lead
+    const results = teamLeadIds.map((teamLeadId: string) => {
+      const teamLeadInitiatives = initiatives.filter((i: any) => i.ownerId === teamLeadId);
+      
+      if (teamLeadInitiatives.length === 0) {
+        return {
+          flagged: false,
+          deviationPercent: 0,
+          averageWeeklyEffort: 0,
+          currentWeekEffort: 0,
+          teamLeadId,
+          quarter: 'Q1 2024'
+        };
+      }
+
+      // Get quarter from first initiative
+      const quarter = teamLeadInitiatives[0].quarter || 'Q1 2024';
+      const quarterMatch = quarter.match(/Q(\d)\s+(\d{4})/);
+      let quarterStartDate: Date;
+      if (quarterMatch) {
+        const quarterNum = parseInt(quarterMatch[1], 10);
+        const year = parseInt(quarterMatch[2], 10);
+        const month = (quarterNum - 1) * 3;
+        quarterStartDate = new Date(year, month, 1);
+      } else {
+        const now = new Date();
+        const currentQuarter = Math.floor(now.getMonth() / 3);
+        const year = now.getFullYear();
+        const month = currentQuarter * 3;
+        quarterStartDate = new Date(year, month, 1);
+      }
+
+      const now = new Date();
+      const daysSinceQuarterStart = Math.floor((now.getTime() - quarterStartDate.getTime()) / (24 * 60 * 60 * 1000));
+      const weeksInQuarter = Math.max(1, Math.ceil(daysSinceQuarterStart / 7));
+
+      const totalTeamEffort = teamLeadInitiatives.reduce((sum: number, i: any) => sum + (parseFloat(i.actualEffort) || 0), 0);
+      const averageWeeklyEffort = totalTeamEffort / weeksInQuarter;
+
+      const lastThursday = new Date(now);
+      lastThursday.setDate(now.getDate() - ((now.getDay() + 3) % 7));
+      lastThursday.setHours(23, 59, 59, 999);
+
+      const currentWeekEffort = teamLeadInitiatives
+        .filter((i: any) => {
+          if (!i.lastWeeklyUpdate) return false;
+          const updateDate = new Date(i.lastWeeklyUpdate);
+          return updateDate >= lastThursday;
+        })
+        .reduce((sum: number, i: any) => sum + (parseFloat(i.actualEffort) || 0), 0);
+
+      const deviationPercent = averageWeeklyEffort > 0
+        ? Math.abs((currentWeekEffort - averageWeeklyEffort) / averageWeeklyEffort) * 100
+        : 0;
+
+      const threshold = config.weeklyEffortValidation?.thresholdPercent || 15;
+
+      return {
+        flagged: deviationPercent >= threshold,
+        deviationPercent: Math.round(deviationPercent * 10) / 10,
+        averageWeeklyEffort: Math.round(averageWeeklyEffort * 10) / 10,
+        currentWeekEffort: Math.round(currentWeekEffort * 10) / 10,
+        teamLeadId,
+        quarter
+      };
+    });
+
+    // Log validation results
+    const flaggedResults = results.filter((r: any) => r.flagged);
+    if (flaggedResults.length > 0) {
+      console.log(`[WEEKLY VALIDATION] ${flaggedResults.length} Team Lead(s) exceeded threshold:`, 
+        flaggedResults.map((r: any) => `${r.teamLeadId}: ${r.deviationPercent.toFixed(1)}%`).join(', '));
+    }
+
+    res.json({ 
+      results,
+      timestamp: new Date().toISOString(),
+      totalTeamLeads: teamLeadIds.length,
+      flaggedCount: flaggedResults.length
+    });
+  } catch (error) {
+    console.error('Error validating weekly effort:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // ============================================
 // BACKUP & RESTORE ENDPOINTS (Admin only)
 // ============================================

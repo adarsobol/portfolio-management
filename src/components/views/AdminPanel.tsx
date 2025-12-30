@@ -2060,8 +2060,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Capacity Table */}
       <CollapsibleSection
         id="capacity-planning"
-        title="Team Capacity Planning"
-        description="Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead"
+        title="Team Capacity Planning (Per Quarter)"
+        description="Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead **per quarter**"
         icon={<div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg"><Gauge size={16} className="text-white" /></div>}
         gradientFrom="from-emerald-50"
         gradientTo="to-teal-50"
@@ -2072,7 +2072,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <thead className="bg-slate-50 border-b border-slate-200">
              <tr>
                <th className="px-6 py-3 font-semibold text-slate-600">Team Lead</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Total Capacity (wks)</th>
+               <th className="px-6 py-3 font-semibold text-slate-600">Total Capacity (wks/quarter)</th>
                <th className="px-6 py-3 font-semibold text-slate-600">Buffer (wks)</th>
                <th className="px-6 py-3 font-semibold text-slate-600">Effective Capacity</th>
                <th className="px-6 py-3 font-semibold text-slate-600">Assigned Load</th>
@@ -2126,6 +2126,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              })}
            </tbody>
          </table>
+         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+           <p className="text-xs text-blue-700">
+             <strong>Note:</strong> Capacity values are per quarter. For example, 20 weeks capacity = 20 weeks of work capacity for the entire quarter.
+           </p>
+         </div>
       </CollapsibleSection>
     </div>
   );

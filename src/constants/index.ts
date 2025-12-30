@@ -185,6 +185,9 @@ export const HIERARCHY: Record<AssetClass, HierarchyNode[]> = {
   ]
 };
 
+// Effort conversion constant
+export const DAYS_PER_WEEK = 5; // Working days per week
+
 const TODAY_OBJ = new Date();
 const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
@@ -662,6 +665,7 @@ export function migratePermissions(
 
 export const INITIAL_CONFIG: AppConfig = {
   bauBufferSuggestion: 15,
+  // Team capacities are per quarter (weeks per quarter)
   teamCapacities: {
     'u_ah': 40,
     'u_tm': 40,
@@ -674,8 +678,8 @@ export const INITIAL_CONFIG: AppConfig = {
     'u_bk_tl': 20,
     'u_da_tl': 20,
   },
+  // Team buffers are per quarter (weeks per quarter reserved for BAU/unplanned work)
   teamBuffers: {
-    // Default buffer values (weeks reserved for BAU/unplanned work)
     'u_ah': 6,
     'u_tm': 6,
     'u_rg': 5,
@@ -766,7 +770,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessWorkplanHealth: 'none',
       createNewTasks: 'yes',
       editTasks: 'own',
-      deleteTasks: 'no',
+      deleteTasks: 'own', // Team Leads can delete their own initiatives
       accessAdmin: 'no',
       manageWorkflows: 'no'
     },
@@ -875,5 +879,9 @@ export const INITIAL_CONFIG: AppConfig = {
       system: true,
       readOnly: true,
     },
-  ]
+  ],
+  weeklyEffortValidation: {
+    enabled: true,
+    thresholdPercent: 15
+  }
 };

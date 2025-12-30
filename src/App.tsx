@@ -1,14 +1,18 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
-import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab } from './utils';
+import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { useLocalStorage, useVersionCheck } from './hooks';
+import { useUrlState } from './hooks/useUrlState';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
+import { validateWeeklyTeamEffort, getCurrentWeekKey, ValidationResult } from './services/weeklyEffortValidation';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
 import AtRiskReasonModal from './components/modals/AtRiskReasonModal';
+import { WeeklyEffortWarningModal } from './components/modals/WeeklyEffortWarningModal';
 
 // Components
 import { TopNav } from './components/shared/TopNav';
@@ -29,6 +33,9 @@ import { LoginPage } from './components/auth';
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
   const { user: authUser, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
   
@@ -449,9 +456,30 @@ export default function App() {
     return () => clearInterval(delayCheckInterval);
   }, [initiatives]);
 
-  // View State
-  const [currentView, setCurrentView] = useState<ViewType>('all');
+  // View State - sync with route
+  const getViewFromPath = (pathname: string): ViewType => {
+    if (pathname === '/admin') return 'admin';
+    if (pathname === '/timeline') return 'timeline';
+    if (pathname === '/workflows') return 'workflows';
+    if (pathname === '/dependencies') return 'dependencies';
+    if (pathname === '/resources') return 'resources';
+    if (pathname.startsWith('/item/')) return 'all'; // Item detail opens in 'all' view
+    return 'all'; // Default to 'all' (dashboard)
+  };
+  
+  const [currentView, setCurrentView] = useState<ViewType>(getViewFromPath(location.pathname));
   const [viewLayout, setViewLayout] = useState<'table' | 'tree'>('table');
+  
+  // Sync currentView with route changes
+  useEffect(() => {
+    const viewFromRoute = getViewFromPath(location.pathname);
+    if (viewFromRoute !== currentView) {
+      setCurrentView(viewFromRoute);
+    }
+  }, [location.pathname]);
+  
+  // Effort Display Unit State (Days vs Weeks)
+  const [effortDisplayUnit, setEffortDisplayUnit] = useLocalStorage<'weeks' | 'days'>('effort-display-unit', 'weeks');
   
   // Team Lead View Simulation (for testing/development)
   const [isTeamLeadView, setIsTeamLeadView] = useLocalStorage<boolean>('portfolio-team-lead-view', false); 
@@ -461,6 +489,32 @@ export default function App() {
   const [filterAssetClass, setFilterAssetClass] = useState<string>('');
   const [filterOwners, setFilterOwners] = useState<string[]>([]);
   const [filterWorkType, setFilterWorkType] = useState<string[]>([]);
+  
+  // URL State Management
+  const { getFilterFromUrl, getSingleFilterFromUrl, updateUrlFilters } = useUrlState();
+  
+  // Initialize filters from URL on mount
+  useEffect(() => {
+    const urlAssetClass = getSingleFilterFromUrl('assetClass');
+    const urlOwners = getFilterFromUrl('owners');
+    const urlWorkType = getFilterFromUrl('workType');
+    const urlSearch = getSingleFilterFromUrl('search');
+    
+    if (urlAssetClass) setFilterAssetClass(urlAssetClass);
+    if (urlOwners.length > 0) setFilterOwners(urlOwners);
+    if (urlWorkType.length > 0) setFilterWorkType(urlWorkType);
+    if (urlSearch) setSearchQuery(urlSearch);
+  }, []); // Only on mount
+  
+  // Update URL when filters change
+  useEffect(() => {
+    updateUrlFilters({
+      assetClass: filterAssetClass,
+      owners: filterOwners,
+      workType: filterWorkType,
+      searchQuery: searchQuery
+    });
+  }, [filterAssetClass, filterOwners, filterWorkType, searchQuery, updateUrlFilters]);
 
   // Sort State
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -475,11 +529,42 @@ export default function App() {
   // At Risk Reason Modal State
   const [isAtRiskModalOpen, setIsAtRiskModalOpen] = useState(false);
   const [pendingAtRiskInitiative, setPendingAtRiskInitiative] = useState<{ id: string; oldStatus: Status } | null>(null);
+  
+  // Weekly Effort Validation State
+  const [weeklyEffortFlags, setWeeklyEffortFlags] = useState<Map<string, ValidationResult>>(new Map());
+  const [showEffortWarningPopup, setShowEffortWarningPopup] = useState(false);
+  const [currentEffortFlag, setCurrentEffortFlag] = useState<ValidationResult | null>(null);
 
-  // Handle hash-based navigation for initiative links (e.g., #initiative=Q425-003)
+  // Handle route-based navigation for initiative links (e.g., /item/Q425-003)
+  // Also handle legacy hash-based navigation for backward compatibility
   useEffect(() => {
     if (!isAuthenticated || initiatives.length === 0) return;
 
+    // Handle route-based navigation: /item/:id
+    if (params.id) {
+      const initiativeId = decodeURIComponent(params.id);
+      const initiative = initiatives.find(i => i.id === initiativeId);
+      
+      if (initiative) {
+        // Ensure we're on dashboard view
+        if (location.pathname.startsWith('/item/') && currentView !== 'all') {
+          navigate('/dashboard', { replace: true });
+        }
+        
+        // Open the modal with the initiative
+        setEditingItem(initiative);
+        setIsModalOpen(true);
+      } else {
+        logger.warn('Initiative not found for route navigation', {
+          context: 'App.routeNavigation',
+          metadata: { initiativeId, availableIds: initiatives.map(i => i.id).slice(0, 5) }
+        });
+        // Redirect to dashboard if initiative not found
+        navigate('/dashboard', { replace: true });
+      }
+    }
+
+    // Handle legacy hash-based navigation for backward compatibility
     const handleHashChange = () => {
       const hash = window.location.hash;
       if (!hash) return;
@@ -489,42 +574,46 @@ export default function App() {
       if (!match) return;
 
       const initiativeId = decodeURIComponent(match[1]);
-      const initiative = initiatives.find(i => i.id === initiativeId);
-
-      if (initiative) {
-        // Switch to the main view if not already there (where initiatives are shown)
-        if (currentView !== 'all') {
-          setCurrentView('all');
-        }
-        
-        // Open the modal with the initiative
-        setEditingItem(initiative);
-        setIsModalOpen(true);
-        
-        // Clear the hash after opening (optional - keeps URL clean)
-        // window.history.replaceState(null, '', window.location.pathname);
-      } else {
-        logger.warn('Initiative not found for hash navigation', {
-          context: 'App.hashNavigation',
-          metadata: { initiativeId, availableIds: initiatives.map(i => i.id).slice(0, 5) }
-        });
-      }
+      // Redirect to route-based URL
+      navigate(`/item/${encodeURIComponent(initiativeId)}`, { replace: true });
+      window.location.hash = ''; // Clear hash
     };
 
-    // Check hash on mount and when initiatives load
-    handleHashChange();
+    // Check hash on mount
+    if (window.location.hash) {
+      handleHashChange();
+    }
 
     // Listen for hash changes
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [isAuthenticated, initiatives, currentView]);
+  }, [isAuthenticated, initiatives, params.id, location.pathname, currentView, navigate]);
+  
+  // Close modal when navigating away from /item/:id
+  useEffect(() => {
+    if (!location.pathname.startsWith('/item/') && isModalOpen && editingItem) {
+      setIsModalOpen(false);
+      setEditingItem(null);
+    }
+  }, [location.pathname, isModalOpen, editingItem]);
 
   // Wrapper function to restrict view changes when Team Lead view is enabled
   const handleViewChange = (view: ViewType) => {
     if (isTeamLeadView && view !== 'all' && view !== 'dependencies') {
       return; // Prevent navigation to restricted views
     }
-    setCurrentView(view);
+    
+    // Map view to route
+    const routeMap: Record<ViewType, string> = {
+      'all': '/dashboard',
+      'admin': '/admin',
+      'timeline': '/timeline',
+      'workflows': '/workflows',
+      'dependencies': '/dependencies',
+      'resources': '/resources'
+    };
+    
+    navigate(routeMap[view] || '/dashboard');
   };
 
   // Team Lead View Restriction - restrict navigation to only 'all' and 'dependencies'
@@ -600,6 +689,88 @@ export default function App() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.workflows, initiatives]);
+
+  // Weekly Effort Validation for Team Leads
+  useEffect(() => {
+    const checkWeeklyValidation = () => {
+      // Only validate if feature is enabled and user is a Team Lead
+      if (!config.weeklyEffortValidation?.enabled || currentUser.role !== Role.TeamLead) {
+        if (currentUser.role === Role.TeamLead) {
+          console.log('[Weekly Validation] Feature disabled or user not Team Lead', {
+            enabled: config.weeklyEffortValidation?.enabled,
+            role: currentUser.role
+          });
+        }
+        return;
+      }
+
+      const result = validateWeeklyTeamEffort(initiatives, config, currentUser.id);
+      
+      // Debug logging
+      console.log('[Weekly Validation] Result:', {
+        flagged: result.flagged,
+        deviationPercent: result.deviationPercent,
+        averageWeeklyEffort: result.averageWeeklyEffort,
+        currentWeekEffort: result.currentWeekEffort,
+        teamLeadId: result.teamLeadId,
+        quarter: result.quarter,
+        threshold: config.weeklyEffortValidation?.thresholdPercent || 15
+      });
+      
+      if (result.flagged) {
+        // Store flag for UI display
+        setWeeklyEffortFlags(prev => new Map(prev).set(currentUser.id, result));
+        
+        // Create notification for Team Lead
+        addNotification(createNotification(
+          NotificationType.WeeklyEffortExceeded,
+          'Weekly Effort Exceeded',
+          `Your weekly effort update (${result.currentWeekEffort.toFixed(1)}w) exceeds the average (${result.averageWeeklyEffort.toFixed(1)}w) by ${result.deviationPercent.toFixed(1)}%`,
+          '', // No specific initiative
+          'Weekly Effort Validation',
+          currentUser.id,
+          { 
+            deviationPercent: result.deviationPercent,
+            averageWeeklyEffort: result.averageWeeklyEffort,
+            currentWeekEffort: result.currentWeekEffort,
+            quarter: result.quarter
+          }
+        ));
+        
+        // Show popup immediately if not already shown for this week
+        const weekKey = getCurrentWeekKey();
+        const lastShown = localStorage.getItem(`effort-warning-shown-${currentUser.id}-${weekKey}`);
+        if (!lastShown) {
+          setCurrentEffortFlag(result);
+          setShowEffortWarningPopup(true);
+          localStorage.setItem(`effort-warning-shown-${currentUser.id}-${weekKey}`, 'true');
+        }
+        
+        // Log to admin/backend
+        logger.warn('Weekly effort validation flagged', {
+          context: 'App.weeklyValidation',
+          teamLeadId: currentUser.id,
+          deviation: result.deviationPercent,
+          averageWeeklyEffort: result.averageWeeklyEffort,
+          currentWeekEffort: result.currentWeekEffort
+        });
+      } else {
+        // Clear flag if no longer exceeded
+        setWeeklyEffortFlags(prev => {
+          const updated = new Map(prev);
+          updated.delete(currentUser.id);
+          return updated;
+        });
+      }
+    };
+    
+    // Check on mount and when initiatives/config change
+    checkWeeklyValidation();
+    
+    // Also check periodically (every hour)
+    const interval = setInterval(checkWeeklyValidation, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [initiatives, config, currentUser, addNotification, createNotification]);
 
   // Derived Data
   const _userPermissions = config.rolePermissions[currentUser.role];
@@ -703,7 +874,9 @@ export default function App() {
       relevantOwners = Object.keys(config.teamCapacities);
     }
 
+    // Calculate total quarterly capacity for filtered owners
     const totalCapacity = relevantOwners.reduce((sum, id) => sum + (config.teamCapacities[id] || 0), 0);
+    // Capacity load: estimated effort vs quarterly capacity
     const capacityLoad = totalCapacity > 0 ? (totalEst / totalCapacity) * 100 : 0;
     const usage = totalEst > 0 ? (totalAct / totalEst) * 100 : 0;
     
@@ -989,10 +1162,15 @@ export default function App() {
       return;
     }
 
-    // Permission check: Only Admin or Director (Group Lead) can delete
-    const canDelete = currentUser.role === Role.Admin || currentUser.role === Role.DirectorGroup;
+    // Permission check: Use permission system
+    const canDelete = canDeleteInitiative(config, currentUser.role, initiative.ownerId, currentUser.id);
     if (!canDelete) {
-      showError('You do not have permission to delete initiatives. Only Admins and Group Leads can delete.');
+      const deleteScope = getTaskManagementScope(config, currentUser.role, 'deleteTasks');
+      if (deleteScope === 'own') {
+        showError('You can only delete initiatives that you own.');
+      } else {
+        showError('You do not have permission to delete initiatives.');
+      }
       return;
     }
 
@@ -1793,6 +1971,7 @@ export default function App() {
         onLogout={logout}
         isTeamLeadView={isTeamLeadView}
         onToggleTeamLeadView={() => setIsTeamLeadView(!isTeamLeadView)}
+        weeklyEffortFlags={weeklyEffortFlags}
       />
 
 
@@ -1939,6 +2118,7 @@ export default function App() {
                   setPendingAtRiskInitiative({ id: initiative.id, oldStatus: initiative.status });
                   setIsAtRiskModalOpen(true);
                 }}
+                effortDisplayUnit={effortDisplayUnit}
               />
             )}
            </>
@@ -1947,7 +2127,14 @@ export default function App() {
 
       <InitiativeModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingItem(null);
+          // Navigate back to dashboard if we're on /item/:id route
+          if (location.pathname.startsWith('/item/')) {
+            navigate('/dashboard', { replace: true });
+          }
+        }}
         onSave={handleSave}
         currentUser={currentUser}
         initiativeToEdit={editingItem}
@@ -1956,6 +2143,8 @@ export default function App() {
         users={users}
         allInitiatives={initiatives}
         onDelete={handleDeleteInitiative}
+        effortDisplayUnit={effortDisplayUnit}
+        setEffortDisplayUnit={setEffortDisplayUnit}
       />
       
       <AtRiskReasonModal
@@ -1964,6 +2153,15 @@ export default function App() {
         currentReason={pendingAtRiskInitiative ? initiatives.find(i => i.id === pendingAtRiskInitiative.id)?.riskActionLog || '' : ''}
         onSave={handleAtRiskReasonSave}
         onCancel={handleAtRiskReasonCancel}
+      />
+
+      <WeeklyEffortWarningModal
+        isOpen={showEffortWarningPopup}
+        onClose={() => {
+          setShowEffortWarningPopup(false);
+          setCurrentEffortFlag(null);
+        }}
+        validationResult={currentEffortFlag}
       />
 
       {/* Support Widget - floating help button */}
