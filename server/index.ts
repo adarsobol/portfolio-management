@@ -740,16 +740,28 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     const loginTimestamp = new Date().toISOString();
     console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
     
-    // Update metadata and lastLogin together
-    if (picture && userRow.get('avatar') !== picture) {
-      userRow.set('avatar', picture);
+    // Ensure userRow exists before attempting save operations
+    if (!userRow) {
+      console.error(`[SERVER] ERROR: userRow is null/undefined for ${email} before save attempt`);
+      throw new Error('Failed to retrieve user row before login update');
     }
-    userRow.set('lastLogin', loginTimestamp);
+    
+    // Update metadata and lastLogin together
+    try {
+      if (picture && userRow.get('avatar') !== picture) {
+        userRow.set('avatar', picture);
+      }
+      userRow.set('lastLogin', loginTimestamp);
+      console.log(`[SERVER] Prepared lastLogin update for ${email}, attempting save...`);
+    } catch (preSaveError) {
+      console.error(`[SERVER] ERROR: Failed to set lastLogin value for ${email} before save:`, preSaveError);
+      throw new Error(`Failed to prepare login update: ${preSaveError instanceof Error ? preSaveError.message : String(preSaveError)}`);
+    }
     
     let savedLastLogin: string | null = loginTimestamp; // Default to what we set
     try {
       await userRow.save();
-      console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
+      console.log(`[SERVER] Successfully saved lastLogin for ${email}: ${loginTimestamp}`);
       
       // Try to verify by reloading, but don't fail if verification doesn't work
       try {
@@ -762,35 +774,87 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
             if (savedTimestamp === loginTimestamp) {
               console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
             } else {
-              console.warn(`[SERVER] lastLogin value differs after save. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+              console.warn(`[SERVER] WARNING: lastLogin value differs after save for ${email}. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
             }
+          } else {
+            console.warn(`[SERVER] WARNING: lastLogin is empty after save for ${email}, but save() succeeded`);
           }
+        } else {
+          console.warn(`[SERVER] WARNING: Could not find user row after save for ${email} during verification`);
         }
       } catch (verifyError) {
-        console.warn(`[SERVER] Could not verify lastLogin save, but save appeared successful:`, verifyError);
+        console.warn(`[SERVER] WARNING: Could not verify lastLogin save for ${email}, but save() appeared successful:`, verifyError instanceof Error ? verifyError.message : String(verifyError));
         // Keep savedLastLogin as loginTimestamp since save() succeeded
       }
     } catch (saveError) {
-      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-      // Try to read existing value as fallback
+      console.error(`[SERVER] ERROR: Failed to save lastLogin for ${email}:`, saveError instanceof Error ? saveError.message : String(saveError));
+      console.error(`[SERVER] ERROR: Save error details for ${email}:`, {
+        error: saveError,
+        errorType: saveError instanceof Error ? saveError.constructor.name : typeof saveError,
+        stack: saveError instanceof Error ? saveError.stack : undefined
+      });
+      
+      // Retry the save operation once
       try {
+        console.log(`[SERVER] Retrying lastLogin save for ${email}...`);
+        // Reload the row to get a fresh reference
         rows = await usersSheet.getRows();
         userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
         if (userRow) {
-          const existingTimestamp = userRow.get('lastLogin');
-          if (existingTimestamp) {
-            savedLastLogin = existingTimestamp;
+          userRow.set('lastLogin', loginTimestamp);
+          await userRow.save();
+          console.log(`[SERVER] Retry successful: Saved lastLogin for ${email}: ${loginTimestamp}`);
+          savedLastLogin = loginTimestamp;
+          
+          // Verify the retry save
+          try {
+            rows = await usersSheet.getRows();
+            userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+            if (userRow) {
+              const retryTimestamp = userRow.get('lastLogin');
+              if (retryTimestamp === loginTimestamp) {
+                console.log(`[SERVER] Verified retry save successful for ${email}`);
+              } else {
+                console.warn(`[SERVER] WARNING: Retry save value differs for ${email}. Expected: ${loginTimestamp}, Got: ${retryTimestamp}`);
+              }
+            }
+          } catch (verifyError) {
+            console.warn(`[SERVER] Could not verify retry save for ${email}:`, verifyError instanceof Error ? verifyError.message : String(verifyError));
+          }
+        } else {
+          console.error(`[SERVER] ERROR: Could not find user row for ${email} during retry`);
+          savedLastLogin = null;
+        }
+      } catch (retryError) {
+        console.error(`[SERVER] ERROR: Retry save also failed for ${email}:`, retryError instanceof Error ? retryError.message : String(retryError));
+        // Try to read existing value as fallback
+        try {
+          rows = await usersSheet.getRows();
+          userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+          if (userRow) {
+            const existingTimestamp = userRow.get('lastLogin');
+            if (existingTimestamp) {
+              savedLastLogin = existingTimestamp;
+              console.log(`[SERVER] Using existing lastLogin value for ${email}: ${existingTimestamp}`);
+            } else {
+              savedLastLogin = null;
+              console.warn(`[SERVER] No existing lastLogin value found for ${email} after retry failure`);
+            }
           } else {
+            console.error(`[SERVER] ERROR: Could not find user row for ${email} after retry error`);
             savedLastLogin = null;
           }
+        } catch (loadError) {
+          console.error(`[SERVER] ERROR: Failed to reload rows after retry error for ${email}:`, loadError instanceof Error ? loadError.message : String(loadError));
+          savedLastLogin = null;
         }
-      } catch (loadError) {
-        console.error(`[SERVER] Failed to reload rows after save error:`, loadError);
-        savedLastLogin = null;
       }
     }
 
-    if (!userRow) throw new Error('Failed to retrieve user after creation');
+    if (!userRow) {
+      console.error(`[SERVER] ERROR: userRow is null/undefined for ${email} after login update attempt`);
+      throw new Error('Failed to retrieve user after login update');
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -2825,14 +2889,20 @@ app.get('/api/admin/login-history', authenticateToken, async (req: Authenticated
     }
 
     const rows = await usersSheet.getRows();
-    const users = rows.map((r: GoogleSpreadsheetRow) => ({
-      id: r.get('id'),
-      email: r.get('email'),
-      name: r.get('name'),
-      role: r.get('role'),
-      avatar: r.get('avatar'),
-      lastLogin: r.get('lastLogin') || null
-    })).sort((a, b) => {
+    const users = rows.map((r: GoogleSpreadsheetRow) => {
+      const lastLoginValue = r.get('lastLogin');
+      // Handle empty strings, null, undefined - convert to null
+      const lastLogin = (lastLoginValue && lastLoginValue.trim() !== '') ? lastLoginValue : null;
+      
+      return {
+        id: r.get('id'),
+        email: r.get('email'),
+        name: r.get('name'),
+        role: r.get('role'),
+        avatar: r.get('avatar'),
+        lastLogin: lastLogin
+      };
+    }).sort((a, b) => {
       // Sort by lastLogin, most recent first, null values at end
       if (!a.lastLogin && !b.lastLogin) return 0;
       if (!a.lastLogin) return 1;
@@ -3834,28 +3904,12 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
 
     // Create notification for admin (adar.sobol@pagaya.com)
     const ADMIN_EMAIL = 'adar.sobol@pagaya.com';
-    const adminNotification = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: NotificationType.SupportTicketNew,
-      title: 'New Support Ticket',
-      message: `${userEmail} submitted: ${title}`,
-      initiativeId: ticket.id,
-      initiativeTitle: title,
-      timestamp: new Date().toISOString(),
-      read: false,
-      userId: 'admin',
-      metadata: {
-        ticketId: ticket.id,
-        submittedBy: userEmail,
-        priority: ticket.priority,
-      },
-    };
-
-    // Store and emit notification to admin
+    
+    // Find admin user ID BEFORE creating notification object
     const gcs = getGCSStorage();
     let adminUserId: string | null = null;
     
-    console.log('[NOTIFICATION] Creating notification for admin, ticket:', ticket.id, 'title:', title);
+    console.log('[NOTIFICATION] Looking up admin user ID for ticket notification, ticket:', ticket.id, 'title:', title);
     
     if (gcs) {
       // Find admin user ID by email
@@ -3868,13 +3922,6 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
           if (adminRow) {
             adminUserId = adminRow.get('id');
             console.log('[NOTIFICATION] Found admin user ID:', adminUserId, 'for email:', ADMIN_EMAIL);
-            if (adminUserId) {
-              adminNotification.userId = adminUserId; // Update notification with actual user ID
-              const stored = await gcs.addNotification(adminUserId, adminNotification);
-              console.log('[NOTIFICATION] Stored notification for admin:', stored, 'notification ID:', adminNotification.id);
-              io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
-              console.log('[NOTIFICATION] Emitted Socket.IO notification to userId:', adminUserId);
-            }
           } else {
             console.warn('[NOTIFICATION] Admin row not found in Users sheet for email:', ADMIN_EMAIL);
           }
@@ -3888,18 +3935,37 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
       console.warn('[NOTIFICATION] GCS storage not available');
     }
     
-    // Always emit via Socket.IO (even if GCS lookup failed, try to find admin user ID from request context)
-    if (!adminUserId) {
-      // If we couldn't find admin user ID, still emit but log a warning
-      console.warn('[NOTIFICATION] Admin user ID not found, emitting with email:', ADMIN_EMAIL);
-      // Store notification with email as userId (fallback)
-      if (gcs) {
-        adminNotification.userId = ADMIN_EMAIL;
-        const stored = await gcs.addNotification(ADMIN_EMAIL, adminNotification);
-        console.log('[NOTIFICATION] Stored notification with email as userId:', stored);
-      }
-      io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
-      console.log('[NOTIFICATION] Emitted Socket.IO notification to email:', ADMIN_EMAIL);
+    // Use actual admin user ID if found, otherwise fall back to email
+    const targetUserId = adminUserId || ADMIN_EMAIL;
+    
+    // Create notification with correct userId from the start
+    const adminNotification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: NotificationType.SupportTicketNew,
+      title: 'New Support Ticket',
+      message: `${userEmail} submitted: ${title}`,
+      initiativeId: ticket.id,
+      initiativeTitle: title,
+      timestamp: new Date().toISOString(),
+      read: false,
+      userId: targetUserId,
+      metadata: {
+        ticketId: ticket.id,
+        submittedBy: userEmail,
+        priority: ticket.priority,
+      },
+    };
+
+    // Store and emit notification to admin
+    if (gcs) {
+      const stored = await gcs.addNotification(targetUserId, adminNotification);
+      console.log('[NOTIFICATION] Stored notification for admin:', stored, 'notification ID:', adminNotification.id, 'targetUserId:', targetUserId);
+      io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
+      console.log('[NOTIFICATION] Emitted Socket.IO notification to userId:', targetUserId);
+    } else {
+      // Emit via Socket.IO even without GCS persistence
+      io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
+      console.log('[NOTIFICATION] Emitted Socket.IO notification to userId:', targetUserId, '(no GCS persistence)');
     }
 
     res.json({ success, ticket });
@@ -4146,25 +4212,8 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
         io.emit('notification:received', { userId: ticket.createdBy, notification: creatorNotification });
       } else {
         // User commented - notify admin
-        const adminNotification = {
-          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          type: NotificationType.SupportTicketReply,
-          title: 'New Comment on Ticket',
-          message: `${userEmail} commented on: "${ticket.title}"`,
-          initiativeId: id,
-          initiativeTitle: ticket.title,
-          timestamp: new Date().toISOString(),
-          read: false,
-          userId: 'admin',
-          metadata: {
-            ticketId: id,
-            commentId: comment.id,
-            commentPreview: content.substring(0, 50),
-          },
-        };
-
-        // Find admin user ID and send notification
-        console.log('[NOTIFICATION] Creating notification for admin comment, ticket:', id, 'title:', ticket.title);
+        // Find admin user ID BEFORE creating notification object
+        console.log('[NOTIFICATION] Looking up admin user ID for comment notification, ticket:', id, 'title:', ticket.title);
         const gcs = getGCSStorage();
         let adminUserId: string | null = null;
         
@@ -4178,13 +4227,6 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
               if (adminRow) {
                 adminUserId = adminRow.get('id');
                 console.log('[NOTIFICATION] Found admin user ID for comment:', adminUserId, 'for email:', ADMIN_EMAIL);
-                if (adminUserId) {
-                  adminNotification.userId = adminUserId; // Update notification with actual user ID
-                  const stored = await gcs.addNotification(adminUserId, adminNotification);
-                  console.log('[NOTIFICATION] Stored comment notification for admin:', stored, 'notification ID:', adminNotification.id);
-                  io.emit('notification:received', { userId: adminUserId, notification: adminNotification });
-                  console.log('[NOTIFICATION] Emitted Socket.IO comment notification to userId:', adminUserId);
-                }
               } else {
                 console.warn('[NOTIFICATION] Admin row not found for comment notification');
               }
@@ -4198,18 +4240,37 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
           console.warn('[NOTIFICATION] GCS storage not available for comment notification');
         }
         
-        // Always emit via Socket.IO (even if GCS lookup failed)
-        if (!adminUserId) {
-          // If we couldn't find admin user ID, still emit but log a warning
-          console.warn('[NOTIFICATION] Admin user ID not found for comment notification, emitting with email:', ADMIN_EMAIL);
-          // Store notification with email as userId (fallback)
-          if (gcs) {
-            adminNotification.userId = ADMIN_EMAIL;
-            const stored = await gcs.addNotification(ADMIN_EMAIL, adminNotification);
-            console.log('[NOTIFICATION] Stored comment notification with email as userId:', stored);
-          }
-          io.emit('notification:received', { userId: ADMIN_EMAIL, notification: adminNotification });
-          console.log('[NOTIFICATION] Emitted Socket.IO comment notification to email:', ADMIN_EMAIL);
+        // Use actual admin user ID if found, otherwise fall back to email
+        const targetUserId = adminUserId || ADMIN_EMAIL;
+        
+        // Create notification with correct userId from the start
+        const adminNotification = {
+          id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: NotificationType.SupportTicketReply,
+          title: 'New Comment on Ticket',
+          message: `${userEmail} commented on: "${ticket.title}"`,
+          initiativeId: id,
+          initiativeTitle: ticket.title,
+          timestamp: new Date().toISOString(),
+          read: false,
+          userId: targetUserId,
+          metadata: {
+            ticketId: id,
+            commentId: comment.id,
+            commentPreview: content.substring(0, 50),
+          },
+        };
+
+        // Store and emit notification
+        if (gcs) {
+          const stored = await gcs.addNotification(targetUserId, adminNotification);
+          console.log('[NOTIFICATION] Stored comment notification for admin:', stored, 'notification ID:', adminNotification.id, 'targetUserId:', targetUserId);
+          io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
+          console.log('[NOTIFICATION] Emitted Socket.IO comment notification to userId:', targetUserId);
+        } else {
+          // Emit via Socket.IO even without GCS persistence
+          io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
+          console.log('[NOTIFICATION] Emitted Socket.IO comment notification to userId:', targetUserId, '(no GCS persistence)');
         }
       }
     }
@@ -4280,6 +4341,72 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
     
     // Broadcast feedback event via Socket.IO for real-time updates
     io.emit('feedback:submitted', { feedback });
+    
+    // Create notification for admin (adar.sobol@pagaya.com)
+    const ADMIN_EMAIL = 'adar.sobol@pagaya.com';
+    
+    // Find admin user ID BEFORE creating notification object
+    const gcs = getGCSStorage();
+    let adminUserId: string | null = null;
+    
+    console.log('[NOTIFICATION] Looking up admin user ID for feedback notification, feedback:', feedback.id, 'title:', feedback.title);
+    
+    if (gcs) {
+      // Find admin user ID by email
+      const doc = await getDoc();
+      if (doc) {
+        const usersSheet = doc.sheetsByTitle['Users'];
+        if (usersSheet) {
+          const rows = await usersSheet.getRows();
+          const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
+          if (adminRow) {
+            adminUserId = adminRow.get('id');
+            console.log('[NOTIFICATION] Found admin user ID for feedback:', adminUserId, 'for email:', ADMIN_EMAIL);
+          } else {
+            console.warn('[NOTIFICATION] Admin row not found in Users sheet for email:', ADMIN_EMAIL);
+          }
+        } else {
+          console.warn('[NOTIFICATION] Users sheet not found for feedback notification');
+        }
+      } else {
+        console.warn('[NOTIFICATION] Could not get Google Sheets doc for feedback notification');
+      }
+    } else {
+      console.warn('[NOTIFICATION] GCS storage not available for feedback notification');
+    }
+    
+    // Use actual admin user ID if found, otherwise fall back to email
+    const targetUserId = adminUserId || ADMIN_EMAIL;
+    
+    // Create notification with correct userId from the start
+    const adminNotification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: NotificationType.SupportTicketNew, // Reuse SupportTicketNew type for feedback
+      title: 'New Feedback Submitted',
+      message: `${feedback.submittedByEmail} submitted ${feedback.type} feedback: ${feedback.title}`,
+      initiativeId: feedback.id,
+      initiativeTitle: feedback.title,
+      timestamp: new Date().toISOString(),
+      read: false,
+      userId: targetUserId,
+      metadata: {
+        feedbackId: feedback.id,
+        feedbackType: feedback.type,
+        submittedBy: feedback.submittedByEmail,
+      },
+    };
+
+    // Store and emit notification to admin
+    if (gcs) {
+      const stored = await gcs.addNotification(targetUserId, adminNotification);
+      console.log('[NOTIFICATION] Stored feedback notification for admin:', stored, 'notification ID:', adminNotification.id, 'targetUserId:', targetUserId);
+      io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
+      console.log('[NOTIFICATION] Emitted Socket.IO feedback notification to userId:', targetUserId);
+    } else {
+      // Emit via Socket.IO even without GCS persistence
+      io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
+      console.log('[NOTIFICATION] Emitted Socket.IO feedback notification to userId:', targetUserId, '(no GCS persistence)');
+    }
     
     res.json({ success: true, stored, feedback });
   } catch (error) {
