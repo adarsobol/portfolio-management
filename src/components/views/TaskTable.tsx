@@ -1121,20 +1121,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           })()}
                         </div>
                         {/* ETA */}
-                        <div className="col-span-3">
+                        <div className="col-span-3 min-w-[140px]">
                           {editable ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">ETA:</span>
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">ETA:</span>
                               <input
                                 type="date"
                                 value={task.eta || ''}
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
-                                className="flex-1 text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                                className="flex-1 min-w-0 text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
                               />
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">ETA:</span>
+                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">ETA:</span>
                               <span className="text-xs text-slate-600">{task.eta || 'N/A'}</span>
                             </div>
                           )}
