@@ -869,19 +869,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       });
 
-      const data = await response.json();
-
+      // Check status BEFORE parsing JSON to handle 404 gracefully
       if (response.status === 404) {
         // User doesn't exist in backend (likely a fallback user from USERS constant)
-        // Just remove from local state - no need to refresh from API
+        // Just remove from local state silently - no need to refresh from API
         setUsers(users.filter(u => u.id !== id));
         setIsDeletingUser(null);
         return;
       }
 
       if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: 'Failed to delete user' }));
         throw new Error(data.error || 'Failed to delete user');
       }
+
+      // Success - parse response
+      const data = await response.json();
 
       // Refresh users list from API
       const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
