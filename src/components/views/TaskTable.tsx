@@ -4,7 +4,7 @@ import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserC
 import { StatusBadge, PriorityBadge } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
 import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
-import { weeksToDays, daysToWeeks, formatEffort } from '../../utils/effortConverter';
+import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];

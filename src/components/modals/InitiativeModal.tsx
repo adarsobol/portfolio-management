@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative } from '../../utils';
-import { weeksToDays, daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
+import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService } from '../../services';
 
 // ============================================================================

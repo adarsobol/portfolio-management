@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 
 /**
@@ -7,7 +7,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
  * Restores filters from URL on mount
  */
 export function useUrlState() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
 

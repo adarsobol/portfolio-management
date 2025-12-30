@@ -17,7 +17,7 @@ interface TopNavProps {
 }
 
 export const TopNav: React.FC<TopNavProps> = ({ 
-  currentView, 
+  currentView: _currentView, 
   setCurrentView, 
   currentUser, 
   config,
