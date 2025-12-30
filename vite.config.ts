@@ -23,7 +23,22 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      plugins: [react()],
+      plugins: [
+        react(),
+        // Plugin to inject build hash into HTML for version checking
+        {
+          name: 'inject-build-hash',
+          transformIndexHtml(html) {
+            // Generate a build hash based on timestamp
+            const buildHash = Date.now().toString(36);
+            // Inject as meta tag in the head
+            return html.replace(
+              '<head>',
+              `<head>\n    <meta name="app-build-hash" content="${buildHash}">`
+            );
+          }
+        }
+      ],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')

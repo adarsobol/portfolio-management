@@ -4,7 +4,7 @@ import { Search, Plus } from 'lucide-react';
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions } from './constants';
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab } from './utils';
-import { useLocalStorage } from './hooks';
+import { useLocalStorage, useVersionCheck } from './hooks';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
@@ -31,6 +31,9 @@ const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 export default function App() {
   const { user: authUser, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
+  
+  // Check for app updates and auto-refresh if new version detected
+  useVersionCheck();
   
   // Ref for main scrollable container
   const mainContainerRef = useRef<HTMLElement>(null);
