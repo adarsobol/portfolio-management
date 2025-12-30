@@ -398,7 +398,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     return <FileText size={14} className="text-blue-600" />;
   };
 
-  const getTaskIcon = (task: Task): React.ReactNode => {
+  const getTaskIcon = (_task: Task): React.ReactNode => {
     return <CheckSquare size={12} className="text-purple-500" />;
   };
 
