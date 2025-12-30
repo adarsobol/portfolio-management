@@ -541,8 +541,11 @@ export default function App() {
     if (!isAuthenticated || initiatives.length === 0) return;
 
     // Handle route-based navigation: /item/:id
-    if (params.id) {
-      const initiativeId = decodeURIComponent(params.id);
+    // Extract ID from pathname or params (params.id may not work if Routes are nested)
+    const itemMatch = location.pathname.match(/^\/item\/(.+)$/);
+    const initiativeId = itemMatch ? decodeURIComponent(itemMatch[1]) : (params.id ? decodeURIComponent(params.id) : null);
+    
+    if (initiativeId) {
       const initiative = initiatives.find(i => i.id === initiativeId);
       
       if (initiative) {
