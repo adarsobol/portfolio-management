@@ -1121,7 +1121,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           })()}
                         </div>
                         {/* ETA */}
-                        <div className="col-span-2">
+                        <div className="col-span-3">
                           {editable ? (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">ETA:</span>
@@ -1162,7 +1162,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           )}
                         </div>
                         {/* Status */}
-                        <div className="col-span-1.5">
+                        <div className="col-span-1">
                           {editable ? (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Status:</span>
