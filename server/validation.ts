@@ -18,6 +18,7 @@ export const registerUserSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   role: z.enum(['Admin', 'Team Lead', 'Group Lead (Director)', 'Portfolio Ops', 'VP']),
   avatar: z.string().url('Invalid avatar URL').optional().or(z.literal('')),
+  team: z.string().optional(),
 });
 
 export const changePasswordSchema = z.object({
@@ -70,6 +71,7 @@ export const bulkImportUsersSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     role: z.enum(['Admin', 'Team Lead', 'Group Lead (Director)', 'Portfolio Ops', 'VP']),
     avatar: z.string().url('Invalid avatar URL').optional().or(z.literal('')),
+    team: z.string().optional(),
   })).min(1, 'At least one user is required'),
 });
 

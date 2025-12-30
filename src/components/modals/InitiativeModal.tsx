@@ -273,6 +273,55 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     }
   }, [showActionsMenu]);
 
+  // Real-time asset class assignment based on selected owner's team
+  useEffect(() => {
+    // Only apply for new initiatives (not edit mode)
+    if (isEditMode) return;
+    
+    // Only apply if owner is selected
+    if (!formData.ownerId) return;
+
+    // Check if workflow is enabled
+    const assetClassWorkflow = config.workflows?.find(
+      w => w.name === 'Team-Based Asset Class Assignment' && w.enabled
+    );
+
+    if (!assetClassWorkflow) return;
+
+    // Find the selected user
+    const selectedUser = users.find(u => u.id === formData.ownerId);
+    if (!selectedUser || !selectedUser.team) return;
+
+    // Map team to asset class
+    const teamToAssetClass: Record<string, AssetClass> = {
+      'PL': AssetClass.PL,
+      'Auto': AssetClass.Auto,
+      'POS': AssetClass.POS,
+      'Advisory': AssetClass.Advisory,
+    };
+
+    const mappedAssetClass = teamToAssetClass[selectedUser.team];
+    if (!mappedAssetClass) return;
+
+    // Only auto-assign if asset class hasn't been manually set (or is default PL)
+    // If current asset class is PL (default), we still apply the workflow
+    const currentAssetClass = formData.l1_assetClass || AssetClass.PL;
+    
+    // Apply asset class if team matches
+    if (mappedAssetClass !== currentAssetClass) {
+      const pillars = HIERARCHY[mappedAssetClass];
+      const defaultPillar = pillars[0]?.name || '';
+      const defaultResp = pillars[0]?.responsibilities[0] || '';
+
+      setFormData(prev => ({
+        ...prev,
+        l1_assetClass: mappedAssetClass,
+        l2_pillar: defaultPillar,
+        l3_responsibility: defaultResp
+      }));
+    }
+  }, [formData.ownerId, isEditMode, config.workflows, users]);
+
   // ============================================================================
   // DERIVED DATA
   // ============================================================================

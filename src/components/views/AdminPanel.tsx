@@ -785,36 +785,177 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     return config.rolePermissions[role]?.[key] ?? defaultValue;
   };
 
-  const handleAddUser = () => {
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  const handleAddUser = async () => {
     if (!newUser.name || !newUser.email) return;
-    const id = 'u_' + generateId().substring(0, 5);
-    const user: User = {
-      id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role as Role,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUser.name)}&background=random`,
-      team: newUser.team
-    };
-    setUsers([...users, user]);
-    setNewUser({ role: Role.TeamLead });
+    
+    setIsAddingUser(true);
+    setUserError(null);
+    
+    try {
+      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(newUser.name)}&background=random`;
+      // Generate a temporary password for OAuth users (they'll use Google login)
+      const tempPassword = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      
+      const response = await fetch(`${API_ENDPOINT}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        },
+        body: JSON.stringify({
+          email: newUser.email,
+          password: tempPassword, // Temporary password for OAuth users
+          name: newUser.name,
+          role: newUser.role || Role.TeamLead,
+          avatar: avatar,
+          team: newUser.team || undefined
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create user');
+      }
+
+      // Refresh users list from API
+      const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        }
+      });
+      
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        if (usersData.users) {
+          setUsers(usersData.users);
+        }
+      }
+
+      // Clear form
+      setNewUser({ role: Role.TeamLead });
+    } catch (error) {
+      console.error('Failed to add user:', error);
+      setUserError(error instanceof Error ? error.message : 'Failed to add user');
+      alert(`Failed to add user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAddingUser(false);
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
+  const [isDeletingUser, setIsDeletingUser] = useState<string | null>(null);
+
+  const handleDeleteUser = async (id: string) => {
     if (id === currentUser.id) {
       alert("You cannot delete yourself.");
       return;
     }
-    if (confirm("Are you sure you want to delete this user?")) {
-      setUsers(users.filter(u => u.id !== id));
+    
+    if (!confirm("Are you sure you want to delete this user?")) {
+      return;
+    }
+
+    setIsDeletingUser(id);
+    setUserError(null);
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete user');
+      }
+
+      // Refresh users list from API
+      const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        }
+      });
+      
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        if (usersData.users) {
+          setUsers(usersData.users);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      setUserError(error instanceof Error ? error.message : 'Failed to delete user');
+      alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDeletingUser(null);
     }
   };
 
+  const [isUpdatingUser, setIsUpdatingUser] = useState<string | null>(null);
+
   // Update user role or team inline
-  const handleUpdateUser = (userId: string, field: keyof User, value: any) => {
+  const handleUpdateUser = async (userId: string, field: keyof User, value: any) => {
+    // Optimistically update UI
+    const previousUsers = users;
     setUsers(users.map(u => 
       u.id === userId ? { ...u, [field]: value } : u
     ));
+
+    setIsUpdatingUser(userId);
+    setUserError(null);
+
+    try {
+      const updateData: { role?: Role; team?: string } = {};
+      if (field === 'role') {
+        updateData.role = value as Role;
+      } else if (field === 'team') {
+        updateData.team = value || undefined;
+      }
+
+      const response = await fetch(`${API_ENDPOINT}/api/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Revert optimistic update on error
+        setUsers(previousUsers);
+        throw new Error(data.error || 'Failed to update user');
+      }
+
+      // Refresh users list from API to get server state
+      const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        }
+      });
+      
+      if (usersResponse.ok) {
+        const usersData = await usersResponse.json();
+        if (usersData.users) {
+          setUsers(usersData.users);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      setUserError(error instanceof Error ? error.message : 'Failed to update user');
+      // Error is silent for inline updates - user can see the revert
+    } finally {
+      setIsUpdatingUser(null);
+    }
   };
 
   // Team options based on asset classes + custom options
@@ -1653,12 +1794,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            </div>
            <button 
              onClick={handleAddUser}
-             disabled={!newUser.name || !newUser.email}
+             disabled={!newUser.name || !newUser.email || isAddingUser}
              className="bg-blue-600 text-white text-sm px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
            >
-             <Plus size={16} /> Add User
+             {isAddingUser ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} 
+             {isAddingUser ? 'Adding...' : 'Add User'}
            </button>
          </div>
+
+         {userError && (
+           <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+             <AlertCircle size={16} />
+             {userError}
+           </div>
+         )}
 
          <div className="max-h-80 overflow-y-auto custom-scrollbar">
            <table className="w-full text-left text-sm">
@@ -1683,7 +1832,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                      <select
                        value={u.role}
                        onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
-                       className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer"
+                       disabled={isUpdatingUser === u.id}
+                       className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                      >
                        {Object.values(Role).map(r => (
                          <option key={r} value={r}>{r}</option>
@@ -1694,7 +1844,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                      <select
                        value={u.team || ''}
                        onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
-                       className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer"
+                       disabled={isUpdatingUser === u.id}
+                       className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                      >
                        <option value="">Unassigned</option>
                        {teamOptions.map(team => (
@@ -1705,10 +1856,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    <td className="px-6 py-3 text-right">
                      <button 
                        onClick={() => handleDeleteUser(u.id)}
-                       className="text-slate-400 hover:text-red-500 transition-colors"
+                       disabled={isDeletingUser === u.id}
+                       className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                        title="Remove User"
                      >
-                       <Trash2 size={16} />
+                       {isDeletingUser === u.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                      </button>
                    </td>
                  </tr>

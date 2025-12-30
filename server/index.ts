@@ -634,7 +634,7 @@ const TASK_HEADERS = [
   'eta', 'ownerId', 'status', 'tags', 'comments', 'lastUpdated', 'deletedAt'
 ];
 
-const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin'];
+const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin', 'team'];
 
 // ============================================
 // AUTH ROUTES (Public)
@@ -913,7 +913,7 @@ app.post('/api/auth/register', authenticateToken, validate(registerUserSchema), 
       return;
     }
 
-    const { email, password, name, role, avatar } = req.body;
+    const { email, password, name, role, avatar, team } = req.body;
 
     const doc = await getDoc();
     if (!doc) {
@@ -948,12 +948,13 @@ app.post('/api/auth/register', authenticateToken, validate(registerUserSchema), 
       name,
       role,
       avatar: userAvatar,
-      lastLogin: ''
+      lastLogin: '',
+      team: team || ''
     });
 
     res.json({
       success: true,
-      user: { id: userId, email, name, role, avatar: userAvatar }
+      user: { id: userId, email, name, role, avatar: userAvatar, team: team || undefined }
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -1062,13 +1063,134 @@ app.get('/api/auth/users', authenticateToken, async (req: AuthenticatedRequest, 
       email: r.get('email'),
       name: r.get('name'),
       role: r.get('role'),
-      avatar: r.get('avatar')
+      avatar: r.get('avatar'),
+      team: r.get('team') || undefined
     }));
 
     res.json({ users });
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Failed to get users' });
+  }
+});
+
+// PUT /api/users/:id - Update user (Admin only)
+app.put('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Check if user is admin
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Only admins can update users' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { role, team } = req.body;
+
+    // Validate that at least one field is being updated
+    if (role === undefined && team === undefined) {
+      res.status(400).json({ error: 'At least one field (role or team) must be provided' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    const usersSheet = doc.sheetsByTitle['Users'];
+    if (!usersSheet) {
+      res.status(404).json({ error: 'Users sheet not found' });
+      return;
+    }
+
+    const rows = await usersSheet.getRows();
+    const userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+
+    if (!userRow) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Update fields if provided
+    if (role !== undefined) {
+      if (!VALID_ROLES.includes(role)) {
+        res.status(400).json({ error: `Invalid role "${role}". Valid roles: ${VALID_ROLES.join(', ')}` });
+        return;
+      }
+      userRow.set('role', role);
+    }
+
+    if (team !== undefined) {
+      userRow.set('team', team || '');
+    }
+
+    await userRow.save();
+
+    res.json({
+      success: true,
+      user: {
+        id: userRow.get('id'),
+        email: userRow.get('email'),
+        name: userRow.get('name'),
+        role: userRow.get('role'),
+        avatar: userRow.get('avatar'),
+        team: userRow.get('team') || undefined
+      }
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// DELETE /api/users/:id - Delete user (Admin only)
+app.delete('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Check if user is admin
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Only admins can delete users' });
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Prevent deleting self
+    if (req.user?.id === id) {
+      res.status(400).json({ error: 'You cannot delete yourself' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    const usersSheet = doc.sheetsByTitle['Users'];
+    if (!usersSheet) {
+      res.status(404).json({ error: 'Users sheet not found' });
+      return;
+    }
+
+    const rows = await usersSheet.getRows();
+    const userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+
+    if (!userRow) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    await userRow.delete();
+
+    res.json({
+      success: true,
+      id: id,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
@@ -1170,7 +1292,8 @@ app.post('/api/users/bulk-import', authenticateToken, validate(bulkImportUsersSc
         name: name,
         role: role,
         avatar: avatar,
-        lastLogin: ''
+        lastLogin: '',
+        team: user.team || ''
       });
 
       // Add to existing set to prevent duplicates within the same import

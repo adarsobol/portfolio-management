@@ -1099,8 +1099,9 @@ export default function App() {
       );
       
       if (assetClassWorkflow) {
-        // Get the current user's team
-        const userTeam = currentUser.team;
+        // Get the selected owner's team (not current user's team)
+        const owner = users.find(u => u.id === item.ownerId);
+        const ownerTeam = owner?.team;
         
         // Map team to asset class (only for teams that match asset classes)
         const teamToAssetClass: Record<string, AssetClass> = {
@@ -1110,11 +1111,11 @@ export default function App() {
           'Advisory': AssetClass.Advisory,
         };
         
-        // Apply asset class if team matches and no explicit asset class was provided
+        // Apply asset class if owner's team matches and no explicit asset class was provided
         // We use a reasonable default check: if the asset class is PL (first option), 
         // we still apply the workflow since the user might not have explicitly chosen it
-        if (userTeam && teamToAssetClass[userTeam]) {
-          item.l1_assetClass = teamToAssetClass[userTeam];
+        if (ownerTeam && teamToAssetClass[ownerTeam]) {
+          item.l1_assetClass = teamToAssetClass[ownerTeam];
         }
       }
     }
