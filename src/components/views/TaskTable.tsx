@@ -441,69 +441,68 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             {index + 1}
           </td>
           <td className="px-3 py-2 border-r border-b border-slate-200 min-w-[320px] relative">
-            <div className="flex items-start gap-2">
-              {/* Initiative icon */}
-              <div className="flex-shrink-0 mt-0.5">
-                {getInitiativeIcon(item)}
-              </div>
-              {isBAU && (
-                <button
-                  onClick={() => toggleTasks(item.id)}
-                  className="relative p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5 flex items-center gap-1"
-                  title={tasksExpanded ? `Collapse ${tasks.length} tasks` : `Expand ${tasks.length} tasks`}
-                >
-                  {tasksExpanded ? (
-                    <ChevronDown size={14} className="text-purple-600" />
-                  ) : (
-                    <ChevronRight size={14} className="text-purple-600" />
-                  )}
-                  {/* Task count badge - always visible when collapsed */}
-                  {!tasksExpanded && tasks.length > 0 && (
-                    <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
-                      {tasks.length}
-                    </span>
-                  )}
-                  {/* Show status breakdown dots when collapsed */}
-                  {!tasksExpanded && tasks.length > 0 && (
-                    <div className="flex gap-0.5 ml-1">
-                      {tasks.filter(t => t.status === Status.InProgress).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${tasks.filter(t => t.status === Status.InProgress).length} in progress`} />
-                      )}
-                      {tasks.filter(t => t.status === Status.AtRisk).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${tasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
-                      )}
-                      {tasks.filter(t => t.status === Status.Done).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${tasks.filter(t => t.status === Status.Done).length} done`} />
-                      )}
-                    </div>
-                  )}
-                </button>
-              )}
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  navigate(`/item/${encodeURIComponent(item.id)}`);
-                }}
-                className={`font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer ${
-                  isBAU ? 'bg-purple-50/50 border border-purple-200' : 'bg-blue-50/30 border border-blue-200'
-                }`}
-                title={item.title}
-              >
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="break-words flex-1 min-w-0">{item.title}</span>
-                  {isBAU && (
-                    <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded flex-shrink-0">
-                      BAU
-                    </span>
-                  )}
-                  {isBAU && tasks.length > 0 && (
-                    <span className="px-1 py-0.5 bg-purple-50 text-purple-600 text-[8px] font-semibold rounded flex-shrink-0">
-                      {tasks.length}t
-                    </span>
-                  )}
+            <div className="flex items-start gap-2 justify-between">
+              {/* Left side: Icon, chevron, and title */}
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                {/* Initiative icon */}
+                <div className="flex-shrink-0 mt-0.5">
+                  {getInitiativeIcon(item)}
                 </div>
-              </button>
+                {isBAU && (
+                  <button
+                    onClick={() => toggleTasks(item.id)}
+                    className="p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5"
+                    title={tasksExpanded ? `Collapse ${tasks.length} tasks` : `Expand ${tasks.length} tasks`}
+                  >
+                    {tasksExpanded ? (
+                      <ChevronDown size={14} className="text-purple-600" />
+                    ) : (
+                      <ChevronRight size={14} className="text-purple-600" />
+                    )}
+                  </button>
+                )}
+                {/* Title button - always starts at same position */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate(`/item/${encodeURIComponent(item.id)}`);
+                  }}
+                  className={`font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 min-w-0 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                    isBAU ? 'bg-purple-50/50 border border-purple-200' : 'bg-blue-50/30 border border-blue-200'
+                  }`}
+                  title={item.title}
+                >
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="break-words">{item.title}</span>
+                    {isBAU && (
+                      <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded flex-shrink-0">
+                        BAU
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </div>
+              {/* Right side: Task count badge and status dots */}
+              {isBAU && !tasksExpanded && tasks.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
+                    {tasks.length}
+                  </span>
+                  {/* Show status breakdown dots */}
+                  <div className="flex gap-0.5">
+                    {tasks.filter(t => t.status === Status.InProgress).length > 0 && (
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${tasks.filter(t => t.status === Status.InProgress).length} in progress`} />
+                    )}
+                    {tasks.filter(t => t.status === Status.AtRisk).length > 0 && (
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${tasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
+                    )}
+                    {tasks.filter(t => t.status === Status.Done).length > 0 && (
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${tasks.filter(t => t.status === Status.Done).length} done`} />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           {/* Compact metadata styling */}
           <div className="text-[9px] mt-1 flex gap-1 items-center flex-wrap">
