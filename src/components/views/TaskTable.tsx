@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge } from '../shared/Shared';
@@ -55,6 +56,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   effortDisplayUnit = 'weeks',
   setEffortDisplayUnit
 }) => {
+  const navigate = useNavigate();
   void _onDeleteInitiative; // Reserved for delete functionality
   // Use allInitiatives if provided, otherwise fall back to filteredInitiatives
   const allInitiativesList = allInitiatives || filteredInitiatives;
@@ -408,7 +410,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 </button>
               )}
               <button
-                onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate(`/item/${encodeURIComponent(item.id)}`);
+                }}
                 className="font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer"
                 title={item.title}
               >
@@ -682,6 +688,42 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <ArrowUp size={12} />
                 </button>
               </div>
+              {setEffortDisplayUnit && (
+                <div className="flex items-center gap-0.5 border border-slate-300 rounded ml-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEffortDisplayUnit('days');
+                    }}
+                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
+                      effortDisplayUnit === 'days' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-slate-600 hover:bg-slate-100 bg-white'
+                    }`}
+                    title="Switch to days"
+                  >
+                    D
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEffortDisplayUnit('weeks');
+                    }}
+                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
+                      effortDisplayUnit === 'weeks' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-slate-600 hover:bg-slate-100 bg-white'
+                    }`}
+                    title="Switch to weeks"
+                  >
+                    W
+                  </button>
+                </div>
+              )}
               <span className="text-slate-400 text-xs font-medium flex-shrink-0">{effortDisplayUnit === 'days' ? 'd' : 'w'}</span>
             </div>
           ) : (

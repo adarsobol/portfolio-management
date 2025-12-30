@@ -546,9 +546,9 @@ export default function App() {
       const initiative = initiatives.find(i => i.id === initiativeId);
       
       if (initiative) {
-        // Ensure we're on dashboard view
+        // Ensure we're on dashboard view (set view state without navigating away from /item/:id)
         if (location.pathname.startsWith('/item/') && currentView !== 'all') {
-          navigate('/dashboard', { replace: true });
+          setCurrentView('all');
         }
         
         // Open the modal with the initiative

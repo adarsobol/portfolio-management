@@ -17,10 +17,12 @@ export function weeksToDays(weeks: number): number {
 /**
  * Convert days to weeks
  * @param days - Number of days
- * @returns Number of weeks (rounded to 2 decimal places)
+ * @returns Number of weeks (rounded to 4 decimal places for better precision)
  */
 export function daysToWeeks(days: number): number {
-  return Math.round((days / DAYS_PER_WEEK) * 100) / 100;
+  // Use 4 decimal places to minimize rounding errors while keeping practical precision
+  // 0.0001 weeks = 0.0005 days, which is negligible for practical purposes
+  return Math.round((days / DAYS_PER_WEEK) * 10000) / 10000;
 }
 
 /**
