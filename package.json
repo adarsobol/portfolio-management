@@ -37,13 +37,13 @@
     "version:show": "node -p \"require('./package.json').version\""
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.14.0",
     "@react-oauth/google": "^0.12.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^8.2.1",
-    "@google-cloud/storage": "^7.14.0",
     "google-auth-library": "^9.14.0",
     "google-spreadsheet": "^4.1.4",
     "html2canvas": "^1.4.1",
@@ -53,7 +53,7 @@
     "lucide-react": "^0.555.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^6.26.0",
+    "react-router-dom": "^6.30.2",
     "recharts": "^3.5.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
