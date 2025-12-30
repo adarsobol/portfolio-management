@@ -883,10 +883,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         throw new Error(data.error || 'Failed to delete user');
       }
 
-      // Success - parse response
-      const data = await response.json();
-
-      // Refresh users list from API
+      // Success - refresh users list from API
       const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
