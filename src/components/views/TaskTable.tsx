@@ -438,7 +438,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       <>
         <tr key={item.id} className={`group hover:bg-blue-50/60 transition-colors border-b border-slate-100 ${rowColorClass} ${isUpdating ? 'bg-blue-50/30' : ''}`}>
           <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
-            {index + 1}
+            {item.id}
           </td>
           <td className="px-3 py-2 border-r border-b border-slate-200 min-w-[320px] relative">
             <div className="flex items-start gap-2 justify-between">
@@ -506,9 +506,6 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
           {/* Compact metadata styling */}
           <div className="text-[9px] mt-1 flex gap-1 items-center flex-wrap">
-             <span className="px-1 py-0.5 bg-slate-100 text-slate-600 font-mono font-semibold rounded flex-shrink-0">
-               {item.id}
-             </span>
              {viewMode === 'flat' && (
                <>
                  <span className="font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{item.l1_assetClass}</span>
@@ -1632,9 +1629,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <thead className="sticky top-0 z-20 shadow-md">
             <tr className="bg-gradient-to-b from-slate-100 to-slate-50 border-b-2 border-slate-300">
               <th className="w-12 px-3 py-2.5 text-center font-bold text-slate-500 text-xs border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
-                #
+                ID
               </th>
-              <SortableHeader label="Initiative" sortKey="title" />
+              <SortableHeader label={`Initiative (${filteredInitiatives.length})`} sortKey="title" />
               <SortableHeader label="Owner" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
