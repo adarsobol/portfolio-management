@@ -727,20 +727,37 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     
     // Set and save lastLogin
     userRow.set('lastLogin', loginTimestamp);
+    let savedLastLogin: string | null = null;
     try {
       await userRow.save();
       console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
       
+      // Reload rows to ensure we have the latest data
+      rows = await usersSheet.getRows();
+      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+      
       // Verify the save worked by reading it back
-      const savedTimestamp = userRow.get('lastLogin');
-      if (savedTimestamp === loginTimestamp) {
-        console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
-      } else {
-        console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+      if (userRow) {
+        const savedTimestamp = userRow.get('lastLogin');
+        savedLastLogin = savedTimestamp || null;
+        if (savedTimestamp === loginTimestamp) {
+          console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+        } else {
+          console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+        }
       }
     } catch (saveError) {
       console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-      // Continue with login even if save fails
+      // Continue with login even if save fails, but try to read the value anyway
+      try {
+        rows = await usersSheet.getRows();
+        userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (userRow) {
+          savedLastLogin = userRow.get('lastLogin') || null;
+        }
+      } catch (loadError) {
+        console.error(`[SERVER] Failed to reload rows after save error:`, loadError);
+      }
     }
 
     if (!userRow) throw new Error('Failed to retrieve user after creation');
@@ -764,7 +781,8 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
         email: userRow.get('email'),
         name: userRow.get('name'),
         role: userRow.get('role'),
-        avatar: userRow.get('avatar')
+        avatar: userRow.get('avatar'),
+        lastLogin: savedLastLogin
       }
     });
 
@@ -860,20 +878,42 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
     
     // Set and save lastLogin
     userRow.set('lastLogin', loginTimestamp);
+    let savedLastLogin: string | null = null;
     try {
       await userRow.save();
       console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
       
+      // Reload rows to ensure we have the latest data
+      rows = await usersSheet.getRows();
+      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+      
       // Verify the save worked by reading it back
-      const savedTimestamp = userRow.get('lastLogin');
-      if (savedTimestamp === loginTimestamp) {
-        console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
-      } else {
-        console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+      if (userRow) {
+        const savedTimestamp = userRow.get('lastLogin');
+        savedLastLogin = savedTimestamp || null;
+        if (savedTimestamp === loginTimestamp) {
+          console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+        } else {
+          console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+        }
       }
     } catch (saveError) {
       console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-      // Continue with login even if save fails
+      // Continue with login even if save fails, but try to read the value anyway
+      try {
+        rows = await usersSheet.getRows();
+        userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (userRow) {
+          savedLastLogin = userRow.get('lastLogin') || null;
+        }
+      } catch (loadError) {
+        console.error(`[SERVER] Failed to reload rows after save error:`, loadError);
+      }
+    }
+
+    if (!userRow) {
+      res.status(500).json({ error: 'Failed to retrieve user after login' });
+      return;
     }
 
     // Generate JWT token
@@ -895,7 +935,8 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
         email: userRow.get('email'),
         name: userRow.get('name'),
         role: userRow.get('role'),
-        avatar: userRow.get('avatar')
+        avatar: userRow.get('avatar'),
+        lastLogin: savedLastLogin
       }
     });
   } catch (error) {
@@ -1073,7 +1114,8 @@ app.get('/api/auth/users', authenticateToken, async (req: AuthenticatedRequest, 
       name: r.get('name'),
       role: r.get('role'),
       avatar: r.get('avatar'),
-      team: r.get('team') || undefined
+      team: r.get('team') || undefined,
+      lastLogin: r.get('lastLogin') || null
     }));
 
     res.json({ users });

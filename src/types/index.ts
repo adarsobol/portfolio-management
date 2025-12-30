@@ -72,6 +72,7 @@ export interface User {
   role: Role;
   avatar: string;
   team?: string; // Team/department assignment
+  lastLogin?: string | null; // Last login timestamp (ISO string)
 }
 
 export interface Comment {
