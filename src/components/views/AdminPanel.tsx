@@ -317,6 +317,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [backupError, setBackupError] = useState<string | null>(null);
   const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
   
+  // User management loading state
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  
+  // Fetch users from spreadsheet
+  const fetchUsers = async () => {
+    setIsLoadingUsers(true);
+    setUsersError(null);
+    try {
+      const response = await fetch(`${API_ENDPOINT}/api/auth/users`, {
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.users && data.users.length > 0) {
+          setUsers(data.users);
+        } else {
+          setUsers([]);
+        }
+      } else if (response.status === 403) {
+        setUsersError('Admin access required to view users');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setUsersError(errorData.error || 'Failed to load users');
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      setUsersError('Network error while fetching users');
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+  
   // Fetch login history
   const fetchLoginHistory = async () => {
     setIsLoadingHistory(true);
@@ -644,11 +680,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       
       if (result.success && result.created > 0) {
         // Refresh users list from API
-        const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`);
-        const usersData = await usersResponse.json();
-        if (usersData.users) {
-          setUsers(usersData.users);
-        }
+        await fetchUsers();
       }
     } catch (err) {
       console.error('Import failed:', err);
@@ -821,18 +853,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Refresh users list from API
-      const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
-        }
-      });
-      
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        if (usersData.users) {
-          setUsers(usersData.users);
-        }
-      }
+      await fetchUsers();
 
       // Clear form
       setNewUser({ role: Role.TeamLead });
@@ -884,18 +905,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Success - refresh users list from API
-      const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
-        }
-      });
-      
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        if (usersData.users) {
-          setUsers(usersData.users);
-        }
-      }
+      await fetchUsers();
     } catch (error) {
       console.error('Failed to delete user:', error);
       setUserError(error instanceof Error ? error.message : 'Failed to delete user');
@@ -944,18 +954,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Refresh users list from API to get server state
-      const usersResponse = await fetch(`${API_ENDPOINT}/api/auth/users`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`
-        }
-      });
-      
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        if (usersData.users) {
-          setUsers(usersData.users);
-        }
-      }
+      await fetchUsers();
     } catch (error) {
       console.error('Failed to update user:', error);
       setUserError(error instanceof Error ? error.message : 'Failed to update user');
@@ -1756,6 +1755,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         gradientTo="to-cyan-50"
         isExpanded={expandedSections.has('user-management')}
         onToggle={toggleSection}
+        onFirstExpand={() => { fetchUsers(); markSectionLoaded('user-management'); }}
+        hasLoaded={loadedSections.has('user-management')}
+        headerActions={
+          <button
+            onClick={fetchUsers}
+            disabled={isLoadingUsers}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <RefreshCw size={14} className={isLoadingUsers ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        }
       >
          <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
            <div>
@@ -1809,6 +1820,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            </button>
          </div>
 
+         {/* Error messages */}
+         {usersError && (
+           <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+             <AlertCircle size={16} />
+             {usersError}
+           </div>
+         )}
          {userError && (
            <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
              <AlertCircle size={16} />
@@ -1816,65 +1834,83 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            </div>
          )}
 
-         <div className="max-h-80 overflow-y-auto custom-scrollbar">
-           <table className="w-full text-left text-sm">
-             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-               <tr>
-                 <th className="px-6 py-3 font-semibold text-slate-600">User</th>
-                 <th className="px-6 py-3 font-semibold text-slate-600">Email</th>
-                 <th className="px-6 py-3 font-semibold text-slate-600">Role</th>
-                 <th className="px-6 py-3 font-semibold text-slate-600">Team</th>
-                 <th className="px-6 py-3 font-semibold text-slate-600 text-right">Actions</th>
-               </tr>
-             </thead>
-             <tbody className="divide-y divide-slate-100">
-               {users.map(u => (
-                 <tr key={u.id} className="hover:bg-slate-50">
-                   <td className="px-6 py-3 font-medium flex items-center gap-2">
-                     <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full bg-slate-200" />
-                     {u.name}
-                   </td>
-                   <td className="px-6 py-3 text-slate-500">{u.email}</td>
-                   <td className="px-6 py-3">
-                     <select
-                       value={u.role}
-                       onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
-                       disabled={isUpdatingUser === u.id}
-                       className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       {Object.values(Role).map(r => (
-                         <option key={r} value={r}>{r}</option>
-                       ))}
-                     </select>
-                   </td>
-                   <td className="px-6 py-3">
-                     <select
-                       value={u.team || ''}
-                       onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
-                       disabled={isUpdatingUser === u.id}
-                       className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       <option value="">Unassigned</option>
-                       {teamOptions.map(team => (
-                         <option key={team} value={team}>{team}</option>
-                       ))}
-                     </select>
-                   </td>
-                   <td className="px-6 py-3 text-right">
-                     <button 
-                       onClick={() => handleDeleteUser(u.id)}
-                       disabled={isDeletingUser === u.id}
-                       className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                       title="Remove User"
-                     >
-                       {isDeletingUser === u.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                     </button>
-                   </td>
+         {isLoadingUsers ? (
+           <div className="text-center py-8 text-slate-400">
+             <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+             <p className="text-sm">Loading users...</p>
+           </div>
+         ) : usersError ? (
+           <div className="text-center py-8 text-slate-400">
+             <Users size={32} className="mx-auto mb-2 text-slate-300" />
+             <p className="text-sm">Unable to load users</p>
+           </div>
+         ) : users.length === 0 ? (
+           <div className="text-center py-8 text-slate-400">
+             <Users size={32} className="mx-auto mb-2 text-slate-300" />
+             <p className="text-sm font-medium text-slate-500">No users found</p>
+             <p className="text-xs text-slate-400 mt-1">Add users using the form above</p>
+           </div>
+         ) : (
+           <div className="max-h-80 overflow-y-auto custom-scrollbar">
+             <table className="w-full text-left text-sm">
+               <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                 <tr>
+                   <th className="px-6 py-3 font-semibold text-slate-600">User</th>
+                   <th className="px-6 py-3 font-semibold text-slate-600">Email</th>
+                   <th className="px-6 py-3 font-semibold text-slate-600">Role</th>
+                   <th className="px-6 py-3 font-semibold text-slate-600">Team</th>
+                   <th className="px-6 py-3 font-semibold text-slate-600 text-right">Actions</th>
                  </tr>
-               ))}
-             </tbody>
-           </table>
-         </div>
+               </thead>
+               <tbody className="divide-y divide-slate-100">
+                 {users.map(u => (
+                   <tr key={u.id} className="hover:bg-slate-50">
+                     <td className="px-6 py-3 font-medium flex items-center gap-2">
+                       <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full bg-slate-200" />
+                       {u.name}
+                     </td>
+                     <td className="px-6 py-3 text-slate-500">{u.email}</td>
+                     <td className="px-6 py-3">
+                       <select
+                         value={u.role}
+                         onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
+                         disabled={isUpdatingUser === u.id}
+                         className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                         {Object.values(Role).map(r => (
+                           <option key={r} value={r}>{r}</option>
+                         ))}
+                       </select>
+                     </td>
+                     <td className="px-6 py-3">
+                       <select
+                         value={u.team || ''}
+                         onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
+                         disabled={isUpdatingUser === u.id}
+                         className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                       >
+                         <option value="">Unassigned</option>
+                         {teamOptions.map(team => (
+                           <option key={team} value={team}>{team}</option>
+                         ))}
+                       </select>
+                     </td>
+                     <td className="px-6 py-3 text-right">
+                       <button 
+                         onClick={() => handleDeleteUser(u.id)}
+                         disabled={isDeletingUser === u.id}
+                         className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                         title="Remove User"
+                       >
+                         {isDeletingUser === u.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                       </button>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         )}
       </CollapsibleSection>
 
       {/* Authorization Matrix */}
