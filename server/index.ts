@@ -698,65 +698,95 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
       return;
     }
 
-    // Update metadata
-    if (picture && userRow.get('avatar') !== picture) {
-      userRow.set('avatar', picture);
+    // Double-check that lastLogin column exists in headers
+    await usersSheet.loadHeaderRow().catch(() => {});
+    const headers = usersSheet.headerValues || [];
+    if (!headers.includes('lastLogin')) {
+      console.log(`[SERVER] lastLogin column missing for ${email}, adding it now`);
+      await usersSheet.setHeaderRow([...headers, 'lastLogin']);
+      
+      // CRITICAL: Reload header row to refresh the sheet's column structure
+      await usersSheet.loadHeaderRow();
+      
+      // Reload rows to get fresh row objects with the new column structure
+      rows = await usersSheet.getRows();
+      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+      
+      if (!userRow) {
+        console.error(`[SERVER] ERROR: Could not find user row after adding lastLogin column`);
+        res.status(500).json({ error: 'Failed to update login history' });
+        return;
+      }
+      
+      // IMPORTANT: Explicitly initialize the column for this row if it doesn't exist
+      // This ensures the row object recognizes the column
+      const currentValue = userRow.get('lastLogin');
+      if (currentValue === undefined || currentValue === null || currentValue === '') {
+        // Set an empty value first to ensure the column is recognized
+        userRow.set('lastLogin', '');
+        await userRow.save();
+        // Reload the row to get the updated structure
+        rows = await usersSheet.getRows();
+        userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (!userRow) {
+          console.error(`[SERVER] ERROR: Could not find user row after initializing lastLogin column`);
+          res.status(500).json({ error: 'Failed to update login history' });
+          return;
+        }
+      }
     }
-    
+
     // Update last login timestamp
     const loginTimestamp = new Date().toISOString();
     console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
     
-    // Ensure we have the latest headers and reload rows if headers were updated
-    await usersSheet.loadHeaderRow().catch(() => {});
-    const headers = usersSheet.headerValues || [];
-    const needsHeaderUpdate = !headers.includes('lastLogin');
-    
-    if (needsHeaderUpdate) {
-      console.log(`[SERVER] Adding missing lastLogin column to headers`);
-      await usersSheet.setHeaderRow([...headers, 'lastLogin']);
-      // Reload rows after header update to get the new column structure
-      rows = await usersSheet.getRows();
-      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
-      if (!userRow) {
-        console.error(`[SERVER] ERROR: Could not find user row after header update`);
-        res.status(500).json({ error: 'Failed to update login history' });
-        return;
-      }
+    // Update metadata and lastLogin together
+    if (picture && userRow.get('avatar') !== picture) {
+      userRow.set('avatar', picture);
     }
-    
-    // Set and save lastLogin
     userRow.set('lastLogin', loginTimestamp);
-    let savedLastLogin: string | null = null;
+    
+    let savedLastLogin: string | null = loginTimestamp; // Default to what we set
     try {
       await userRow.save();
       console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
       
-      // Reload rows to ensure we have the latest data
-      rows = await usersSheet.getRows();
-      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
-      
-      // Verify the save worked by reading it back
-      if (userRow) {
-        const savedTimestamp = userRow.get('lastLogin');
-        savedLastLogin = savedTimestamp || null;
-        if (savedTimestamp === loginTimestamp) {
-          console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
-        } else {
-          console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
-        }
-      }
-    } catch (saveError) {
-      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-      // Continue with login even if save fails, but try to read the value anyway
+      // Try to verify by reloading, but don't fail if verification doesn't work
       try {
         rows = await usersSheet.getRows();
         userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
         if (userRow) {
-          savedLastLogin = userRow.get('lastLogin') || null;
+          const savedTimestamp = userRow.get('lastLogin');
+          if (savedTimestamp) {
+            savedLastLogin = savedTimestamp;
+            if (savedTimestamp === loginTimestamp) {
+              console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+            } else {
+              console.warn(`[SERVER] lastLogin value differs after save. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+            }
+          }
+        }
+      } catch (verifyError) {
+        console.warn(`[SERVER] Could not verify lastLogin save, but save appeared successful:`, verifyError);
+        // Keep savedLastLogin as loginTimestamp since save() succeeded
+      }
+    } catch (saveError) {
+      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+      // Try to read existing value as fallback
+      try {
+        rows = await usersSheet.getRows();
+        userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (userRow) {
+          const existingTimestamp = userRow.get('lastLogin');
+          if (existingTimestamp) {
+            savedLastLogin = existingTimestamp;
+          } else {
+            savedLastLogin = null;
+          }
         }
       } catch (loadError) {
         console.error(`[SERVER] Failed to reload rows after save error:`, loadError);
+        savedLastLogin = null;
       }
     }
 
@@ -854,60 +884,91 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
       return;
     }
 
+    // Double-check that lastLogin column exists in headers
+    await usersSheet.loadHeaderRow().catch(() => {});
+    const headers = usersSheet.headerValues || [];
+    if (!headers.includes('lastLogin')) {
+      console.log(`[SERVER] lastLogin column missing for ${email}, adding it now`);
+      await usersSheet.setHeaderRow([...headers, 'lastLogin']);
+      
+      // CRITICAL: Reload header row to refresh the sheet's column structure
+      await usersSheet.loadHeaderRow();
+      
+      // Reload rows to get fresh row objects with the new column structure
+      rows = await usersSheet.getRows();
+      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+      
+      if (!userRow) {
+        console.error(`[SERVER] ERROR: Could not find user row after adding lastLogin column`);
+        res.status(500).json({ error: 'Failed to update login history' });
+        return;
+      }
+      
+      // IMPORTANT: Explicitly initialize the column for this row if it doesn't exist
+      // This ensures the row object recognizes the column
+      const currentValue = userRow.get('lastLogin');
+      if (currentValue === undefined || currentValue === null || currentValue === '') {
+        // Set an empty value first to ensure the column is recognized
+        userRow.set('lastLogin', '');
+        await userRow.save();
+        // Reload the row to get the updated structure
+        rows = await usersSheet.getRows();
+        userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (!userRow) {
+          console.error(`[SERVER] ERROR: Could not find user row after initializing lastLogin column`);
+          res.status(500).json({ error: 'Failed to update login history' });
+          return;
+        }
+      }
+    }
+
     // Update last login timestamp
     const loginTimestamp = new Date().toISOString();
     console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
     
-    // Ensure we have the latest headers and reload rows if headers were updated
-    await usersSheet.loadHeaderRow().catch(() => {});
-    const headers = usersSheet.headerValues || [];
-    const needsHeaderUpdate = !headers.includes('lastLogin');
-    
-    if (needsHeaderUpdate) {
-      console.log(`[SERVER] Adding missing lastLogin column to headers`);
-      await usersSheet.setHeaderRow([...headers, 'lastLogin']);
-      // Reload rows after header update to get the new column structure
-      rows = await usersSheet.getRows();
-      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
-      if (!userRow) {
-        console.error(`[SERVER] ERROR: Could not find user row after header update`);
-        res.status(500).json({ error: 'Failed to update login history' });
-        return;
-      }
-    }
-    
     // Set and save lastLogin
     userRow.set('lastLogin', loginTimestamp);
-    let savedLastLogin: string | null = null;
+    let savedLastLogin: string | null = loginTimestamp; // Default to what we set
     try {
       await userRow.save();
       console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
       
-      // Reload rows to ensure we have the latest data
-      rows = await usersSheet.getRows();
-      userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
-      
-      // Verify the save worked by reading it back
-      if (userRow) {
-        const savedTimestamp = userRow.get('lastLogin');
-        savedLastLogin = savedTimestamp || null;
-        if (savedTimestamp === loginTimestamp) {
-          console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
-        } else {
-          console.error(`[SERVER] WARNING: lastLogin verification failed. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
-        }
-      }
-    } catch (saveError) {
-      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
-      // Continue with login even if save fails, but try to read the value anyway
+      // Try to verify by reloading, but don't fail if verification doesn't work
       try {
         rows = await usersSheet.getRows();
         userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
         if (userRow) {
-          savedLastLogin = userRow.get('lastLogin') || null;
+          const savedTimestamp = userRow.get('lastLogin');
+          if (savedTimestamp) {
+            savedLastLogin = savedTimestamp;
+            if (savedTimestamp === loginTimestamp) {
+              console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+            } else {
+              console.warn(`[SERVER] lastLogin value differs after save. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+            }
+          }
+        }
+      } catch (verifyError) {
+        console.warn(`[SERVER] Could not verify lastLogin save, but save appeared successful:`, verifyError);
+        // Keep savedLastLogin as loginTimestamp since save() succeeded
+      }
+    } catch (saveError) {
+      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+      // Try to read existing value as fallback
+      try {
+        rows = await usersSheet.getRows();
+        userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
+        if (userRow) {
+          const existingTimestamp = userRow.get('lastLogin');
+          if (existingTimestamp) {
+            savedLastLogin = existingTimestamp;
+          } else {
+            savedLastLogin = null;
+          }
         }
       } catch (loadError) {
         console.error(`[SERVER] Failed to reload rows after save error:`, loadError);
+        savedLastLogin = null;
       }
     }
 
