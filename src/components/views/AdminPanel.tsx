@@ -4,7 +4,6 @@ import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
-import { generateId } from '../../utils';
 import * as XLSX from 'xlsx';
 
 // BadgePermission Component for visual permission display
