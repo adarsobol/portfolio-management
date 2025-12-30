@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
@@ -1976,9 +1976,10 @@ export default function App() {
         weeklyEffortFlags={weeklyEffortFlags}
       />
 
-
-      <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <Routes>
+        <Route path="/item/:id" element={
+          <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
              <h2 className="text-2xl font-bold text-slate-800 capitalize">
                {currentView === 'all' ? 'Comprehensive Dashboard' : 
@@ -2127,6 +2128,160 @@ export default function App() {
            </>
         )}
       </main>
+        } />
+        <Route path="*" element={
+          <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+             <h2 className="text-2xl font-bold text-slate-800 capitalize">
+               {currentView === 'all' ? 'Comprehensive Dashboard' : 
+                currentView === 'resources' ? 'Workplan Health' : currentView}
+             </h2>
+          </div>
+          <div className="flex gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text" placeholder="Search..." 
+                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
+              />
+            </div>
+            <PresenceIndicator currentUserId={currentUser.id} />
+            <ExportDropdown 
+              initiatives={filteredInitiatives} 
+              users={users}
+              filters={{
+                assetClass: filterAssetClass,
+                owners: filterOwners,
+                workType: filterWorkType?.[0] || undefined
+              }}
+            />
+            <NotificationMenu
+              notifications={notifications}
+              onMarkAsRead={handleMarkAsRead}
+              onMarkAllAsRead={handleMarkAllAsRead}
+              onClearAll={handleClearAll}
+              onNotificationClick={handleNotificationClick}
+              currentUserId={currentUser.id}
+              currentUserEmail={currentUser.email}
+            />
+            {canCreate && (
+              <button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                <Plus size={16} /><span>New</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {currentView === 'admin' ? (
+          <AdminPanel
+            onClearCache={handleClearCache}
+            currentUser={currentUser}
+            config={config}
+            setConfig={setConfig}
+            users={users}
+            setUsers={setUsers}
+            initiatives={initiatives}
+            deletedInitiatives={initiatives.filter(i => i.status === Status.Deleted)}
+            onRestore={handleRestoreInitiative}
+            isDataLoading={isDataLoading}
+          />
+        ) : (
+           <>
+             {currentView === 'all' && (
+                <MetricsDashboard 
+                  metrics={metrics}
+                />
+             )}
+             
+             <FilterBar 
+                filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+                filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+                filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+                searchQuery={searchQuery} resetFilters={resetFilters}
+                currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+                users={users}
+             />
+
+             {currentView === 'resources' ? (
+               canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (
+                 <ResourcesDashboard 
+                   filteredInitiatives={filteredInitiatives} 
+                   config={config} 
+                   users={users} 
+                 />
+               ) : (
+                 <div className="p-10 text-center text-red-500 font-bold">Access Denied</div>
+               )
+             ) : currentView === 'timeline' ? (
+               <CalendarView 
+                 filteredInitiatives={filteredInitiatives}
+                 handleInlineUpdate={handleInlineUpdate}
+                 setEditingItem={setEditingItem}
+                 setIsModalOpen={setIsModalOpen}
+                 calendarDate={calendarDate}
+                 setCalendarDate={setCalendarDate}
+                 users={users}
+                 filterOwners={filterOwners}
+                 filterAssetClass={filterAssetClass}
+                filterWorkType={filterWorkType?.[0] || ''}
+                filterStatus={null}
+                searchQuery={searchQuery}
+                totalInitiativesCount={initiatives.length}
+                showToast={(message: string) => showSuccess(message)}
+               />
+             ) : currentView === 'workflows' ? (
+               <WorkflowsView
+                 workflows={config.workflows || []}
+                 setWorkflows={(workflows) => setConfig(prev => ({ ...prev, workflows: typeof workflows === 'function' ? workflows(prev.workflows || []) : workflows }))}
+                 currentUser={currentUser}
+                 initiatives={initiatives}
+                 setInitiatives={setInitiatives}
+                 recordChange={recordChange}
+                 config={config}
+                 setConfig={setConfig}
+               />
+            ) : currentView === 'dependencies' ? (
+               <DependenciesView
+                 initiatives={filteredInitiatives}
+                 users={users}
+                 onInitiativeClick={(initiative) => {
+                   setEditingItem(initiative);
+                   setIsModalOpen(true);
+                 }}
+                 onInitiativeUpdate={handleSave}
+               />
+            ) : (
+              <TaskTable 
+                filteredInitiatives={filteredInitiatives}
+                allInitiatives={initiatives}
+                handleInlineUpdate={handleInlineUpdate}
+                setEditingItem={setEditingItem}
+                setIsModalOpen={setIsModalOpen}
+                sortConfig={sortConfig}
+                handleSort={handleSort}
+                users={users}
+                currentUser={currentUser}
+                config={config}
+                viewMode="flat"
+                commentReadState={commentReadState}
+                onAddComment={handleAddComment}
+                onMarkCommentRead={handleMarkCommentRead}
+                onDeleteInitiative={handleDeleteInitiative}
+                onOpenAtRiskModal={(initiative) => {
+                  setPendingAtRiskInitiative({ id: initiative.id, oldStatus: initiative.status });
+                  setIsAtRiskModalOpen(true);
+                }}
+                effortDisplayUnit={effortDisplayUnit}
+                setEffortDisplayUnit={setEffortDisplayUnit}
+              />
+            )}
+           </>
+        )}
+      </main>
+        } />
+      </Routes>
 
       <InitiativeModal 
         isOpen={isModalOpen}

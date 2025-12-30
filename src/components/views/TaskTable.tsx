@@ -58,6 +58,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 }) => {
   const navigate = useNavigate();
   void _onDeleteInitiative; // Reserved for delete functionality
+  
+  // Per-initiative effort display unit state
+  const [effortDisplayUnits, setEffortDisplayUnits] = useState<Map<string, 'weeks' | 'days'>>(new Map());
+  
+  // Helper functions for per-initiative display units
+  const getDisplayUnit = (initiativeId: string): 'weeks' | 'days' => {
+    return effortDisplayUnits.get(initiativeId) || 'weeks';
+  };
+  
+  const setDisplayUnit = (initiativeId: string, unit: 'weeks' | 'days') => {
+    setEffortDisplayUnits(prev => new Map(prev).set(initiativeId, unit));
+  };
+  
   // Use allInitiatives if provided, otherwise fall back to filteredInitiatives
   const allInitiativesList = allInitiatives || filteredInitiatives;
   // Ref for scrollable container
@@ -384,6 +397,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     const isBAU = item.initiativeType === InitiativeType.BAU;
     const tasksExpanded = expandedTasks.has(item.id);
     const isAddingTask = addingTaskFor === item.id;
+    // Get per-initiative display unit (defaults to 'weeks')
+    const displayUnit = getDisplayUnit(item.id);
     const tasks = item.tasks || [];
     const isAtRisk = item.status === Status.AtRisk;
     const showTooltip = hoveredAtRiskDot === item.id && isAtRisk;
@@ -600,24 +615,24 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     e.preventDefault();
                     e.stopPropagation();
                     const currentWeeks = item.actualEffort || 0;
-                    const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    const decrement = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'actualEffort', Math.max(0, currentWeeks - decrement));
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
+                  title={displayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                 >
                   <ArrowDown size={12} />
                 </button>
                 <input 
                   type="number"
                   min="0"
-                  step={effortDisplayUnit === 'days' ? '1' : '0.25'}
-                  value={effortDisplayUnit === 'days'
+                  step={displayUnit === 'days' ? '1' : '0.25'}
+                  value={displayUnit === 'days'
                     ? weeksToDays(item.actualEffort || 0).toFixed(1)
                     : (item.actualEffort || 0).toFixed(2)}
                   onChange={(e) => {
                     const inputValue = parseFloat(e.target.value) || 0;
-                    const weeksValue = effortDisplayUnit === 'days'
+                    const weeksValue = displayUnit === 'days'
                       ? daysToWeeks(inputValue)
                       : inputValue;
                     handleInlineUpdate(item.id, 'actualEffort', weeksValue);
@@ -631,11 +646,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     e.preventDefault();
                     e.stopPropagation();
                     const currentWeeks = item.actualEffort || 0;
-                    const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    const increment = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'actualEffort', currentWeeks + increment);
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
+                  title={displayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                 >
                   <ArrowUp size={12} />
                 </button>
@@ -648,24 +663,24 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     e.preventDefault();
                     e.stopPropagation();
                     const currentWeeks = item.estimatedEffort || 0;
-                    const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    const decrement = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'estimatedEffort', Math.max(0, currentWeeks - decrement));
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
+                  title={displayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                 >
                   <ArrowDown size={12} />
                 </button>
                 <input 
                   type="number"
                   min="0"
-                  step={effortDisplayUnit === 'days' ? '1' : '0.25'}
-                  value={effortDisplayUnit === 'days' 
+                  step={displayUnit === 'days' ? '1' : '0.25'}
+                  value={displayUnit === 'days' 
                     ? weeksToDays(item.estimatedEffort || 0).toFixed(1)
                     : (item.estimatedEffort || 0).toFixed(2)}
                   onChange={(e) => {
                     const inputValue = parseFloat(e.target.value) || 0;
-                    const weeksValue = effortDisplayUnit === 'days' 
+                    const weeksValue = displayUnit === 'days' 
                       ? daysToWeeks(inputValue)
                       : inputValue;
                     handleInlineUpdate(item.id, 'estimatedEffort', weeksValue);
@@ -679,56 +694,54 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     e.preventDefault();
                     e.stopPropagation();
                     const currentWeeks = item.estimatedEffort || 0;
-                    const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                    const increment = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'estimatedEffort', currentWeeks + increment);
                   }}
                   className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
-                  title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
+                  title={displayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                 >
                   <ArrowUp size={12} />
                 </button>
               </div>
-              {setEffortDisplayUnit && (
-                <div className="flex items-center gap-0.5 border border-slate-300 rounded ml-1">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setEffortDisplayUnit('days');
-                    }}
-                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
-                      effortDisplayUnit === 'days' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'text-slate-600 hover:bg-slate-100 bg-white'
-                    }`}
-                    title="Switch to days"
-                  >
-                    D
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setEffortDisplayUnit('weeks');
-                    }}
-                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
-                      effortDisplayUnit === 'weeks' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'text-slate-600 hover:bg-slate-100 bg-white'
-                    }`}
-                    title="Switch to weeks"
-                  >
-                    W
-                  </button>
-                </div>
-              )}
-              <span className="text-slate-400 text-xs font-medium flex-shrink-0">{effortDisplayUnit === 'days' ? 'd' : 'w'}</span>
+              <div className="flex items-center gap-0.5 border border-slate-300 rounded ml-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDisplayUnit(item.id, 'days');
+                  }}
+                  className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
+                    displayUnit === 'days' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-100 bg-white'
+                  }`}
+                  title="Switch to days"
+                >
+                  D
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDisplayUnit(item.id, 'weeks');
+                  }}
+                  className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
+                    displayUnit === 'weeks' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-100 bg-white'
+                  }`}
+                  title="Switch to weeks"
+                >
+                  W
+                </button>
+              </div>
+              <span className="text-slate-400 text-xs font-medium flex-shrink-0">{displayUnit === 'days' ? 'd' : 'w'}</span>
             </div>
           ) : (
             <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-slate-50 px-2 py-1 rounded">
-              {effortDisplayUnit === 'days' 
+              {displayUnit === 'days' 
                 ? `${weeksToDays(item.actualEffort || 0).toFixed(1)}/${weeksToDays(item.estimatedEffort || 0).toFixed(1)}d`
                 : `${item.actualEffort}/${item.estimatedEffort}w`}
             </div>
@@ -1502,43 +1515,39 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <SortableHeader label="Priority" sortKey="priority" />
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">
                 <div className="flex items-center justify-center gap-2">
-                  <span>Effort (act/plan) {effortDisplayUnit === 'days' ? '(d)' : '(w)'}</span>
-                  {setEffortDisplayUnit && (
-                    <div className="flex items-center gap-0.5 border border-slate-300 rounded">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setEffortDisplayUnit('days');
-                        }}
-                        className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
-                          effortDisplayUnit === 'days' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'text-slate-600 hover:bg-slate-100 bg-white'
-                        }`}
-                        title="Switch to days"
-                      >
-                        D
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setEffortDisplayUnit('weeks');
-                        }}
-                        className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
-                          effortDisplayUnit === 'weeks' 
-                            ? 'bg-blue-600 text-white' 
-                            : 'text-slate-600 hover:bg-slate-100 bg-white'
-                        }`}
-                        title="Switch to weeks"
-                      >
-                        W
-                      </button>
-                    </div>
-                  )}
+                  <span>Effort (act/plan)</span>
+                  <div className="flex items-center gap-0.5 border border-slate-300 rounded">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Set all filtered initiatives to days
+                        filteredInitiatives.forEach(initiative => {
+                          setDisplayUnit(initiative.id, 'days');
+                        });
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-slate-600 hover:bg-slate-100 bg-white"
+                      title="Set all to days"
+                    >
+                      D
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Set all filtered initiatives to weeks
+                        filteredInitiatives.forEach(initiative => {
+                          setDisplayUnit(initiative.id, 'weeks');
+                        });
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-slate-600 hover:bg-slate-100 bg-white"
+                      title="Set all to weeks"
+                    >
+                      W
+                    </button>
+                  </div>
                 </div>
               </th>
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
