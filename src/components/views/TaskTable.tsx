@@ -897,7 +897,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                         {/* Effort (Actual/Planned) */}
                         <div className="col-span-2">
-                          {editable ? (
+                          {editable ? (() => {
+                            // Get display unit from parent initiative
+                            const taskDisplayUnit = getDisplayUnit(item.id);
+                            return (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Effort:</span>
                               <div className="flex items-center gap-0.5">
@@ -906,24 +909,29 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    const newEffort = Math.max(0, (task.actualEffort || 0) - 0.25);
-                                    handleUpdateTask(item.id, task.id, 'actualEffort', newEffort);
+                                    const currentWeeks = task.actualEffort || 0;
+                                    const decrement = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                                    handleUpdateTask(item.id, task.id, 'actualEffort', Math.max(0, currentWeeks - decrement));
                                   }}
                                   className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                  title="Decrease by 0.25"
+                                  title={taskDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                                 >
                                   <ArrowDown size={10} />
                                 </button>
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.25"
-                                  value={task.actualEffort ?? 0}
+                                  step={taskDisplayUnit === 'days' ? '1' : '0.25'}
+                                  value={taskDisplayUnit === 'days'
+                                    ? weeksToDays(task.actualEffort || 0).toFixed(1)
+                                    : (task.actualEffort || 0).toFixed(2)}
                                   onChange={(e) => {
-                                    const inputValue = e.target.value;
-                                    const newEffort = inputValue === '' ? 0 : parseFloat(inputValue);
-                                    if (!isNaN(newEffort) && newEffort >= 0) {
-                                      handleUpdateTask(item.id, task.id, 'actualEffort', newEffort);
+                                    const inputValue = parseFloat(e.target.value) || 0;
+                                    const weeksValue = taskDisplayUnit === 'days'
+                                      ? daysToWeeks(inputValue)
+                                      : inputValue;
+                                    if (!isNaN(weeksValue) && weeksValue >= 0) {
+                                      handleUpdateTask(item.id, task.id, 'actualEffort', weeksValue);
                                     }
                                   }}
                                   className="w-14 text-xs font-mono text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -934,11 +942,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    const newEffort = (task.actualEffort || 0) + 0.25;
-                                    handleUpdateTask(item.id, task.id, 'actualEffort', newEffort);
+                                    const currentWeeks = task.actualEffort || 0;
+                                    const increment = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                                    handleUpdateTask(item.id, task.id, 'actualEffort', currentWeeks + increment);
                                   }}
                                   className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                  title="Increase by 0.25"
+                                  title={taskDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                                 >
                                   <ArrowUp size={10} />
                                 </button>
@@ -950,24 +959,29 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    const newEffort = Math.max(0, (task.estimatedEffort || 0) - 0.25);
-                                    handleUpdateTask(item.id, task.id, 'estimatedEffort', newEffort);
+                                    const currentWeeks = task.estimatedEffort || 0;
+                                    const decrement = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                                    handleUpdateTask(item.id, task.id, 'estimatedEffort', Math.max(0, currentWeeks - decrement));
                                   }}
                                   className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                  title="Decrease by 0.25"
+                                  title={taskDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                                 >
                                   <ArrowDown size={10} />
                                 </button>
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.25"
-                                  value={task.estimatedEffort ?? 0}
+                                  step={taskDisplayUnit === 'days' ? '1' : '0.25'}
+                                  value={taskDisplayUnit === 'days'
+                                    ? weeksToDays(task.estimatedEffort || 0).toFixed(1)
+                                    : (task.estimatedEffort || 0).toFixed(2)}
                                   onChange={(e) => {
-                                    const inputValue = e.target.value;
-                                    const newEffort = inputValue === '' ? 0 : parseFloat(inputValue);
-                                    if (!isNaN(newEffort) && newEffort >= 0) {
-                                      handleUpdateTask(item.id, task.id, 'estimatedEffort', newEffort);
+                                    const inputValue = parseFloat(e.target.value) || 0;
+                                    const weeksValue = taskDisplayUnit === 'days'
+                                      ? daysToWeeks(inputValue)
+                                      : inputValue;
+                                    if (!isNaN(weeksValue) && weeksValue >= 0) {
+                                      handleUpdateTask(item.id, task.id, 'estimatedEffort', weeksValue);
                                     }
                                   }}
                                   className="w-14 text-xs font-mono text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -978,25 +992,69 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    const newEffort = (task.estimatedEffort || 0) + 0.25;
-                                    handleUpdateTask(item.id, task.id, 'estimatedEffort', newEffort);
+                                    const currentWeeks = task.estimatedEffort || 0;
+                                    const increment = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                                    handleUpdateTask(item.id, task.id, 'estimatedEffort', currentWeeks + increment);
                                   }}
                                   className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
-                                  title="Increase by 0.25"
+                                  title={taskDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                                 >
                                   <ArrowUp size={10} />
                                 </button>
                               </div>
-                              <span className="text-[10px] text-slate-400">w</span>
+                              {setDisplayUnit && (
+                                <div className="flex items-center gap-0.5 border border-slate-300 rounded ml-1">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setDisplayUnit(item.id, 'days');
+                                    }}
+                                    className={`px-0.5 py-0.5 text-[8px] font-medium rounded transition-colors ${
+                                      taskDisplayUnit === 'days' 
+                                        ? 'bg-blue-600 text-white' 
+                                        : 'text-slate-600 hover:bg-slate-100 bg-white'
+                                    }`}
+                                    title="Switch to days"
+                                  >
+                                    D
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setDisplayUnit(item.id, 'weeks');
+                                    }}
+                                    className={`px-0.5 py-0.5 text-[8px] font-medium rounded transition-colors ${
+                                      taskDisplayUnit === 'weeks' 
+                                        ? 'bg-blue-600 text-white' 
+                                        : 'text-slate-600 hover:bg-slate-100 bg-white'
+                                    }`}
+                                    title="Switch to weeks"
+                                  >
+                                    W
+                                  </button>
+                                </div>
+                              )}
+                              <span className="text-[10px] text-slate-400">{taskDisplayUnit === 'days' ? 'd' : 'w'}</span>
                             </div>
-                          ) : (
+                            );
+                          })() : (() => {
+                            // Get display unit from parent initiative for read-only display
+                            const taskDisplayUnit = getDisplayUnit(item.id);
+                            return (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Effort:</span>
                               <span className="text-xs text-slate-600 font-mono">
-                                {task.actualEffort || 0}/{task.estimatedEffort || 0}w
+                                {taskDisplayUnit === 'days'
+                                  ? `${weeksToDays(task.actualEffort || 0).toFixed(1)}/${weeksToDays(task.estimatedEffort || 0).toFixed(1)}d`
+                                  : `${task.actualEffort || 0}/${task.estimatedEffort || 0}w`}
                               </span>
                             </div>
-                          )}
+                            );
+                          })()}
                         </div>
                         {/* ETA */}
                         <div className="col-span-2">
