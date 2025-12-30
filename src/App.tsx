@@ -1589,9 +1589,8 @@ export default function App() {
     const initiative = initiatives.find(i => i.id === id);
     if (!initiative) return;
 
-    // Store old value for potential rollback (used in catch block)
+    // Store old value for potential rollback
     const oldValue = initiative[field];
-    void oldValue; // Explicitly mark as used for TypeScript
     
     // Optimistic update - update UI immediately
     setOptimisticUpdates(prev => new Map(prev).set(id, {
