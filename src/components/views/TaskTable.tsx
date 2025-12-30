@@ -53,8 +53,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onMarkCommentRead,
   onDeleteInitiative: _onDeleteInitiative,
   onOpenAtRiskModal,
-  effortDisplayUnit = 'weeks',
-  setEffortDisplayUnit
+  effortDisplayUnit: _effortDisplayUnit = 'weeks',
+  setEffortDisplayUnit: _setEffortDisplayUnit
 }) => {
   const navigate = useNavigate();
   void _onDeleteInitiative; // Reserved for delete functionality
