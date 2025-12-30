@@ -415,7 +415,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     );
   };
 
-  const renderRow = (item: Initiative, index: number, editable: boolean) => {
+  const renderRow = (item: Initiative, _index: number, editable: boolean) => {
     const isOutdated = checkOutdated(item.lastUpdated);
     const _prevEffort = getPreviousValue(item, 'Effort');
     void _prevEffort; // Reserved for effort history display
