@@ -2121,6 +2121,7 @@ export default function App() {
                   setIsAtRiskModalOpen(true);
                 }}
                 effortDisplayUnit={effortDisplayUnit}
+                setEffortDisplayUnit={setEffortDisplayUnit}
               />
             )}
            </>

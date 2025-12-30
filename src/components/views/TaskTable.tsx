@@ -26,6 +26,7 @@ interface TaskTableProps {
   // At Risk reason modal props
   onOpenAtRiskModal?: (initiative: Initiative) => void;
   effortDisplayUnit?: 'weeks' | 'days';
+  setEffortDisplayUnit?: (unit: 'weeks' | 'days') => void;
 }
 
 interface GroupedInitiatives {
@@ -51,7 +52,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onMarkCommentRead,
   onDeleteInitiative: _onDeleteInitiative,
   onOpenAtRiskModal,
-  effortDisplayUnit = 'weeks'
+  effortDisplayUnit = 'weeks',
+  setEffortDisplayUnit
 }) => {
   void _onDeleteInitiative; // Reserved for delete functionality
   // Use allInitiatives if provided, otherwise fall back to filteredInitiatives
@@ -680,10 +682,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <ArrowUp size={12} />
                 </button>
               </div>
-              <span className="text-slate-400 text-xs font-medium flex-shrink-0">w</span>
+              <span className="text-slate-400 text-xs font-medium flex-shrink-0">{effortDisplayUnit === 'days' ? 'd' : 'w'}</span>
             </div>
           ) : (
-            <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-slate-50 px-2 py-1 rounded">{item.actualEffort}/{item.estimatedEffort}w</div>
+            <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-slate-50 px-2 py-1 rounded">
+              {effortDisplayUnit === 'days' 
+                ? `${weeksToDays(item.actualEffort || 0).toFixed(1)}/${weeksToDays(item.estimatedEffort || 0).toFixed(1)}d`
+                : `${item.actualEffort}/${item.estimatedEffort}w`}
+            </div>
           )}
           {item.originalEstimatedEffort !== item.estimatedEffort && (
              <div className="text-[9px] text-slate-400 italic text-right mt-1">Orig: {item.originalEstimatedEffort}w</div>
@@ -1453,7 +1459,45 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">
-                Effort (act/plan) {effortDisplayUnit === 'days' ? '(d)' : '(w)'}
+                <div className="flex items-center justify-center gap-2">
+                  <span>Effort (act/plan) {effortDisplayUnit === 'days' ? '(d)' : '(w)'}</span>
+                  {setEffortDisplayUnit && (
+                    <div className="flex items-center gap-0.5 border border-slate-300 rounded">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEffortDisplayUnit('days');
+                        }}
+                        className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                          effortDisplayUnit === 'days' 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-slate-600 hover:bg-slate-100 bg-white'
+                        }`}
+                        title="Switch to days"
+                      >
+                        D
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEffortDisplayUnit('weeks');
+                        }}
+                        className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                          effortDisplayUnit === 'weeks' 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-slate-600 hover:bg-slate-100 bg-white'
+                        }`}
+                        title="Switch to weeks"
+                      >
+                        W
+                      </button>
+                    </div>
+                  )}
+                </div>
               </th>
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
               <SortableHeader label="ETA / Update" sortKey="eta" />
