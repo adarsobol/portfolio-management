@@ -1572,41 +1572,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">
-                <div className="flex items-center justify-center gap-2">
-                  <span>Effort (act/plan)</span>
-                  <div className="flex items-center gap-0.5 border border-slate-300 rounded">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Set all filtered initiatives to days
-                        filteredInitiatives.forEach(initiative => {
-                          setDisplayUnit(initiative.id, 'days');
-                        });
-                      }}
-                      className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-slate-600 hover:bg-slate-100 bg-white"
-                      title="Set all to days"
-                    >
-                      D
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Set all filtered initiatives to weeks
-                        filteredInitiatives.forEach(initiative => {
-                          setDisplayUnit(initiative.id, 'weeks');
-                        });
-                      }}
-                      className="px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors text-slate-600 hover:bg-slate-100 bg-white"
-                      title="Set all to weeks"
-                    >
-                      W
-                    </button>
-                  </div>
-                </div>
+                Effort (act/plan)
               </th>
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
               <SortableHeader label="ETA / Update" sortKey="eta" />
