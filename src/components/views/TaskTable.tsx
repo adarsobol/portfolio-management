@@ -881,9 +881,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.length})</div>
                   {tasks.map((task, taskIndex) => (
                     <div key={task.id} className="bg-white border-l-4 border-l-purple-400 border border-purple-200 rounded-md p-2 shadow-sm hover:shadow transition-shadow relative ml-8">
-                      <div className="grid grid-cols-12 gap-2 items-center pr-10">
+                      <div className="grid grid-cols-12 gap-2 items-center pr-12">
                         {/* Task Title */}
-                        <div className="col-span-4">
+                        <div className="col-span-3">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {getTaskIcon(task)}
                             {editable ? (
@@ -1121,26 +1121,26 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           })()}
                         </div>
                         {/* ETA */}
-                        <div className="col-span-3 overflow-visible">
+                        <div className="col-span-3">
                           {editable ? (
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">ETA:</span>
                               <input
                                 type="date"
                                 value={task.eta || ''}
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
-                                className="w-[110px] text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                                className="w-[100px] text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
                               />
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">ETA:</span>
                               <span className="text-xs text-slate-600">{task.eta || 'N/A'}</span>
                             </div>
                           )}
                         </div>
                         {/* Owner */}
-                        <div className="col-span-2 min-w-[120px]">
+                        <div className="col-span-2">
                           {editable ? (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Owner:</span>
@@ -1162,14 +1162,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           )}
                         </div>
                         {/* Status */}
-                        <div className="col-span-1 min-w-[90px]">
+                        <div className="col-span-2">
                           {editable ? (
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">Status:</span>
                               <select
                                 value={task.status}
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
-                                className={`flex-1 min-w-0 text-[10px] font-bold border px-1 py-0.5 rounded cursor-pointer ${getStatusSelectStyle(task.status)}`}
+                                className={`w-[100px] text-[10px] font-bold border px-1 py-0.5 rounded cursor-pointer ${getStatusSelectStyle(task.status)}`}
                               >
                                 {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
                                   <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
@@ -1177,7 +1177,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               </select>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">Status:</span>
                               <StatusBadge status={task.status} />
                             </div>
