@@ -5,15 +5,15 @@ export const StatusBadge = ({ status }: { status: Status }) => {
     // Not Started: Light gray with clear text
     [Status.NotStarted]: 'text-slate-500 bg-slate-100 border-slate-200',
     // In Progress: Vibrant blue for positive momentum
-    [Status.InProgress]: 'text-white bg-blue-500 border-blue-600 shadow-sm',
-    // At Risk: Prominent amber/red for immediate attention
-    [Status.AtRisk]: 'text-white bg-amber-500 border-amber-600 shadow-sm animate-pulse',
+    [Status.InProgress]: 'text-white bg-blue-600 border-blue-700 shadow-md',
+    // At Risk: Red for immediate attention (changed from amber)
+    [Status.AtRisk]: 'text-white bg-red-600 border-red-700 shadow-lg animate-pulse',
     // Done: Muted green to fade into background
-    [Status.Done]: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    [Status.Done]: 'text-emerald-800 bg-emerald-100 border-emerald-300',
     // Obsolete: Muted gray/purple to indicate deprecated items
     [Status.Obsolete]: 'text-slate-600 bg-slate-200 border-slate-300',
     // Deleted: Red/strikethrough style for soft-deleted items
-    [Status.Deleted]: 'text-red-600 bg-red-50 border-red-200 line-through',
+    [Status.Deleted]: 'text-red-700 bg-red-100 border-red-300 line-through',
   };
   return (
     <span className={`px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap border ${styles[status]}`}>
@@ -36,4 +36,48 @@ export const PriorityBadge = ({ priority }: { priority: Priority }) => {
       {priority}
     </span>
   );
+};
+
+// Utility functions for row background colors
+export const getStatusRowColor = (status: Status): string => {
+  const colors = {
+    [Status.NotStarted]: 'bg-slate-50/30',
+    [Status.InProgress]: 'bg-blue-50/40',
+    [Status.AtRisk]: 'bg-red-50/50',
+    [Status.Done]: 'bg-emerald-50/30',
+    [Status.Obsolete]: 'bg-slate-100/30',
+    [Status.Deleted]: 'bg-red-50/20',
+  };
+  return colors[status] || '';
+};
+
+export const getPriorityRowColor = (priority: Priority): string => {
+  const colors = {
+    [Priority.P0]: 'border-l-4 border-l-red-600 bg-red-50/20',
+    [Priority.P1]: 'border-l-4 border-l-amber-500 bg-amber-50/20',
+    [Priority.P2]: '',
+  };
+  return colors[priority] || '';
+};
+
+// Utility functions for cell background colors
+export const getStatusCellBg = (status: Status): string => {
+  const bgColors = {
+    [Status.NotStarted]: 'bg-slate-50',
+    [Status.InProgress]: 'bg-blue-50',
+    [Status.AtRisk]: 'bg-red-50',
+    [Status.Done]: 'bg-emerald-50',
+    [Status.Obsolete]: 'bg-slate-100',
+    [Status.Deleted]: 'bg-red-50',
+  };
+  return bgColors[status] || '';
+};
+
+export const getPriorityCellBg = (priority: Priority): string => {
+  const bgColors = {
+    [Priority.P0]: 'bg-red-50',
+    [Priority.P1]: 'bg-amber-50',
+    [Priority.P2]: 'bg-white',
+  };
+  return bgColors[priority] || '';
 };

@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight, Plus, X, Layers, FileText, CheckSquare } from 'lucide-react';
 import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
-import { StatusBadge, PriorityBadge } from '../shared/Shared';
+import { StatusBadge, PriorityBadge, getStatusRowColor, getPriorityRowColor, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
 import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
@@ -28,6 +28,7 @@ interface TaskTableProps {
   onOpenAtRiskModal?: (initiative: Initiative) => void;
   effortDisplayUnit?: 'weeks' | 'days';
   setEffortDisplayUnit?: (unit: 'weeks' | 'days') => void;
+  optimisticUpdates?: Map<string, { field: string; value: any; timestamp: number }>;
 }
 
 interface GroupedInitiatives {
@@ -54,7 +55,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onDeleteInitiative: _onDeleteInitiative,
   onOpenAtRiskModal,
   effortDisplayUnit: _effortDisplayUnit = 'weeks',
-  setEffortDisplayUnit: _setEffortDisplayUnit
+  setEffortDisplayUnit: _setEffortDisplayUnit,
+  optimisticUpdates = new Map()
 }) => {
   const navigate = useNavigate();
   void _onDeleteInitiative; // Reserved for delete functionality
@@ -367,11 +369,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       // Not Started: Light gray - clearly shows item hasn't begun
       case Status.NotStarted: return 'bg-slate-200 text-slate-700 border-slate-300';
       // In Progress: Vibrant blue for positive momentum
-      case Status.InProgress: return 'bg-blue-500 text-white border-blue-600 shadow-sm';
-      // At Risk/Delayed: Prominent amber for immediate attention
-      case Status.AtRisk: return 'bg-amber-500 text-white border-amber-600 shadow-sm';
+      case Status.InProgress: return 'bg-blue-600 text-white border-blue-700 shadow-sm';
+      // At Risk/Delayed: Red for immediate attention (changed from amber)
+      case Status.AtRisk: return 'bg-red-600 text-white border-red-700 shadow-lg';
       // Completed: Muted green to fade into background
-      case Status.Done: return 'bg-emerald-100 text-emerald-700 border-emerald-300';
+      case Status.Done: return 'bg-emerald-100 text-emerald-800 border-emerald-300';
       default: return 'bg-white text-slate-700 border-slate-200';
     }
   };
@@ -388,6 +390,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
   };
 
+  // Icon utilities for visual hierarchy
+  const getInitiativeIcon = (initiative: Initiative): React.ReactNode => {
+    if (initiative.initiativeType === InitiativeType.BAU) {
+      return <Layers size={14} className="text-purple-600" />;
+    }
+    return <FileText size={14} className="text-blue-600" />;
+  };
+
+  const getTaskIcon = (task: Task): React.ReactNode => {
+    return <CheckSquare size={12} className="text-purple-500" />;
+  };
+
+  // Loading indicator component
+  const LoadingIndicator = ({ size = 'sm' }: { size?: 'sm' | 'md' | 'lg' }) => {
+    const sizeClasses = {
+      sm: 'w-3 h-3',
+      md: 'w-4 h-4',
+      lg: 'w-6 h-6'
+    };
+    
+    return (
+      <div className={`${sizeClasses[size]} border-2 border-blue-500 border-t-transparent rounded-full animate-spin`} />
+    );
+  };
 
   const renderRow = (item: Initiative, index: number, editable: boolean) => {
     const isOutdated = checkOutdated(item.lastUpdated);
@@ -403,24 +429,53 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     const isAtRisk = item.status === Status.AtRisk;
     const showTooltip = hoveredAtRiskDot === item.id && isAtRisk;
 
+    const statusRowColor = getStatusRowColor(item.status);
+    const priorityRowColor = getPriorityRowColor(item.priority);
+    const rowColorClass = `${statusRowColor} ${priorityRowColor}`;
+    const isUpdating = optimisticUpdates.has(item.id);
+
     return (
       <>
-        <tr key={item.id} className="group hover:bg-blue-50/60 transition-colors border-b border-slate-100">
+        <tr key={item.id} className={`group hover:bg-blue-50/60 transition-colors border-b border-slate-100 ${rowColorClass} ${isUpdating ? 'bg-blue-50/30' : ''}`}>
           <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
             {index + 1}
           </td>
           <td className="px-3 py-2 border-r border-b border-slate-200 min-w-[320px] relative">
             <div className="flex items-start gap-2">
+              {/* Initiative icon */}
+              <div className="flex-shrink-0 mt-0.5">
+                {getInitiativeIcon(item)}
+              </div>
               {isBAU && (
                 <button
                   onClick={() => toggleTasks(item.id)}
-                  className="p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5"
-                  title={tasksExpanded ? "Collapse tasks" : "View tasks"}
+                  className="relative p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5 flex items-center gap-1"
+                  title={tasksExpanded ? `Collapse ${tasks.length} tasks` : `Expand ${tasks.length} tasks`}
                 >
                   {tasksExpanded ? (
                     <ChevronDown size={14} className="text-purple-600" />
                   ) : (
                     <ChevronRight size={14} className="text-purple-600" />
+                  )}
+                  {/* Task count badge - always visible when collapsed */}
+                  {!tasksExpanded && tasks.length > 0 && (
+                    <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
+                      {tasks.length}
+                    </span>
+                  )}
+                  {/* Show status breakdown dots when collapsed */}
+                  {!tasksExpanded && tasks.length > 0 && (
+                    <div className="flex gap-0.5 ml-1">
+                      {tasks.filter(t => t.status === Status.InProgress).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${tasks.filter(t => t.status === Status.InProgress).length} in progress`} />
+                      )}
+                      {tasks.filter(t => t.status === Status.AtRisk).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${tasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
+                      )}
+                      {tasks.filter(t => t.status === Status.Done).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${tasks.filter(t => t.status === Status.Done).length} done`} />
+                      )}
+                    </div>
                   )}
                 </button>
               )}
@@ -430,7 +485,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   e.stopPropagation();
                   navigate(`/item/${encodeURIComponent(item.id)}`);
                 }}
-                className="font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer"
+                className={`font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                  isBAU ? 'bg-purple-50/50 border border-purple-200' : 'bg-blue-50/30 border border-blue-200'
+                }`}
                 title={item.title}
               >
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -518,7 +575,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       }
                       setHoveredAtRiskDot(null);
                     }}
-                    className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-sm hover:bg-amber-600 transition-colors cursor-pointer"
+                    className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-sm hover:bg-red-600 transition-colors cursor-pointer"
                     title="Click to edit risk reason"
                   />
                   {/* Hover Tooltip */}
@@ -550,7 +607,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         style={tooltipStyle}
                       >
                       <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                        <AlertTriangle size={12} className="text-amber-600" />
+                        <AlertTriangle size={12} className="text-red-600" />
                         At Risk Reason
                       </div>
                       <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">
@@ -579,7 +636,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
           </div>
         </td>
-        <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center">
+        <td className={`px-2.5 py-2 border-r border-b border-slate-200 text-center relative ${getStatusCellBg(item.status)}`}>
+          {isUpdating && (
+            <div className="absolute top-1 right-1 z-10">
+              <LoadingIndicator size="sm" />
+            </div>
+          )}
           {editable ? (
              <select 
                value={item.status}
@@ -592,7 +654,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              <StatusBadge status={item.status} />
           )}
         </td>
-        <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center">
+        <td className={`px-2.5 py-2 border-r border-b border-slate-200 text-center relative ${getPriorityCellBg(item.priority)}`}>
+          {isUpdating && (
+            <div className="absolute top-1 right-1 z-10">
+              <LoadingIndicator size="sm" />
+            </div>
+          )}
           {editable ? (
             <select 
               value={item.priority}
@@ -817,11 +884,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 <div className="space-y-1">
                   <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.length})</div>
                   {tasks.map((task, taskIndex) => (
-                    <div key={task.id} className="bg-white border border-purple-200 rounded-md p-2 shadow-sm hover:shadow transition-shadow relative">
+                    <div key={task.id} className="bg-white border-l-4 border-l-purple-400 border border-purple-200 rounded-md p-2 shadow-sm hover:shadow transition-shadow relative ml-8">
                       <div className="grid grid-cols-12 gap-2 items-center pr-6">
                         {/* Task Title */}
                         <div className="col-span-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            {getTaskIcon(task)}
                             {editable ? (
                               <input
                                 type="text"

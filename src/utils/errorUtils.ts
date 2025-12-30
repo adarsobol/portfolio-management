@@ -1,102 +1,61 @@
-/**
- * Error handling utilities for consistent error message formatting
- */
-
-export interface AppError {
+export interface ErrorDetails {
   message: string;
-  userMessage: string;
   code?: string;
-  details?: Record<string, unknown>;
-}
-
-/**
- * Convert any error to a user-friendly message
- */
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  return 'An unexpected error occurred';
-}
-
-/**
- * Convert error to user-friendly format
- */
-export function formatErrorForUser(error: unknown): AppError {
-  if (error instanceof Error) {
-    return {
-      message: error.message,
-      userMessage: getUserFriendlyMessage(error),
-      details: { stack: error.stack }
-    };
-  }
-  
-  return {
-    message: String(error),
-    userMessage: getUserFriendlyMessage(error)
+  recoverable?: boolean;
+  recoveryAction?: {
+    label: string;
+    action: () => void;
   };
 }
 
-/**
- * Map technical error messages to user-friendly ones
- */
-function getUserFriendlyMessage(error: unknown): string {
+export const formatError = (error: unknown, recoveryActions?: {
+  retry?: () => void;
+  retrySync?: () => void;
+}): ErrorDetails => {
   if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    
     // Network errors
-    if (message.includes('failed to fetch') || message.includes('network')) {
-      return 'Unable to connect to the server. Please check your internet connection.';
+    if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
+      return {
+        message: 'Network error. Please check your connection.',
+        code: 'NETWORK_ERROR',
+        recoverable: true,
+        recoveryAction: recoveryActions?.retry ? {
+          label: 'Retry',
+          action: recoveryActions.retry
+        } : undefined
+      };
     }
     
-    // Authentication errors
-    if (message.includes('unauthorized') || message.includes('401')) {
-      return 'Your session has expired. Please log in again.';
+    // Sync errors
+    if (error.message.includes('sync') || error.message.includes('sheets') || error.message.includes('Google')) {
+      return {
+        message: 'Failed to sync with Google Sheets. Your changes are saved locally.',
+        code: 'SYNC_ERROR',
+        recoverable: true,
+        recoveryAction: recoveryActions?.retrySync ? {
+          label: 'Retry Sync',
+          action: recoveryActions.retrySync
+        } : undefined
+      };
     }
     
     // Permission errors
-    if (message.includes('forbidden') || message.includes('403')) {
-      return 'You don\'t have permission to perform this action.';
-    }
-    
-    // Not found errors
-    if (message.includes('not found') || message.includes('404')) {
-      return 'The requested resource could not be found.';
-    }
-    
-    // Server errors
-    if (message.includes('500') || message.includes('internal server')) {
-      return 'A server error occurred. Please try again later.';
-    }
-    
-    // Rate limiting
-    if (message.includes('rate limit') || message.includes('429')) {
-      return 'Too many requests. Please wait a moment and try again.';
+    if (error.message.includes('permission') || error.message.includes('unauthorized') || error.message.includes('403') || error.message.includes('401')) {
+      return {
+        message: 'You don\'t have permission to perform this action.',
+        code: 'PERMISSION_ERROR',
+        recoverable: false
+      };
     }
   }
   
-  return 'Something went wrong. Please try again.';
-}
-
-/**
- * Check if error is a network error
- */
-export function isNetworkError(error: unknown): boolean {
-  if (error instanceof TypeError) {
-    return error.message.includes('Failed to fetch') || error.message.includes('NetworkError');
-  }
-  return false;
-}
-
-/**
- * Check if error is offline-related
- */
-export function isOfflineError(error: unknown): boolean {
-  if (isNetworkError(error)) {
-    return !navigator.onLine;
-  }
-  return false;
-}
+  return {
+    message: 'An unexpected error occurred. Please try again.',
+    code: 'UNKNOWN_ERROR',
+    recoverable: true,
+    recoveryAction: recoveryActions?.retry ? {
+      label: 'Retry',
+      action: recoveryActions.retry
+    } : undefined
+  };
+};

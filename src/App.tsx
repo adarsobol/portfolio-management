@@ -5,6 +5,7 @@ import { Search, Plus } from 'lucide-react';
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
+import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck } from './hooks';
 import { useUrlState } from './hooks/useUrlState';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
@@ -37,7 +38,7 @@ export default function App() {
   const location = useLocation();
   const params = useParams();
   const { user: authUser, isAuthenticated, isLoading: authLoading, logout } = useAuth();
-  const { showSuccess, showError, showInfo } = useToast();
+  const { showSuccess, showError, showInfo, showErrorWithDetails } = useToast();
   
   // Check for app updates and auto-refresh if new version detected
   useVersionCheck();
@@ -534,6 +535,13 @@ export default function App() {
   const [weeklyEffortFlags, setWeeklyEffortFlags] = useState<Map<string, ValidationResult>>(new Map());
   const [showEffortWarningPopup, setShowEffortWarningPopup] = useState(false);
   const [currentEffortFlag, setCurrentEffortFlag] = useState<ValidationResult | null>(null);
+
+  // Optimistic Updates State
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Map<string, {
+    field: string;
+    value: any;
+    timestamp: number;
+  }>>(new Map());
 
   // Handle route-based navigation for initiative links (e.g., /item/Q425-003)
   // Also handle legacy hash-based navigation for backward compatibility
@@ -1220,7 +1228,10 @@ export default function App() {
       }
     } catch (error) {
       logger.error('Failed to delete initiative', { context: 'App.handleDeleteInitiative', error: error instanceof Error ? error : new Error(String(error)) });
-      showError('Failed to delete initiative. Please try again.');
+      const errorDetails = formatError(error, {
+        retry: () => handleDeleteInitiative(id)
+      });
+      showErrorWithDetails(errorDetails);
     } finally {
       setIsDataLoading(false);
     }
@@ -1264,7 +1275,10 @@ export default function App() {
       }
     } catch (error) {
       logger.error('Failed to restore initiative', { context: 'App.handleRestoreInitiative', error: error instanceof Error ? error : new Error(String(error)) });
-      showError('Failed to restore initiative. Please try again.');
+      const errorDetails = formatError(error, {
+        retry: () => handleRestoreInitiative(id)
+      });
+      showErrorWithDetails(errorDetails);
     } finally {
       setIsDataLoading(false);
     }
@@ -1572,6 +1586,32 @@ export default function App() {
       }
     }
     
+    const initiative = initiatives.find(i => i.id === id);
+    if (!initiative) return;
+
+    // Store old value for potential rollback
+    const oldValue = initiative[field];
+    
+    // Optimistic update - update UI immediately
+    setOptimisticUpdates(prev => new Map(prev).set(id, {
+      field: field as string,
+      value,
+      timestamp: Date.now()
+    }));
+
+    // Show success toast immediately for better UX
+    const fieldName = field === 'estimatedEffort' ? 'Effort' : field === 'eta' ? 'ETA' : field === 'status' ? 'Status' : field === 'priority' ? 'Priority' : field;
+    showSuccess(`${fieldName} updated successfully`);
+
+    // Set timeout to clear optimistic marker if sync takes too long (10s)
+    const timeoutId = setTimeout(() => {
+      setOptimisticUpdates(prev => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 10000);
+    
     // Proceed with normal update
     const today = new Date().toISOString().split('T')[0];
     setInitiatives(prev => prev.map(i => {
@@ -1650,12 +1690,63 @@ export default function App() {
         // Broadcast to other users in real-time
         realtimeService.broadcastUpdate(updated);
         
-        // Sync to Google Sheets
-        sheetsSync.queueInitiativeSync(updated);
-        
-        // Sync tasks to separate Tasks sheet
-        if (updated.tasks && updated.tasks.length > 0) {
-          sheetsSync.queueTasksSync(updated.tasks, updated);
+        // Sync to Google Sheets (queued, happens asynchronously)
+        try {
+          sheetsSync.queueInitiativeSync(updated);
+          
+          // Sync tasks to separate Tasks sheet
+          if (updated.tasks && updated.tasks.length > 0) {
+            sheetsSync.queueTasksSync(updated.tasks, updated);
+          }
+          
+          // Clear optimistic marker after a short delay (assuming success)
+          // The timeout will also clear it if sync takes too long
+          setTimeout(() => {
+            clearTimeout(timeoutId);
+            setOptimisticUpdates(prev => {
+              const next = new Map(prev);
+              next.delete(id);
+              return next;
+            });
+          }, 2000); // Clear after 2 seconds (sync should complete quickly)
+        } catch (error) {
+          // Rollback on immediate error
+          clearTimeout(timeoutId);
+          setInitiatives(prev => prev.map(i => {
+            if (i.id === id) {
+              return { ...i, [field]: oldValue };
+            }
+            return i;
+          }));
+          
+          // Clear optimistic marker
+          setOptimisticUpdates(prev => {
+            const next = new Map(prev);
+            next.delete(id);
+            return next;
+          });
+          
+          // Format and show enhanced error toast
+          const errorDetails = formatError(error, {
+            retry: () => {
+              // Retry the update
+              handleInlineUpdate(id, field, value);
+            },
+            retrySync: () => {
+              // Retry sync - force sync all pending changes
+              sheetsSync.forceSyncNow().catch((syncError) => {
+                const syncErrorDetails = formatError(syncError);
+                showErrorWithDetails(syncErrorDetails);
+              });
+            }
+          });
+          showErrorWithDetails(errorDetails);
+          
+          logger.error('Failed to sync optimistic update', { 
+            context: 'App.handleInlineUpdate', 
+            error: error instanceof Error ? error : new Error(String(error)),
+            metadata: { id, field, value }
+          });
         }
         
         return updated;
@@ -2126,6 +2217,7 @@ export default function App() {
                 }}
                 effortDisplayUnit={effortDisplayUnit}
                 setEffortDisplayUnit={setEffortDisplayUnit}
+                optimisticUpdates={optimisticUpdates}
               />
             )}
            </>
@@ -2278,6 +2370,7 @@ export default function App() {
                 }}
                 effortDisplayUnit={effortDisplayUnit}
                 setEffortDisplayUnit={setEffortDisplayUnit}
+                optimisticUpdates={optimisticUpdates}
               />
             )}
            </>

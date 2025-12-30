@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { ErrorDetails } from '../utils/errorUtils';
+import { ErrorToast } from '../components/shared/ErrorToast';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -8,6 +10,7 @@ export interface Toast {
   type: ToastType;
   message: string;
   duration?: number;
+  errorDetails?: ErrorDetails; // Optional error details for enhanced error toasts
 }
 
 interface ToastContextType {
@@ -15,6 +18,7 @@ interface ToastContextType {
   showToast: (message: string, type?: ToastType, duration?: number) => void;
   showSuccess: (message: string, duration?: number) => void;
   showError: (message: string, duration?: number) => void;
+  showErrorWithDetails: (errorDetails: ErrorDetails, duration?: number) => void;
   showInfo: (message: string, duration?: number) => void;
   showWarning: (message: string, duration?: number) => void;
   removeToast: (id: string) => void;
@@ -51,6 +55,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     showToast(message, 'error', duration || 7000);
   }, [showToast]);
 
+  const showErrorWithDetails = useCallback((errorDetails: ErrorDetails, duration: number = 10000) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    const newToast: Toast = { 
+      id, 
+      type: 'error', 
+      message: errorDetails.message, 
+      duration,
+      errorDetails
+    };
+    
+    setToasts(prev => [...prev, newToast]);
+
+    // Auto-remove after duration
+    if (duration > 0) {
+      setTimeout(() => {
+        removeToast(id);
+      }, duration);
+    }
+  }, [removeToast]);
+
   const showInfo = useCallback((message: string, duration?: number) => {
     showToast(message, 'info', duration);
   }, [showToast]);
@@ -65,6 +89,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       showToast,
       showSuccess,
       showError,
+      showErrorWithDetails,
       showInfo,
       showWarning,
       removeToast
@@ -96,6 +121,16 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+  // Use ErrorToast component for errors with details
+  if (toast.type === 'error' && toast.errorDetails) {
+    return (
+      <ErrorToast
+        error={toast.errorDetails}
+        onDismiss={() => onRemove(toast.id)}
+      />
+    );
+  }
+
   const icons = {
     success: <CheckCircle className="w-5 h-5" />,
     error: <AlertCircle className="w-5 h-5" />,
