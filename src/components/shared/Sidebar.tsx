@@ -3,7 +3,7 @@ import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch } fr
 import { User, ViewType, AppConfig } from '../../types';
 import { TeamLeadViewToggle } from './TeamLeadViewToggle';
 import { canViewTab, canAccessAdmin } from '../../utils';
-import { daysToWeeks, weeksToDays, DAYS_PER_WEEK } from '../../utils/effortConverter';
+import { daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
 
 interface SidebarProps {
   currentView: ViewType;

@@ -565,7 +565,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (validate()) {
       const now = new Date().toISOString().split('T')[0];
       const isNew = !formData.id;
-      const isBAU = formData.initiativeType === InitiativeType.BAU;
       
       const payload = {
         ...formData,

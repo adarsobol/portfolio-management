@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router
 import { Search, Plus, ChevronDown } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
-import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
+import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck } from './hooks';
@@ -1529,7 +1529,7 @@ export default function App() {
         // Log but don't fail the save if versioning fails
         logger.warn('Failed to create automatic version', { 
           context: 'App.handleSave', 
-          error: error instanceof Error ? error : new Error(String(error)) 
+          metadata: { error: error instanceof Error ? error.message : String(error) }
         });
       }
 

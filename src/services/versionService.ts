@@ -112,7 +112,7 @@ class VersionService {
       } catch (error) {
         logger.warn('Debounced version creation failed', { 
           context: 'VersionService', 
-          error: error instanceof Error ? error : new Error(String(error)) 
+          metadata: { error: error instanceof Error ? error.message : String(error) }
         });
       }
       this.debounceTimer = null;

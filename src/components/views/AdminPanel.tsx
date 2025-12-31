@@ -323,6 +323,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
   
+  // Version management state
+  const [versions, setVersions] = useState<VersionMetadata[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [versionError, setVersionError] = useState<string | null>(null);
+  const [versionSuccess, setVersionSuccess] = useState<string | null>(null);
+  const [isRestoringVersion, setIsRestoringVersion] = useState(false);
+  const [isSyncingVersion, setIsSyncingVersion] = useState<string | null>(null);
+  const [retentionDays, setRetentionDays] = useState<number>(30);
+  
   // Fetch users from spreadsheet
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
@@ -501,6 +510,125 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
+  
+  // Version management functions
+  const fetchVersions = useCallback(() => {
+    setIsLoadingVersions(true);
+    setVersionError(null);
+    try {
+      const versionService = getVersionService();
+      const allVersions = versionService.listVersions();
+      setVersions(allVersions);
+      setRetentionDays(versionService.getRetentionDays());
+    } catch (error) {
+      console.error('Failed to fetch versions:', error);
+      setVersionError('Failed to load versions');
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }, []);
+  
+  const cleanupOldVersions = useCallback(() => {
+    try {
+      const versionService = getVersionService();
+      const deletedCount = versionService.cleanupOldVersions(retentionDays);
+      setVersionSuccess(`Cleaned up ${deletedCount} old version(s)`);
+      setTimeout(() => setVersionSuccess(null), 3000);
+      fetchVersions();
+    } catch (error) {
+      console.error('Failed to cleanup versions:', error);
+      setVersionError('Failed to cleanup old versions');
+      setTimeout(() => setVersionError(null), 5000);
+    }
+  }, [retentionDays, fetchVersions]);
+  
+  const restoreVersion = useCallback(async (versionId: string) => {
+    setIsRestoringVersion(true);
+    setVersionError(null);
+    try {
+      const versionService = getVersionService();
+      const versionData = versionService.restoreVersion(versionId);
+      
+      if (!versionData) {
+        setVersionError('Version not found');
+        setTimeout(() => setVersionError(null), 5000);
+        return;
+      }
+      
+      // Restore initiatives and tasks
+      // Note: This should trigger a reload in the parent component
+      // For now, we'll show a success message
+      setVersionSuccess(`Version restored successfully. Please refresh the page to see changes.`);
+      setTimeout(() => setVersionSuccess(null), 5000);
+      
+      // Trigger window reload to apply changes
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to restore version:', error);
+      setVersionError('Failed to restore version');
+      setTimeout(() => setVersionError(null), 5000);
+    } finally {
+      setIsRestoringVersion(false);
+    }
+  }, []);
+  
+  const syncVersionToSheets = useCallback(async (versionId: string) => {
+    setIsSyncingVersion(versionId);
+    setVersionError(null);
+    try {
+      const versionService = getVersionService();
+      const snapshot = versionService.exportVersion(versionId, config, currentUser.email);
+      
+      if (!snapshot) {
+        setVersionError('Failed to export version');
+        setTimeout(() => setVersionError(null), 5000);
+        return;
+      }
+      
+      // Sync to sheets
+      const success = await sheetsSync.createSnapshot(snapshot);
+      
+      if (success) {
+        versionService.markSyncedToSheets(versionId, snapshot.name);
+        setVersionSuccess('Version synced to Google Sheets successfully');
+        setTimeout(() => setVersionSuccess(null), 3000);
+        fetchVersions();
+      } else {
+        setVersionError('Failed to sync version to Google Sheets');
+        setTimeout(() => setVersionError(null), 5000);
+      }
+    } catch (error) {
+      console.error('Failed to sync version:', error);
+      setVersionError('Failed to sync version to Google Sheets');
+      setTimeout(() => setVersionError(null), 5000);
+    } finally {
+      setIsSyncingVersion(null);
+    }
+  }, [config, currentUser.email, fetchVersions]);
+  
+  const deleteVersion = useCallback((versionId: string) => {
+    if (!confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const versionService = getVersionService();
+      const success = versionService.deleteVersion(versionId);
+      
+      if (success) {
+        setVersionSuccess('Version deleted successfully');
+        setTimeout(() => setVersionSuccess(null), 3000);
+        fetchVersions();
+      } else {
+        setVersionError('Failed to delete version');
+        setTimeout(() => setVersionError(null), 5000);
+      }
+    } catch (error) {
+      console.error('Failed to delete version:', error);
+      setVersionError('Failed to delete version');
+      setTimeout(() => setVersionError(null), 5000);
+    }
+  }, [fetchVersions]);
   
   // Initial fetch
   // Note: Data is fetched lazily when sections are expanded
