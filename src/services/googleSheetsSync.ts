@@ -66,6 +66,7 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     eta: i.eta ?? '',
     originalEta: i.originalEta ?? '',
     lastUpdated: i.lastUpdated ?? '',
+    createdAt: i.createdAt ?? '',
     lastWeeklyUpdate: i.lastWeeklyUpdate ?? '',
     dependencies: i.dependencies?.map(d => `${d.team} (${d.deliverable || 'N/A'}, ETA: ${d.eta || 'N/A'})`).join('; ') || '',
     workType: i.workType,
@@ -112,6 +113,7 @@ export interface FlatTask {
   status: string;
   tags: string;
   comments: string;
+  createdAt: string;
   lastUpdated: string;
   deletedAt: string;
 }
@@ -129,6 +131,7 @@ export function flattenTask(task: Task, initiative: Initiative): FlatTask {
     status: task.status || '',
     tags: JSON.stringify(task.tags || []),
     comments: JSON.stringify(task.comments || []),
+    createdAt: task.createdAt || '',
     lastUpdated: new Date().toISOString().split('T')[0],
     deletedAt: task.deletedAt || ''
   };

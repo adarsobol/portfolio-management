@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, AlertTriangle } from 'lucide-react';
 import { User as UserType, ViewType, AppConfig, Role } from '../../types';
 import { canViewTab, canAccessAdmin } from '../../utils';
 import { ValidationResult } from '../../services/weeklyEffortValidation';
+import { daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
 
 interface TopNavProps {
   currentView: ViewType;
   setCurrentView: (view: ViewType) => void;
   currentUser: UserType;
   config: AppConfig;
+  setConfig: (config: AppConfig | ((prev: AppConfig) => AppConfig)) => void;
   onLogout: () => void;
   isTeamLeadView: boolean;
   onToggleTeamLeadView: () => void;
@@ -21,6 +23,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   setCurrentView, 
   currentUser, 
   config,
+  setConfig,
   onLogout,
   isTeamLeadView,
   onToggleTeamLeadView,
@@ -33,6 +36,78 @@ export const TopNav: React.FC<TopNavProps> = ({
   
   // Check if current user has an active weekly effort flag
   const hasEffortWarning = currentUser.role === Role.TeamLead && weeklyEffortFlags?.has(currentUser.id);
+  
+  // Get current capacity in weeks
+  const currentCapacityWeeks = config.teamCapacities[currentUser.id] || 0;
+  
+  // Convert weeks to weeks and days for display
+  const capacityDisplay = useMemo(() => {
+    const totalWeeks = currentCapacityWeeks;
+    const wholeWeeks = Math.floor(totalWeeks);
+    const fractionalWeeks = totalWeeks - wholeWeeks;
+    const days = Math.round(fractionalWeeks * DAYS_PER_WEEK);
+    return { weeks: wholeWeeks, days };
+  }, [currentCapacityWeeks]);
+  
+  // Local state for input values
+  const [weeksInput, setWeeksInput] = useState<string>(capacityDisplay.weeks.toString());
+  const [daysInput, setDaysInput] = useState<string>(capacityDisplay.days.toString());
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showCapacityInput, setShowCapacityInput] = useState(false);
+  
+  // Update inputs when capacity changes externally
+  useEffect(() => {
+    setWeeksInput(capacityDisplay.weeks.toString());
+    setDaysInput(capacityDisplay.days.toString());
+    setHasChanges(false);
+  }, [capacityDisplay]);
+  
+  // Handle capacity update
+  const handleCapacityChange = () => {
+    const weeks = parseFloat(weeksInput) || 0;
+    const days = parseFloat(daysInput) || 0;
+    
+    // Validate inputs
+    if (weeks < 0 || days < 0) {
+      return; // Invalid input, don't update
+    }
+    if (days >= DAYS_PER_WEEK) {
+      // Auto-convert excess days to weeks
+      const extraWeeks = Math.floor(days / DAYS_PER_WEEK);
+      const remainingDays = days % DAYS_PER_WEEK;
+      setWeeksInput((weeks + extraWeeks).toString());
+      setDaysInput(remainingDays.toString());
+      return; // Will trigger re-render and this function again
+    }
+    
+    // Convert to total weeks
+    const totalWeeks = weeks + daysToWeeks(days);
+    
+    // Update config
+    setConfig((prev: AppConfig) => ({
+      ...prev,
+      teamCapacities: {
+        ...prev.teamCapacities,
+        [currentUser.id]: totalWeeks
+      }
+    }));
+    
+    setHasChanges(false);
+  };
+  
+  // Handle input changes
+  const handleWeeksChange = (value: string) => {
+    setWeeksInput(value);
+    setHasChanges(true);
+  };
+  
+  const handleDaysChange = (value: string) => {
+    setDaysInput(value);
+    setHasChanges(true);
+  };
+  
+  // Check if user has capacity assigned (or allow setting it)
+  const hasCapacity = currentCapacityWeeks > 0 || config.teamCapacities.hasOwnProperty(currentUser.id);
   
   // Determine active view from location
   const getActiveView = (): ViewType => {
@@ -135,7 +210,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                 <p className="text-xs font-semibold text-white">{currentUser.name}</p>
                 <p className="text-[10px] text-slate-500 font-medium">{currentUser.role}</p>
               </div>
-              <div className="px-2 py-1.5">
+              <div className="px-2 py-1.5 space-y-2">
                 <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
                   <label className="flex items-center justify-between cursor-pointer group">
                     <div className="flex items-center gap-2">
@@ -169,6 +244,70 @@ export const TopNav: React.FC<TopNavProps> = ({
                     </div>
                   </label>
                 </div>
+                
+                {/* Capacity Input */}
+                {(hasCapacity || true) && (
+                  <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
+                    <button
+                      onClick={() => setShowCapacityInput(!showCapacityInput)}
+                      className="w-full flex items-center justify-between cursor-pointer group"
+                    >
+                      <span className="text-xs font-medium text-slate-300 group-hover:text-slate-200 transition-colors">
+                        My Capacity
+                      </span>
+                      <ChevronDown size={12} className={`text-slate-400 transition-transform ${showCapacityInput ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showCapacityInput && (
+                      <div className="mt-2 pt-2 border-t border-slate-700/50">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="60"
+                              step="1"
+                              value={weeksInput}
+                              onChange={(e) => handleWeeksChange(e.target.value)}
+                              onBlur={handleCapacityChange}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCapacityChange();
+                                }
+                              }}
+                              className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="0"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-0.5 text-center">weeks</p>
+                          </div>
+                          <span className="text-slate-500 text-xs pt-4">/</span>
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="4"
+                              step="1"
+                              value={daysInput}
+                              onChange={(e) => handleDaysChange(e.target.value)}
+                              onBlur={handleCapacityChange}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCapacityChange();
+                                }
+                              }}
+                              className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="0"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-0.5 text-center">days</p>
+                          </div>
+                        </div>
+                        {hasChanges && (
+                          <p className="text-[10px] text-amber-400 mt-1 text-center">Press Enter or click outside to save</p>
+                        )}
+                        <p className="text-[10px] text-slate-500 mt-1 text-center">Total capacity per quarter</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => {

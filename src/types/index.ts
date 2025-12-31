@@ -94,6 +94,7 @@ export interface Task {
   tags?: UnplannedTag[]; // PM Item, Risk Item, Both
   comments?: Comment[];
   deletedAt?: string; // ISO date string when soft-deleted
+  createdAt?: string; // ISO date string when created
 }
 
 export interface Dependency {
@@ -152,6 +153,7 @@ export interface Initiative {
   eta?: string; // Current ETA (ISO Date String)
   originalEta?: string; // Baseline ETA (ISO Date String), only tracked when changed
   lastUpdated: string; // ISO Date String
+  createdAt?: string; // ISO date string when created
   lastWeeklyUpdate?: string; // Last Thursday EoD update (ISO Date String) for weekly routine tracking
   
   // External Team Dependencies

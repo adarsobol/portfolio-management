@@ -1450,6 +1450,10 @@ export default function App() {
         if (!item.lastDelayDate && existing.lastDelayDate) {
           item.lastDelayDate = existing.lastDelayDate;
         }
+        // Preserve createdAt if not being updated
+        if (!item.createdAt && existing.createdAt) {
+          item.createdAt = existing.createdAt;
+        }
         
         nextInitiatives[existingIndex] = item;
       } else {
@@ -1460,8 +1464,11 @@ export default function App() {
           const duplicateIndex = nextInitiatives.findIndex(i => i.id === item.id);
           nextInitiatives[duplicateIndex] = item;
         } else {
-          // New initiative: initialize overlookedCount to 0
+          // New initiative: initialize overlookedCount to 0 and set createdAt if not already set
           item.overlookedCount = 0;
+          if (!item.createdAt) {
+            item.createdAt = new Date().toISOString();
+          }
           nextInitiatives.push(item);
         }
       }
@@ -2099,6 +2106,7 @@ export default function App() {
         setCurrentView={handleViewChange} 
         currentUser={currentUser}
         config={config}
+        setConfig={setConfig}
         onLogout={logout}
         isTeamLeadView={isTeamLeadView}
         onToggleTeamLeadView={() => setIsTeamLeadView(!isTeamLeadView)}

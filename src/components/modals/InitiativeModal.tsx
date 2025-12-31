@@ -574,6 +574,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         // Set originalEstimatedEffort only when creating new or when it changes
         originalEstimatedEffort: isNew ? (formData.estimatedEffort || 0) : formData.originalEstimatedEffort,
         originalEta: isNew ? (formData.eta || '') : formData.originalEta,
+        // Set createdAt for new initiatives
+        createdAt: isNew ? new Date().toISOString() : formData.createdAt,
         // Include tasks for all initiative types
         tasks: tasks && tasks.length > 0 ? tasks : undefined,
         // Ensure initiativeType is set (required field)
@@ -697,6 +699,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         unplannedTags: row.unplannedTags && row.unplannedTags.length > 0 ? row.unplannedTags : undefined,
         workType: WorkType.Planned, // Default to Planned
         lastUpdated: now,
+        createdAt: new Date().toISOString(),
         comments: [],
         history: []
       };
@@ -745,7 +748,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       ownerId: formData.ownerId || '',
       status: Status.NotStarted,
       tags: [],
-      comments: []
+      comments: [],
+      createdAt: new Date().toISOString()
     };
   }, [formData.ownerId]);
 
@@ -770,7 +774,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       const newTask: Task = {
         ...taskToDuplicate,
         id: generateId(),
-        title: taskToDuplicate.title ? `${taskToDuplicate.title} (copy)` : undefined
+        title: taskToDuplicate.title ? `${taskToDuplicate.title} (copy)` : undefined,
+        createdAt: new Date().toISOString() // New task gets new createdAt
       };
       setTasks(prev => [...prev, newTask]);
     }

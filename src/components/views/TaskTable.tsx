@@ -168,7 +168,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       ownerId: newTaskForm.ownerId,
       status: newTaskForm.status || Status.NotStarted,
       tags: newTaskForm.tags || [],
-      comments: []
+      comments: [],
+      createdAt: new Date().toISOString()
     };
     
     const updatedTasks = [...(initiative.tasks || []), newTask];
