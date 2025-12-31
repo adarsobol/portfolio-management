@@ -327,6 +327,94 @@ function calculateDelayDistribution(initiatives: Initiative[]) {
   return delayBuckets;
 }
 
+function calculateCompletionTimeDistribution(initiatives: Initiative[]) {
+  // Filter for completed initiatives with createdAt
+  const completedInitiatives = initiatives.filter(
+    i => i.status === Status.Done && i.createdAt
+  );
+
+  if (completedInitiatives.length === 0) {
+    return {
+      buckets: [
+        { name: '0-7 days', range: '0-7', count: 0, color: '#10b981' },
+        { name: '8-14 days', range: '8-14', count: 0, color: '#fbbf24' },
+        { name: '15-30 days', range: '15-30', count: 0, color: '#f97316' },
+        { name: '31-60 days', range: '31-60', count: 0, color: '#ef4444' },
+        { name: '60+ days', range: '60+', count: 0, color: '#dc2626' },
+      ],
+      avgCompletionDays: 0,
+      medianCompletionDays: 0,
+      totalCompleted: 0,
+    };
+  }
+
+  const completionTimes: number[] = [];
+
+  completedInitiatives.forEach(i => {
+    let completionDate: string | null = null;
+
+    // Try to find when status changed to Done in history
+    if (i.history && i.history.length > 0) {
+      const doneChange = i.history.find(
+        change => change.field === 'Status' && change.newValue === Status.Done
+      );
+      if (doneChange) {
+        completionDate = doneChange.timestamp;
+      }
+    }
+
+    // Fallback to lastUpdated if no history record found
+    if (!completionDate) {
+      completionDate = i.lastUpdated;
+    }
+
+    if (completionDate && i.createdAt) {
+      try {
+        const days = daysBetween(i.createdAt, completionDate);
+        if (days >= 0) {
+          completionTimes.push(days);
+        }
+      } catch {
+        // Skip invalid dates
+      }
+    }
+  });
+
+  // Create distribution buckets
+  const buckets = [
+    { name: '0-7 days', range: '0-7', count: 0, color: '#10b981' },
+    { name: '8-14 days', range: '8-14', count: 0, color: '#fbbf24' },
+    { name: '15-30 days', range: '15-30', count: 0, color: '#f97316' },
+    { name: '31-60 days', range: '31-60', count: 0, color: '#ef4444' },
+    { name: '60+ days', range: '60+', count: 0, color: '#dc2626' },
+  ];
+
+  completionTimes.forEach(days => {
+    if (days <= 7) buckets[0].count++;
+    else if (days <= 14) buckets[1].count++;
+    else if (days <= 30) buckets[2].count++;
+    else if (days <= 60) buckets[3].count++;
+    else buckets[4].count++;
+  });
+
+  // Calculate average and median
+  const avgCompletionDays = completionTimes.length > 0
+    ? Math.round(completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length)
+    : 0;
+
+  const sortedTimes = [...completionTimes].sort((a, b) => a - b);
+  const medianCompletionDays = sortedTimes.length > 0
+    ? sortedTimes[Math.floor(sortedTimes.length / 2)]
+    : 0;
+
+  return {
+    buckets,
+    avgCompletionDays,
+    medianCompletionDays,
+    totalCompleted: completedInitiatives.length,
+  };
+}
+
 // Health score color helper
 const _getHealthColor = (score: number): string => {
   if (score >= 80) return 'text-emerald-600';
@@ -1223,6 +1311,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [showBurndownChart, setShowBurndownChart] = useState(false);
   const [showBufferChart, setShowBufferChart] = useState(false);
   const [showDelayChart, setShowDelayChart] = useState(false);
+  const [showCompletionTimeChart, setShowCompletionTimeChart] = useState(false);
   
   // Pagination state for tables
   const [delayedPage, setDelayedPage] = useState(1);
@@ -1234,6 +1323,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [burndownRef, isBurndownVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [bufferRef, isBufferVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [delayRef, isDelayVisible] = useIntersectionObserver({ threshold: 0.1 });
+  const [completionTimeRef, isCompletionTimeVisible] = useIntersectionObserver({ threshold: 0.1 });
 
   // Update visibility states when charts come into view
   React.useEffect(() => {
@@ -1247,6 +1337,10 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   React.useEffect(() => {
     if (isDelayVisible) setShowDelayChart(true);
   }, [isDelayVisible]);
+
+  React.useEffect(() => {
+    if (isCompletionTimeVisible) setShowCompletionTimeChart(true);
+  }, [isCompletionTimeVisible]);
 
   // Invalidate cache when initiatives change significantly
   React.useEffect(() => {
@@ -1375,6 +1469,26 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     return result;
   }, [debouncedInitiatives, cacheKey, showDelayChart]);
 
+  // Completion time distribution calculation (lazy evaluation)
+  const completionTimeDistribution = useMemo(() => {
+    if (!showCompletionTimeChart) {
+      return {
+        buckets: [],
+        avgCompletionDays: 0,
+        medianCompletionDays: 0,
+        totalCompleted: 0,
+      };
+    }
+    
+    const cacheKey_completion = `${cacheKey}-completion-time-dist`;
+    const cached = metricsCache.get<ReturnType<typeof calculateCompletionTimeDistribution>>(cacheKey_completion);
+    if (cached) return cached;
+
+    const result = calculateCompletionTimeDistribution(debouncedInitiatives);
+    metricsCache.set(cacheKey_completion, result, 60000); // 1 minute TTL
+    return result;
+  }, [debouncedInitiatives, cacheKey, showCompletionTimeChart]);
+
   // Combine all metrics
   const healthMetrics = useMemo(() => {
     // Calculate health scores
@@ -1404,6 +1518,11 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
       ...obsoleteEffortMetrics,
       // Planning
       delayBuckets: delayDistribution,
+      // Completion Time Distribution
+      completionTimeBuckets: completionTimeDistribution.buckets,
+      avgCompletionDays: completionTimeDistribution.avgCompletionDays,
+      medianCompletionDays: completionTimeDistribution.medianCompletionDays,
+      totalCompleted: completionTimeDistribution.totalCompleted,
       // Overall
       overallHealth,
       scheduleScore,
@@ -1411,7 +1530,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
       riskScore,
       initiativeCount: filteredInitiatives.length,
     };
-  }, [scheduleMetrics, effortMetrics, changeMetrics, riskMetrics, completionMetrics, obsoleteEffortMetrics, delayDistribution, filteredInitiatives.length]);
+  }, [scheduleMetrics, effortMetrics, changeMetrics, riskMetrics, completionMetrics, obsoleteEffortMetrics, delayDistribution, completionTimeDistribution, filteredInitiatives.length]);
 
   // Health Score History data (from config or mock)
   // Note: Preserved for future use in health trend visualization
@@ -1999,6 +2118,62 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Completion Time Distribution Chart */}
+        {healthMetrics.totalCompleted > 0 && (
+          <div ref={completionTimeRef} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                Completion Time Distribution
+              </h3>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-slate-500">Avg: <span className="font-bold text-slate-700">{healthMetrics.avgCompletionDays}d</span></span>
+                {healthMetrics.medianCompletionDays > 0 && (
+                  <span className="text-slate-500">Median: <span className="font-bold text-slate-700">{healthMetrics.medianCompletionDays}d</span></span>
+                )}
+              </div>
+            </div>
+            {showCompletionTimeChart && healthMetrics.completionTimeBuckets.length > 0 ? (
+              <>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={healthMetrics.completionTimeBuckets} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 10 }} 
+                        axisLine={false} 
+                        tickLine={false}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: number) => [`${value} initiative${value !== 1 ? 's' : ''}`, 'Count']}
+                        labelFormatter={(label) => `Time Range: ${label}`}
+                      />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                        {healthMetrics.completionTimeBuckets.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-center gap-4 mt-3 text-xs text-slate-500">
+                  <span>Total Completed: <span className="font-bold text-slate-700">{healthMetrics.totalCompleted}</span></span>
+                </div>
+              </>
+            ) : showCompletionTimeChart ? (
+              <div className="h-40 flex items-center justify-center text-slate-400 text-sm">
+                No completion data available
+              </div>
+            ) : null}
           </div>
         )}
       </div>
