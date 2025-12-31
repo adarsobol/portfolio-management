@@ -407,7 +407,7 @@ function logActivity(
 // ============================================
 
 // Configure CORS based on environment
-const getAllowedOrigins = (): string[] => {
+const getAllowedOrigins = (): string[] | true => {
   const origins: string[] = [];
   
   // Production origins from environment
@@ -424,6 +424,13 @@ const getAllowedOrigins = (): string[] => {
       'http://localhost:3000',
       'http://localhost:3002'
     );
+  }
+  
+  // If no origins configured and serving static files (same origin), allow all
+  // This is a fallback for Cloud Run when CORS_ALLOWED_ORIGINS secret isn't set
+  // TODO: Properly configure CORS_ALLOWED_ORIGINS secret in production
+  if (origins.length === 0 && process.env.SERVE_STATIC === 'true') {
+    return true; // Allow all origins when serving static from same domain
   }
   
   return origins;
