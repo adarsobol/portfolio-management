@@ -1469,6 +1469,14 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     return result;
   }, [debouncedInitiatives, cacheKey, showDelayChart]);
 
+  // Calculate total completed count independently (always runs, not lazy-loaded)
+  // This is needed to determine if the chart section should render
+  const totalCompletedCount = useMemo(() => {
+    return filteredInitiatives.filter(
+      i => i.status === Status.Done && i.createdAt
+    ).length;
+  }, [filteredInitiatives]);
+
   // Completion time distribution calculation (lazy evaluation)
   const completionTimeDistribution = useMemo(() => {
     if (!showCompletionTimeChart) {
@@ -1476,7 +1484,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
         buckets: [],
         avgCompletionDays: 0,
         medianCompletionDays: 0,
-        totalCompleted: 0,
+        totalCompleted: totalCompletedCount,
       };
     }
     
@@ -1487,7 +1495,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     const result = calculateCompletionTimeDistribution(debouncedInitiatives);
     metricsCache.set(cacheKey_completion, result, 60000); // 1 minute TTL
     return result;
-  }, [debouncedInitiatives, cacheKey, showCompletionTimeChart]);
+  }, [debouncedInitiatives, cacheKey, showCompletionTimeChart, totalCompletedCount]);
 
   // Combine all metrics
   const healthMetrics = useMemo(() => {
@@ -2122,7 +2130,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
         )}
 
         {/* Completion Time Distribution Chart */}
-        {healthMetrics.totalCompleted > 0 && (
+        {totalCompletedCount > 0 && (
           <div ref={completionTimeRef} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
