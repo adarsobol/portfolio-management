@@ -880,10 +880,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 <div className="space-y-1">
                   <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.length})</div>
                   {tasks.map((task, taskIndex) => (
-                    <div key={task.id} className="bg-white border-l-4 border-l-purple-400 border border-purple-200 rounded-md p-2 shadow-sm hover:shadow transition-shadow relative ml-8">
-                      <div className="grid grid-cols-12 gap-2 items-center pr-12">
-                        {/* Task Title */}
-                        <div className="col-span-3">
+                    <div key={task.id} className="bg-purple-50/30 border-l-4 border-l-purple-400 border border-purple-200 rounded-md shadow-sm hover:shadow transition-shadow relative ml-8">
+                      <div className="flex items-center">
+                        {/* Column 1: ID - Empty, matching initiative ID column width */}
+                        <div className="w-12 px-2.5 py-2 text-center border-r border-purple-200"></div>
+                        
+                        {/* Column 2: Task Title (aligned with Initiative column) */}
+                        <div className="px-3 py-2 border-r border-purple-200 min-w-[320px] flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {getTaskIcon(task)}
                             {editable ? (
@@ -892,7 +895,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 value={task.title || ''}
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'title', e.target.value || undefined)}
                                 placeholder={`Task ${taskIndex + 1}`}
-                                className="flex-1 min-w-[120px] text-xs font-medium text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                                className="flex-1 min-w-[120px] text-xs font-medium text-slate-700 px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
                               />
                             ) : (
                               <span className="text-xs font-medium text-slate-700">
@@ -959,14 +962,60 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             )}
                           </div>
                         </div>
-                        {/* Effort (Actual/Planned) */}
-                        <div className="col-span-2">
+                        
+                        {/* Column 3: Owner (aligned with Owner column) */}
+                        <div className="px-2.5 py-2 border-r border-purple-200 whitespace-nowrap">
+                          {editable ? (
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={task.ownerId}
+                                onChange={(e) => handleUpdateTask(item.id, task.id, 'ownerId', e.target.value)}
+                                className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
+                              >
+                                {users.filter(u => u.role === Role.TeamLead).map(u => (
+                                  <option key={u.id} value={u.id}>{u.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2.5" title="Owner">
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-[10px] font-bold text-purple-600 border border-purple-300 shadow-sm">
+                                {getOwnerNameById(task.ownerId)?.charAt(0)}
+                              </div>
+                              <div className="flex flex-col justify-center gap-0.5">
+                                <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{getOwnerNameById(task.ownerId)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Column 4: Status (aligned with Status column) */}
+                        <div className="px-2.5 py-2 border-r border-purple-200 text-center">
+                          {editable ? (
+                            <select
+                              value={task.status}
+                              onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
+                              className={`w-full text-[11px] font-bold border focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-1.5 py-1 rounded-md cursor-pointer ${getStatusSelectStyle(task.status)}`}
+                            >
+                              {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
+                                <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <StatusBadge status={task.status} />
+                          )}
+                        </div>
+                        
+                        {/* Column 5: Priority - Empty (tasks don't have priority) */}
+                        <div className="px-2.5 py-2 border-r border-purple-200 text-center"></div>
+                        
+                        {/* Column 6: Effort (aligned with Effort column) */}
+                        <div className="px-2.5 py-2 border-r border-purple-200 min-w-[150px]">
                           {editable ? (() => {
                             // Get display unit from parent initiative
                             const taskDisplayUnit = getDisplayUnit(item.id);
                             return (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Effort:</span>
                               <div className="flex items-center gap-0.5">
                                 <button
                                   type="button"
@@ -977,10 +1026,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const decrement = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'actualEffort', Math.max(0, currentWeeks - decrement));
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                                 >
-                                  <ArrowDown size={10} />
+                                  <ArrowDown size={12} />
                                 </button>
                                 <input
                                   type="number"
@@ -998,7 +1047,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       handleUpdateTask(item.id, task.id, 'actualEffort', weeksValue);
                                     }
                                   }}
-                                  className="w-14 text-xs font-mono text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   title="Actual Effort"
                                 />
                                 <button
@@ -1010,13 +1059,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const increment = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'actualEffort', currentWeeks + increment);
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                                 >
-                                  <ArrowUp size={10} />
+                                  <ArrowUp size={12} />
                                 </button>
                               </div>
-                              <span className="text-slate-300 text-xs font-medium">/</span>
+                              <span className="text-slate-300 text-xs font-medium flex-shrink-0">/</span>
                               <div className="flex items-center gap-0.5">
                                 <button
                                   type="button"
@@ -1027,10 +1076,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const decrement = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'estimatedEffort', Math.max(0, currentWeeks - decrement));
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                                 >
-                                  <ArrowDown size={10} />
+                                  <ArrowDown size={12} />
                                 </button>
                                 <input
                                   type="number"
@@ -1048,7 +1097,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       handleUpdateTask(item.id, task.id, 'estimatedEffort', weeksValue);
                                     }
                                   }}
-                                  className="w-14 text-xs font-mono text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   title="Planned Effort"
                                 />
                                 <button
@@ -1060,14 +1109,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const increment = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'estimatedEffort', currentWeeks + increment);
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors"
+                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                                 >
-                                  <ArrowUp size={10} />
+                                  <ArrowUp size={12} />
                                 </button>
                               </div>
                               {setDisplayUnit && (
-                                <div className="flex items-center gap-0.5 border border-slate-300 rounded ml-1">
+                                <div className="flex items-center gap-0.5 border border-purple-300 rounded ml-1">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1075,9 +1124,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       e.stopPropagation();
                                       setDisplayUnit(item.id, 'days');
                                     }}
-                                    className={`px-0.5 py-0.5 text-[8px] font-medium rounded transition-colors ${
+                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
                                       taskDisplayUnit === 'days' 
-                                        ? 'bg-blue-600 text-white' 
+                                        ? 'bg-purple-600 text-white' 
                                         : 'text-slate-600 hover:bg-slate-100 bg-white'
                                     }`}
                                     title="Switch to days"
@@ -1091,9 +1140,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       e.stopPropagation();
                                       setDisplayUnit(item.id, 'weeks');
                                     }}
-                                    className={`px-0.5 py-0.5 text-[8px] font-medium rounded transition-colors ${
+                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
                                       taskDisplayUnit === 'weeks' 
-                                        ? 'bg-blue-600 text-white' 
+                                        ? 'bg-purple-600 text-white' 
                                         : 'text-slate-600 hover:bg-slate-100 bg-white'
                                     }`}
                                     title="Switch to weeks"
@@ -1102,93 +1151,46 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   </button>
                                 </div>
                               )}
-                              <span className="text-[10px] text-slate-400">{taskDisplayUnit === 'days' ? 'd' : 'w'}</span>
+                              <span className="text-slate-400 text-xs font-medium flex-shrink-0">{taskDisplayUnit === 'days' ? 'd' : 'w'}</span>
                             </div>
                             );
                           })() : (() => {
                             // Get display unit from parent initiative for read-only display
                             const taskDisplayUnit = getDisplayUnit(item.id);
                             return (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Effort:</span>
-                              <span className="text-xs text-slate-600 font-mono">
-                                {taskDisplayUnit === 'days'
-                                  ? `${weeksToDays(task.actualEffort || 0).toFixed(1)}/${weeksToDays(task.estimatedEffort || 0).toFixed(1)}d`
-                                  : `${task.actualEffort || 0}/${task.estimatedEffort || 0}w`}
-                              </span>
+                            <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-purple-50 px-2 py-1 rounded">
+                              {taskDisplayUnit === 'days'
+                                ? `${weeksToDays(task.actualEffort || 0).toFixed(1)}/${weeksToDays(task.estimatedEffort || 0).toFixed(1)}d`
+                                : `${task.actualEffort || 0}/${task.estimatedEffort || 0}w`}
                             </div>
                             );
                           })()}
                         </div>
-                        {/* ETA */}
-                        <div className="col-span-3">
-                          {editable ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">ETA:</span>
+                        
+                        {/* Column 7: Progress - Empty (tasks don't have progress) */}
+                        <div className="px-2.5 py-2 border-r border-purple-200 text-center"></div>
+                        
+                        {/* Column 8: ETA (aligned with ETA / Update column) */}
+                        <div className="px-2.5 py-2 min-w-[110px]">
+                          <div className="flex flex-col gap-1">
+                            {editable ? (
                               <input
                                 type="date"
                                 value={task.eta || ''}
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
-                                className="w-[100px] text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
+                                className="w-full bg-white text-xs border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md"
                               />
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">ETA:</span>
-                              <span className="text-xs text-slate-600">{task.eta || 'N/A'}</span>
-                            </div>
-                          )}
-                        </div>
-                        {/* Owner */}
-                        <div className="col-span-2">
-                          {editable ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Owner:</span>
-                              <select
-                                value={task.ownerId}
-                                onChange={(e) => handleUpdateTask(item.id, task.id, 'ownerId', e.target.value)}
-                                className="flex-1 text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300"
-                              >
-                                {users.filter(u => u.role === Role.TeamLead).map(u => (
-                                  <option key={u.id} value={u.id}>{u.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap">Owner:</span>
-                              <span className="text-xs text-slate-600">{getOwnerNameById(task.ownerId)}</span>
-                            </div>
-                          )}
-                        </div>
-                        {/* Status */}
-                        <div className="col-span-2">
-                          {editable ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">Status:</span>
-                              <select
-                                value={task.status}
-                                onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
-                                className={`w-[100px] text-[10px] font-bold border px-1 py-0.5 rounded cursor-pointer ${getStatusSelectStyle(task.status)}`}
-                              >
-                                {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
-                                  <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-medium text-slate-500 tracking-wide whitespace-nowrap flex-shrink-0">Status:</span>
-                              <StatusBadge status={task.status} />
-                            </div>
-                          )}
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-700">{task.eta || 'N/A'}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {/* Delete Button - positioned absolutely on the right */}
                       {editable && (
                         <button
                           onClick={() => handleDeleteTask(item.id, task.id)}
-                          className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors z-10"
                           title="Delete task"
                         >
                           <X size={14} />
