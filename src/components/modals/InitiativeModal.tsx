@@ -2253,7 +2253,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </button>
                   </div>
                 </AccordionSection>
-              )}
             </form>
           </div>
         )}
