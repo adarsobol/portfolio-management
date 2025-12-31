@@ -546,26 +546,65 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   </div>
                 </button>
               </div>
-              {/* Right side: Task count badge and status dots */}
-              {!tasksExpanded && tasks.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                  <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
-                    {tasks.length}
-                  </span>
-                  {/* Show status breakdown dots */}
-                  <div className="flex gap-0.5">
-                    {tasks.filter(t => t.status === Status.InProgress).length > 0 && (
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${tasks.filter(t => t.status === Status.InProgress).length} in progress`} />
-                    )}
-                    {tasks.filter(t => t.status === Status.AtRisk).length > 0 && (
-                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${tasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
-                    )}
-                    {tasks.filter(t => t.status === Status.Done).length > 0 && (
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${tasks.filter(t => t.status === Status.Done).length} done`} />
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Right side: Task count badge, status dots, and add task button */}
+              <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                {!tasksExpanded && tasks.length > 0 && (
+                  <>
+                    <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
+                      {tasks.length}
+                    </span>
+                    {/* Show status breakdown dots */}
+                    <div className="flex gap-0.5">
+                      {tasks.filter(t => t.status === Status.InProgress).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${tasks.filter(t => t.status === Status.InProgress).length} in progress`} />
+                      )}
+                      {tasks.filter(t => t.status === Status.AtRisk).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${tasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
+                      )}
+                      {tasks.filter(t => t.status === Status.Done).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${tasks.filter(t => t.status === Status.Done).length} done`} />
+                      )}
+                    </div>
+                  </>
+                )}
+                {/* Add task button - visible when editable */}
+                {editable && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // Expand tasks if not already expanded
+                      if (!tasksExpanded) {
+                        setExpandedTasks(prev => {
+                          const newSet = new Set(prev);
+                          newSet.add(item.id);
+                          return newSet;
+                        });
+                      }
+                      // Show add task form
+                      setAddingTaskFor(item.id);
+                      const defaultEta = new Date().toISOString().split('T')[0];
+                      setNewTaskForm({
+                        title: '',
+                        estimatedEffort: 1,
+                        actualEffort: 0,
+                        eta: defaultEta,
+                        ownerId: item.ownerId,
+                        status: Status.NotStarted,
+                        tags: [],
+                        initiativeId: item.id,
+                        tradeOffInitiativeId: undefined,
+                        tradeOffTaskId: undefined,
+                        tradeOffEta: undefined
+                      });
+                    }}
+                    className={`p-1 hover:bg-blue-100 rounded transition-colors flex-shrink-0 ${isBAU ? 'hover:bg-purple-100' : ''}`}
+                    title="Add new task"
+                  >
+                    <Plus size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                  </button>
+                )}
+              </div>
             </div>
           {/* Compact metadata styling */}
           <div className="text-[9px] mt-1 flex gap-1 items-center flex-wrap">
