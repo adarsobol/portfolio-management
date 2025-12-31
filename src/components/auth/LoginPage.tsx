@@ -16,7 +16,17 @@ export function LoginPage() {
         await loginWithGoogle(credentialResponse.credential);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google login failed');
+      let errorMessage = 'Google login failed';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        // Provide helpful error messages for common issues
+        if (err.message.includes('CORS') || err.message.includes('Access-Control')) {
+          errorMessage = 'CORS error: Please ensure your domain is authorized in Google Cloud Console OAuth settings';
+        } else if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+          errorMessage = 'Authentication failed: Please check OAuth configuration';
+        }
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -59,10 +69,20 @@ export function LoginPage() {
           <div className="flex justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
-              onError={() => setError('Google Login Failed')}
+              onError={(error) => {
+                console.error('Google OAuth error:', error);
+                if (error.type === 'popup_closed') {
+                  setError('Login popup was closed');
+                } else if (error.type === 'popup_failed_to_open') {
+                  setError('Could not open login popup. Please check browser popup settings and ensure your domain is authorized in Google Cloud Console.');
+                } else {
+                  setError('Google Login Failed: Please ensure your domain is authorized in Google Cloud Console OAuth settings');
+                }
+              }}
               theme="filled_black"
               shape="rectangular"
               width="100%"
+              useOneTap={false}
             />
           </div>
 
