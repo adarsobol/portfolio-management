@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
-  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, InitiativeType, WorkType, Role
+  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, Role
 } from '../../types';
 import { HIERARCHY, QUARTERS } from '../../constants';
-import { generateId } from '../../utils';
 import { Plus, X, Trash2, Users, ArrowDown, ArrowUp, Copy } from 'lucide-react';
 
 interface BulkEntryRow {
@@ -47,13 +46,13 @@ interface BulkInitiativeSpreadsheetModalProps {
 
 export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetModalProps> = ({
   rows,
-  onRowsChange,
+  onRowsChange: _onRowsChange,
   errors,
-  onErrorsChange,
+  onErrorsChange: _onErrorsChange,
   sharedSettings,
   onSharedSettingsChange,
   users,
-  allInitiatives,
+  allInitiatives: _allInitiatives,
   onRowChange,
   onAddRow,
   onRemoveRow,
@@ -115,7 +114,6 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
   };
 
   const teamLeads = users.filter(u => u.role === Role.TeamLead);
-  const tradeOffCandidates = allInitiatives.filter(i => i.status === Status.InProgress);
 
   // Column definitions for the spreadsheet
   const columns = [
@@ -207,7 +205,6 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                 const rowErrors = errors[row.id] || {};
                 const hasDependencies = row.dependencies && row.dependencies.length > 0;
                 const isDependenciesExpanded = expandedDependencies.has(row.id);
-                const maxDeps = Math.max(1, row.dependencies?.length || 0);
 
                 return (
                   <React.Fragment key={row.id}>
