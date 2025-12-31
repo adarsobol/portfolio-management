@@ -23,17 +23,17 @@ export const EffortExceededModal: React.FC<EffortExceededModalProps> = ({
     : '0.0';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 border-2 border-red-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 border-2 border-red-200">
         {/* Header */}
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 px-6 py-4 border-b border-red-200 rounded-t-xl">
+        <div className="bg-gradient-to-r from-red-50 to-orange-50 px-4 py-3 border-b border-red-200 rounded-t-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
+                <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Effort Exceeded</h2>
+                <h2 className="text-lg font-bold text-slate-900">Effort Exceeded</h2>
                 <p className="text-sm text-slate-600 mt-0.5">Actual effort exceeds original allocation</p>
               </div>
             </div>
@@ -48,8 +48,8 @@ export const EffortExceededModal: React.FC<EffortExceededModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
-          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <div className="p-4 space-y-3">
+          <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
             <p className="text-sm font-semibold text-slate-900 mb-3">
               {initiative.title}
             </p>
@@ -62,7 +62,7 @@ export const EffortExceededModal: React.FC<EffortExceededModalProps> = ({
             </p>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-white rounded-lg p-3 border border-slate-200">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingUp className="w-4 h-4 text-red-500" />
@@ -106,7 +106,7 @@ export const EffortExceededModal: React.FC<EffortExceededModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 rounded-b-xl border-t border-slate-200 flex justify-end gap-3">
+        <div className="px-4 py-3 bg-slate-50 rounded-b-xl border-t border-slate-200 flex justify-end gap-3">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
