@@ -801,10 +801,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         ));
       } else {
         alert('Failed to delete task. Please try again.');
-        logger.error('Failed to delete task', { context: 'InitiativeModal.deleteTask', taskId });
+        logger.error('Failed to delete task', { context: 'InitiativeModal.deleteTask', metadata: { taskId } });
       }
     } catch (error) {
-      logger.error('Failed to delete task', { context: 'InitiativeModal.deleteTask', error: error instanceof Error ? error : new Error(String(error)), taskId });
+      logger.error('Failed to delete task', { context: 'InitiativeModal.deleteTask', error: error instanceof Error ? error : new Error(String(error)), metadata: { taskId } });
       alert('Failed to delete task. Please try again.');
     }
   };
@@ -2037,7 +2037,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               >
                                 <Copy size={16} />
                               </button>
-                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
+                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && initiativeToEdit && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
                                 <button
                                   type="button"
                                   onClick={() => deleteTask(task.id)}
@@ -2054,7 +2054,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           {expandedTasks.has(task.id) && (
                             <div className="bg-white p-4 space-y-4">
                               {/* Delete button at top of expanded section */}
-                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
+                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && initiativeToEdit && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
                                 <div className="flex justify-end pb-3 border-b border-slate-200">
                                   <button
                                     type="button"

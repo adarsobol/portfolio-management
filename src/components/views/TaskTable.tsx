@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRig
 import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge, getStatusRowColor, getPriorityRowColor, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
-import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
+import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
@@ -344,10 +344,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
       } else {
         alert('Failed to delete task. Please try again.');
-        logger.error('Failed to delete task', { context: 'TaskTable.handleDeleteTask', taskId, initiativeId });
+        logger.error('Failed to delete task', { context: 'TaskTable.handleDeleteTask', metadata: { taskId, initiativeId } });
       }
     } catch (error) {
-      logger.error('Failed to delete task', { context: 'TaskTable.handleDeleteTask', error: error instanceof Error ? error : new Error(String(error)), taskId, initiativeId });
+      logger.error('Failed to delete task', { context: 'TaskTable.handleDeleteTask', error: error instanceof Error ? error : new Error(String(error)), metadata: { taskId, initiativeId } });
       alert('Failed to delete task. Please try again.');
     }
   };
