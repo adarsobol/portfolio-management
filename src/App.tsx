@@ -821,8 +821,15 @@ export default function App() {
       relevantOwners = Object.keys(config.teamCapacities);
     }
 
-    // Calculate total quarterly capacity for filtered owners
-    const totalCapacity = relevantOwners.reduce((sum, id) => sum + (config.teamCapacities[id] || 0), 0);
+    // Helper function to get adjusted capacity (base - adjustment)
+    const getAdjustedCapacity = (userId: string): number => {
+      const baseCapacity = config.teamCapacities[userId] || 0;
+      const adjustment = config.teamCapacityAdjustments?.[userId] || 0;
+      return Math.max(0, baseCapacity - adjustment);
+    };
+
+    // Calculate total quarterly capacity for filtered owners (using adjusted capacity)
+    const totalCapacity = relevantOwners.reduce((sum, id) => sum + getAdjustedCapacity(id), 0);
     // Capacity load: estimated effort vs quarterly capacity
     const capacityLoad = totalCapacity > 0 ? (totalEst / totalCapacity) * 100 : 0;
     const usage = totalEst > 0 ? (totalAct / totalEst) * 100 : 0;
@@ -940,7 +947,7 @@ export default function App() {
         const wpEffort = filteredInitiatives
           .filter(i => i.initiativeType === InitiativeType.WP && i.ownerId === ownerId)
           .reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
-        const capacity = config.teamCapacities[ownerId] || 0;
+        const capacity = getAdjustedCapacity(ownerId);
         const excess = Math.max(0, wpEffort - capacity);
         return acc + excess;
       }, 0);

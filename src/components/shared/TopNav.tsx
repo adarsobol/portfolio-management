@@ -37,32 +37,49 @@ export const TopNav: React.FC<TopNavProps> = ({
   // Check if current user has an active weekly effort flag
   const hasEffortWarning = currentUser.role === Role.TeamLead && weeklyEffortFlags?.has(currentUser.id);
   
-  // Get current capacity in weeks
-  const currentCapacityWeeks = config.teamCapacities[currentUser.id] || 0;
+  // Get base capacity (set by admin) and adjustment (set by user)
+  const baseCapacityWeeks = config.teamCapacities[currentUser.id] || 0;
+  const adjustmentWeeks = config.teamCapacityAdjustments?.[currentUser.id] || 0;
+  const adjustedCapacityWeeks = Math.max(0, baseCapacityWeeks - adjustmentWeeks);
   
-  // Convert weeks to weeks and days for display
-  const capacityDisplay = useMemo(() => {
-    const totalWeeks = currentCapacityWeeks;
+  // Convert adjustment to weeks and days for display
+  const adjustmentDisplay = useMemo(() => {
+    const totalWeeks = adjustmentWeeks;
     const wholeWeeks = Math.floor(totalWeeks);
     const fractionalWeeks = totalWeeks - wholeWeeks;
     const days = Math.round(fractionalWeeks * DAYS_PER_WEEK);
     return { weeks: wholeWeeks, days };
-  }, [currentCapacityWeeks]);
+  }, [adjustmentWeeks]);
   
-  // Local state for input values
-  const [weeksInput, setWeeksInput] = useState<string>(capacityDisplay.weeks.toString());
-  const [daysInput, setDaysInput] = useState<string>(capacityDisplay.days.toString());
+  // Convert base and adjusted capacity for display
+  const baseCapacityDisplay = useMemo(() => {
+    const wholeWeeks = Math.floor(baseCapacityWeeks);
+    const fractionalWeeks = baseCapacityWeeks - wholeWeeks;
+    const days = Math.round(fractionalWeeks * DAYS_PER_WEEK);
+    return { weeks: wholeWeeks, days };
+  }, [baseCapacityWeeks]);
+  
+  const adjustedCapacityDisplay = useMemo(() => {
+    const wholeWeeks = Math.floor(adjustedCapacityWeeks);
+    const fractionalWeeks = adjustedCapacityWeeks - wholeWeeks;
+    const days = Math.round(fractionalWeeks * DAYS_PER_WEEK);
+    return { weeks: wholeWeeks, days };
+  }, [adjustedCapacityWeeks]);
+  
+  // Local state for input values (adjustment)
+  const [weeksInput, setWeeksInput] = useState<string>(adjustmentDisplay.weeks.toString());
+  const [daysInput, setDaysInput] = useState<string>(adjustmentDisplay.days.toString());
   const [hasChanges, setHasChanges] = useState(false);
   const [showCapacityInput, setShowCapacityInput] = useState(false);
   
-  // Update inputs when capacity changes externally
+  // Update inputs when adjustment changes externally
   useEffect(() => {
-    setWeeksInput(capacityDisplay.weeks.toString());
-    setDaysInput(capacityDisplay.days.toString());
+    setWeeksInput(adjustmentDisplay.weeks.toString());
+    setDaysInput(adjustmentDisplay.days.toString());
     setHasChanges(false);
-  }, [capacityDisplay]);
+  }, [adjustmentDisplay]);
   
-  // Handle capacity update
+  // Handle capacity adjustment update
   const handleCapacityChange = () => {
     const weeks = parseFloat(weeksInput) || 0;
     const days = parseFloat(daysInput) || 0;
@@ -80,15 +97,15 @@ export const TopNav: React.FC<TopNavProps> = ({
       return; // Will trigger re-render and this function again
     }
     
-    // Convert to total weeks
-    const totalWeeks = weeks + daysToWeeks(days);
+    // Convert to total weeks (adjustment amount)
+    const totalAdjustmentWeeks = weeks + daysToWeeks(days);
     
-    // Update config
+    // Update config with adjustment
     setConfig((prev: AppConfig) => ({
       ...prev,
-      teamCapacities: {
-        ...prev.teamCapacities,
-        [currentUser.id]: totalWeeks
+      teamCapacityAdjustments: {
+        ...(prev.teamCapacityAdjustments || {}),
+        [currentUser.id]: totalAdjustmentWeeks
       }
     }));
     
@@ -107,7 +124,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   };
   
   // Check if user has capacity assigned (or allow setting it)
-  const hasCapacity = currentCapacityWeeks > 0 || config.teamCapacities.hasOwnProperty(currentUser.id);
+  const hasCapacity = baseCapacityWeeks > 0 || config.teamCapacities.hasOwnProperty(currentUser.id);
   
   // Determine active view from location
   const getActiveView = (): ViewType => {
@@ -245,7 +262,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                   </label>
                 </div>
                 
-                {/* Capacity Input */}
+                {/* Capacity Adjustment */}
                 {(hasCapacity || true) && (
                   <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
                     <button
@@ -253,12 +270,20 @@ export const TopNav: React.FC<TopNavProps> = ({
                       className="w-full flex items-center justify-between cursor-pointer group"
                     >
                       <span className="text-xs font-medium text-slate-300 group-hover:text-slate-200 transition-colors">
-                        My Capacity
+                        Capacity Adjustment
                       </span>
                       <ChevronDown size={12} className={`text-slate-400 transition-transform ${showCapacityInput ? 'rotate-180' : ''}`} />
                     </button>
                     {showCapacityInput && (
                       <div className="mt-2 pt-2 border-t border-slate-700/50">
+                        <div className="mb-2 space-y-1">
+                          <p className="text-[10px] text-slate-400 text-center">
+                            Base: {baseCapacityDisplay.weeks}w {baseCapacityDisplay.days > 0 ? `${baseCapacityDisplay.days}d` : ''}
+                          </p>
+                          <p className="text-[10px] text-slate-300 text-center font-medium">
+                            Adjusted: {adjustedCapacityDisplay.weeks}w {adjustedCapacityDisplay.days > 0 ? `${adjustedCapacityDisplay.days}d` : ''}
+                          </p>
+                        </div>
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
                             <input
@@ -303,7 +328,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                         {hasChanges && (
                           <p className="text-[10px] text-amber-400 mt-1 text-center">Press Enter or click outside to save</p>
                         )}
-                        <p className="text-[10px] text-slate-500 mt-1 text-center">Total capacity per quarter</p>
+                        <p className="text-[10px] text-slate-500 mt-1 text-center">Deduct from base capacity</p>
                       </div>
                     )}
                   </div>

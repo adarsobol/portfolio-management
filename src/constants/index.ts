@@ -678,6 +678,8 @@ export const INITIAL_CONFIG: AppConfig = {
     'u_bk_tl': 20,
     'u_da_tl': 20,
   },
+  // Team capacity adjustments are per quarter (weeks per quarter, deducted from base capacity)
+  teamCapacityAdjustments: {},
   // Team buffers are per quarter (weeks per quarter reserved for BAU/unplanned work)
   teamBuffers: {
     'u_ah': 6,

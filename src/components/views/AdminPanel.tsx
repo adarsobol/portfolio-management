@@ -2388,7 +2388,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <thead className="bg-slate-50 border-b border-slate-200">
              <tr>
                <th className="px-6 py-3 font-semibold text-slate-600">Team Lead</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Total Capacity (wks/quarter)</th>
+               <th className="px-6 py-3 font-semibold text-slate-600">Base Capacity (wks/quarter)</th>
+               <th className="px-6 py-3 font-semibold text-slate-600">Adjustment (wks)</th>
+               <th className="px-6 py-3 font-semibold text-slate-600">Adjusted Capacity</th>
                <th className="px-6 py-3 font-semibold text-slate-600">Buffer (wks)</th>
                <th className="px-6 py-3 font-semibold text-slate-600">Effective Capacity</th>
                <th className="px-6 py-3 font-semibold text-slate-600">Assigned Load</th>
@@ -2397,9 +2399,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            </thead>
            <tbody className="divide-y divide-slate-100">
              {users.filter(u => u.role === Role.TeamLead).map(user => {
-               const capacity = config.teamCapacities[user.id] || 0;
+               const baseCapacity = config.teamCapacities[user.id] || 0;
+               const adjustment = config.teamCapacityAdjustments?.[user.id] || 0;
+               const adjustedCapacity = Math.max(0, baseCapacity - adjustment);
                const buffer = config.teamBuffers?.[user.id] || 0;
-               const effectiveCapacity = Math.max(0, capacity - buffer);
+               const effectiveCapacity = Math.max(0, adjustedCapacity - buffer);
                const load = initiatives.filter(i => i.ownerId === user.id).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
                const utilization = effectiveCapacity > 0 ? Math.round((load / effectiveCapacity) * 100) : 0;
                let utilColor = 'text-emerald-600';
@@ -2418,10 +2422,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                      <input 
                        type="number" 
                        className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                       value={capacity}
+                       value={baseCapacity}
                        onChange={(e) => setConfig((prev: AppConfig) => ({...prev, teamCapacities: {...prev.teamCapacities, [user.id]: parseFloat(e.target.value)||0}}))}
                      />
                    </td>
+                   <td className="px-6 py-3">
+                     <input 
+                       type="number" 
+                       className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                       value={adjustment}
+                       placeholder="0"
+                       onChange={(e) => setConfig((prev: AppConfig) => ({
+                         ...prev, 
+                         teamCapacityAdjustments: {...(prev.teamCapacityAdjustments || {}), [user.id]: parseFloat(e.target.value) || 0}
+                       }))}
+                     />
+                   </td>
+                   <td className="px-6 py-3 text-slate-600 font-medium">{adjustedCapacity.toFixed(1)} wks</td>
                    <td className="px-6 py-3">
                      <input 
                        type="number" 
@@ -2434,8 +2451,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        }))}
                      />
                    </td>
-                   <td className="px-6 py-3 text-slate-600">{effectiveCapacity} wks</td>
-                   <td className="px-6 py-3">{load} wks</td>
+                   <td className="px-6 py-3 text-slate-600">{effectiveCapacity.toFixed(1)} wks</td>
+                   <td className="px-6 py-3">{load.toFixed(1)} wks</td>
                    <td className={`px-6 py-3 ${utilColor}`}>{utilization}%</td>
                  </tr>
                );
@@ -2444,7 +2461,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
          </table>
          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
            <p className="text-xs text-blue-700">
-             <strong>Note:</strong> Capacity values are per quarter. For example, 20 weeks capacity = 20 weeks of work capacity for the entire quarter.
+             <strong>Note:</strong> Capacity values are per quarter. Base capacity is set by admin. Team leads can set adjustments (deductions) via their profile menu. Adjusted Capacity = Base Capacity - Adjustment. Effective Capacity = Adjusted Capacity - Buffer.
            </p>
          </div>
       </CollapsibleSection>

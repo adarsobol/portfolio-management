@@ -227,6 +227,7 @@ export type PermissionValue = TabAccessLevel | TaskManagementScope;
 export interface AppConfig {
   bauBufferSuggestion: number; // Percentage
   teamCapacities: Record<string, number>; // ownerId -> capacity (weeks per quarter)
+  teamCapacityAdjustments: Record<string, number>; // ownerId -> adjustment (weeks per quarter, deducted from base capacity)
   teamBuffers: Record<string, number>; // ownerId -> buffer weeks (reserved for BAU/unplanned, per quarter)
   // Support both old and new permission structures for migration
   rolePermissions: Record<Role, Record<PermissionKey, PermissionValue>>;
