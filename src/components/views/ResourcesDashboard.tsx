@@ -1342,6 +1342,13 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     if (isCompletionTimeVisible) setShowCompletionTimeChart(true);
   }, [isCompletionTimeVisible]);
 
+  // Auto-show completion time chart if there are completed items
+  React.useEffect(() => {
+    if (totalCompletedCount > 0) {
+      setShowCompletionTimeChart(true);
+    }
+  }, [totalCompletedCount]);
+
   // Invalidate cache when initiatives change significantly
   React.useEffect(() => {
     // Cleanup expired cache entries periodically
@@ -1477,14 +1484,16 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     ).length;
   }, [filteredInitiatives]);
 
-  // Completion time distribution calculation (lazy evaluation)
+  // Completion time distribution calculation (always calculate if there are completed items)
   const completionTimeDistribution = useMemo(() => {
-    if (!showCompletionTimeChart) {
+    // Always calculate if there are completed items, regardless of chart visibility
+    // This ensures the data is available when the chart section becomes visible
+    if (totalCompletedCount === 0) {
       return {
         buckets: [],
         avgCompletionDays: 0,
         medianCompletionDays: 0,
-        totalCompleted: totalCompletedCount,
+        totalCompleted: 0,
       };
     }
     
@@ -1495,7 +1504,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     const result = calculateCompletionTimeDistribution(debouncedInitiatives);
     metricsCache.set(cacheKey_completion, result, 60000); // 1 minute TTL
     return result;
-  }, [debouncedInitiatives, cacheKey, showCompletionTimeChart, totalCompletedCount]);
+  }, [debouncedInitiatives, cacheKey, totalCompletedCount]);
 
   // Combine all metrics
   const healthMetrics = useMemo(() => {

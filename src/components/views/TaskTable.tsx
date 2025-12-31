@@ -489,6 +489,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     // Get per-initiative display unit (defaults to 'weeks')
     const displayUnit = getDisplayUnit(item.id);
     const tasks = item.tasks || [];
+    const activeTasks = tasks.filter(t => t.status !== Status.Deleted);
     const isAtRisk = item.status === Status.AtRisk;
     const showTooltip = hoveredAtRiskDot === item.id && isAtRisk;
 
@@ -511,11 +512,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 <div className="flex-shrink-0 mt-0.5">
                   {getInitiativeIcon(item)}
                 </div>
-                {tasks.length > 0 && (
+                {activeTasks.length > 0 && (
                   <button
                     onClick={() => toggleTasks(item.id)}
                     className={`p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5 ${isBAU ? '' : 'hover:bg-blue-100'}`}
-                    title={tasksExpanded ? `Collapse ${tasks.length} tasks` : `Expand ${tasks.length} tasks`}
+                    title={tasksExpanded ? `Collapse ${activeTasks.length} tasks` : `Expand ${activeTasks.length} tasks`}
                   >
                     {tasksExpanded ? (
                       <ChevronDown size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
@@ -548,27 +549,27 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               </div>
               {/* Right side: Task count badge, status dots, and add task button */}
               <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                {!tasksExpanded && tasks.length > 0 && (
+                {!tasksExpanded && activeTasks.length > 0 && (
                   <>
                     <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
-                      {tasks.length}
+                      {activeTasks.length}
                     </span>
                     {/* Show status breakdown dots */}
                     <div className="flex gap-0.5">
-                      {tasks.filter(t => t.status === Status.InProgress).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${tasks.filter(t => t.status === Status.InProgress).length} in progress`} />
+                      {activeTasks.filter(t => t.status === Status.InProgress).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${activeTasks.filter(t => t.status === Status.InProgress).length} in progress`} />
                       )}
-                      {tasks.filter(t => t.status === Status.AtRisk).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${tasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
+                      {activeTasks.filter(t => t.status === Status.AtRisk).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${activeTasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
                       )}
-                      {tasks.filter(t => t.status === Status.Done).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${tasks.filter(t => t.status === Status.Done).length} done`} />
+                      {activeTasks.filter(t => t.status === Status.Done).length > 0 && (
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${activeTasks.filter(t => t.status === Status.Done).length} done`} />
                       )}
                     </div>
                   </>
                 )}
                 {/* Add task button - visible when editable and no tasks exist */}
-                {editable && tasks.length === 0 && (
+                {editable && activeTasks.length === 0 && (
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -1365,8 +1366,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               tradeOffTaskId: undefined,
                               tradeOffEta: undefined
                             });
-                            // Collapse the expanded section if there are no tasks
-                            if (tasks.length === 0) {
+                            // Collapse the expanded section if there are no active tasks
+                            if (activeTasks.length === 0) {
                               setExpandedTasks(prev => {
                                 const newSet = new Set(prev);
                                 newSet.delete(item.id);
@@ -1714,8 +1715,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               tradeOffTaskId: undefined,
                               tradeOffEta: undefined
                             });
-                            // Collapse the expanded section if there are no tasks
-                            if (tasks.length === 0) {
+                            // Collapse the expanded section if there are no active tasks
+                            if (activeTasks.length === 0) {
                               setExpandedTasks(prev => {
                                 const newSet = new Set(prev);
                                 newSet.delete(item.id);
