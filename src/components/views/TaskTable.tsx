@@ -82,7 +82,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const [_collapsedGroups, _setCollapsedGroups] = useState<Set<string>>(new Set());
   void _collapsedGroups; void _setCollapsedGroups; // Reserved for group collapse feature
   
-  // Track expanded tasks for BAU initiatives
+  // Track expanded tasks for all initiatives
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   
   // Track which initiatives are in "add task" mode
@@ -149,8 +149,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
     
     const initiative = filteredInitiatives.find(i => i.id === targetInitiativeId);
-    if (!initiative || initiative.initiativeType !== InitiativeType.BAU) {
-      alert('Selected initiative must be a BAU initiative');
+    if (!initiative) {
+      alert('Please select an initiative');
       return;
     }
     
@@ -174,7 +174,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     const updatedTasks = [...(initiative.tasks || []), newTask];
     const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
     
-    // Update tasks and actual effort (planned effort is manually set for BAU initiatives)
+    // Update tasks and actual effort (auto-calculate actual effort from tasks if tasks exist)
     handleInlineUpdate(targetInitiativeId, 'tasks', updatedTasks);
     handleInlineUpdate(targetInitiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
     
@@ -184,7 +184,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       if (tradeOffInitiative) {
         // If task ID is provided, update task ETA
         if (newTaskForm.tradeOffTaskId) {
-          if (tradeOffInitiative.initiativeType === InitiativeType.BAU && tradeOffInitiative.tasks && tradeOffInitiative.tasks.length > 0) {
+          if (tradeOffInitiative.tasks && tradeOffInitiative.tasks.length > 0) {
             const taskExists = tradeOffInitiative.tasks.some(t => t.id === newTaskForm.tradeOffTaskId);
             if (taskExists) {
               const updatedTradeOffTasks = tradeOffInitiative.tasks.map(task =>
@@ -197,7 +197,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               console.warn('Trade-off task not found:', newTaskForm.tradeOffTaskId);
             }
           } else {
-            console.warn('Trade-off initiative is not BAU or has no tasks:', newTaskForm.tradeOffInitiativeId);
+            console.warn('Trade-off initiative has no tasks:', newTaskForm.tradeOffInitiativeId);
           }
         } else {
           // No task ID provided, update initiative ETA
@@ -442,16 +442,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 <div className="flex-shrink-0 mt-0.5">
                   {getInitiativeIcon(item)}
                 </div>
-                {isBAU && (
+                {tasks.length > 0 && (
                   <button
                     onClick={() => toggleTasks(item.id)}
-                    className="p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5"
+                    className={`p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5 ${isBAU ? '' : 'hover:bg-blue-100'}`}
                     title={tasksExpanded ? `Collapse ${tasks.length} tasks` : `Expand ${tasks.length} tasks`}
                   >
                     {tasksExpanded ? (
-                      <ChevronDown size={14} className="text-purple-600" />
+                      <ChevronDown size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
                     ) : (
-                      <ChevronRight size={14} className="text-purple-600" />
+                      <ChevronRight size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
                     )}
                   </button>
                 )}
@@ -478,7 +478,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 </button>
               </div>
               {/* Right side: Task count badge and status dots */}
-              {isBAU && !tasksExpanded && tasks.length > 0 && (
+              {!tasksExpanded && tasks.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                   <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
                     {tasks.length}
@@ -864,8 +864,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         </td>
       </tr>
       
-      {/* Tasks dropdown row for BAU initiatives */}
-      {isBAU && tasksExpanded && (
+      {/* Tasks dropdown row for all initiatives with tasks */}
+      {tasksExpanded && tasks.length > 0 && (
         <tr className="bg-purple-50/30">
           <td colSpan={8} className="px-3 py-2 border-b border-slate-200">
             <div className="space-y-1.5">
@@ -1512,14 +1512,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 }}
                                 disabled={!newTaskForm.tradeOffInitiativeId || (() => {
                                   const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
-                                  return !tradeOffInitiative || tradeOffInitiative.initiativeType !== InitiativeType.BAU || !tradeOffInitiative.tasks || tradeOffInitiative.tasks.length === 0;
+                                  return !tradeOffInitiative || !tradeOffInitiative.tasks || tradeOffInitiative.tasks.length === 0;
                                 })()}
                                 className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               >
                                 <option value="">Select task...</option>
                                 {newTaskForm.tradeOffInitiativeId && (() => {
                                   const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
-                                  if (tradeOffInitiative?.initiativeType === InitiativeType.BAU && tradeOffInitiative.tasks) {
+                                  if (tradeOffInitiative?.tasks && tradeOffInitiative.tasks.length > 0) {
                                     return tradeOffInitiative.tasks.map(task => (
                                       <option key={task.id} value={task.id}>
                                         {task.title || `Task ${task.id.slice(-4)}`} ({task.eta || 'No ETA'})

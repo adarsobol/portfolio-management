@@ -918,7 +918,7 @@ export default function App() {
       const unplannedActuals = filteredInitiatives
         .filter(i => i.workType === WorkType.Unplanned)
         .reduce((sum, i) => sum + (i.actualEffort || 0), 0);
-      // Calculate BAU effort: planned effort is manually set, actual effort is auto-calculated from tasks
+      // Calculate BAU effort: planned effort is manually set, actual effort is auto-calculated from tasks (if tasks exist)
       const bauInitiativeEstimated = filteredInitiatives
         .filter(i => i.initiativeType === InitiativeType.BAU)
         .reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);

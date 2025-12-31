@@ -175,7 +175,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<'slack' | 'notion' | null>(null);
 
-  // BAU Task Management State
+  // Task Management State (for all initiative types)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
@@ -398,19 +398,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const selectedPillarNode = availablePillars.find(p => p.name === formData.l2_pillar);
   const availableResponsibilities = selectedPillarNode ? selectedPillarNode.responsibilities : [];
 
-  // BAU Initiative: Calculate actual effort from tasks (planned effort is manually set)
+  // Calculate actual effort from tasks if tasks exist (hybrid approach: auto-calculate if tasks exist, otherwise manual)
   const isBAU = formData.initiativeType === InitiativeType.BAU;
   const taskActualEffortSum = tasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
   
-  // Update formData.actualEffort when tasks change (planned effort is manually set)
+  // Update formData.actualEffort when tasks change (for all initiative types with tasks)
   useEffect(() => {
-    if (isBAU && tasks.length > 0) {
+    if (tasks.length > 0) {
       setFormData(prev => ({ 
         ...prev, 
         actualEffort: taskActualEffortSum
       }));
     }
-  }, [tasks, taskActualEffortSum, isBAU]);
+  }, [tasks, taskActualEffortSum]);
 
   // Progress indicator for required fields
   const requiredFieldsCount = isBAU ? 5 : 6; // BAU doesn't require definitionOfDone
@@ -436,17 +436,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
-      // When switching initiative type, handle tasks
+      // When switching initiative type, keep tasks (tasks are now available for all types)
       if (field === 'initiativeType') {
-        if (value === InitiativeType.WP) {
-          // Converting BAU to WP: remove tasks, keep effort
-          updated.tasks = undefined;
-          setTasks([]);
-        } else if (value === InitiativeType.BAU) {
-          // Converting WP to BAU: initialize empty tasks array
-          updated.tasks = [];
-          setTasks([]);
-        }
+        // Keep existing tasks when switching types
+        // Tasks are optional for all initiative types
       }
       
       return updated;
@@ -497,7 +490,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (!formData.ownerId) newErrors.ownerId = "Primary Owner is required";
     if (!formData.eta) newErrors.eta = "ETA is required";
     if (!formData.quarter) newErrors.quarter = "Quarter is required";
-    // For BAU, effort comes from tasks; for WP, effort is required
+    // For WP without tasks, effort is required; if tasks exist, effort can be auto-calculated
     if (!isBAU && (formData.estimatedEffort === undefined || formData.estimatedEffort < 0)) {
       newErrors.estimatedEffort = "Valid effort required";
     }
@@ -521,8 +514,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       newErrors.riskActionLog = "Risk/Action documentation is MANDATORY for At Risk items.";
     }
 
-    // BAU initiative validation: validate tasks if they exist
-    if (isBAU && tasks && tasks.length > 0) {
+    // Task validation: validate tasks if they exist (for all initiative types)
+    if (tasks && tasks.length > 0) {
       // Validate each task
       tasks.forEach((task, index) => {
         if (task.estimatedEffort === undefined || task.estimatedEffort < 0) {
@@ -581,8 +574,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         // Set originalEstimatedEffort only when creating new or when it changes
         originalEstimatedEffort: isNew ? (formData.estimatedEffort || 0) : formData.originalEstimatedEffort,
         originalEta: isNew ? (formData.eta || '') : formData.originalEta,
-        // Include tasks for BAU initiatives
-        tasks: isBAU ? tasks : undefined,
+        // Include tasks for all initiative types
+        tasks: tasks && tasks.length > 0 ? tasks : undefined,
         // Ensure initiativeType is set (required field)
         initiativeType: formData.initiativeType || InitiativeType.WP,
         // Ensure effort fields have defaults
@@ -740,7 +733,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   }, [bulkSharedSettings.l1_assetClass]);
 
   // ============================================================================
-  // HANDLERS - TASK MANAGEMENT (BAU)
+  // HANDLERS - TASK MANAGEMENT (ALL INITIATIVE TYPES)
   // ============================================================================
 
   const createEmptyTask = useCallback((): Task => {
@@ -1923,10 +1916,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
               )}
 
               {/* ============================================ */}
-              {/* TASKS SECTION - BAU ONLY */}
+              {/* TASKS SECTION - ALL INITIATIVE TYPES */}
               {/* ============================================ */}
-              {isBAU && (
-                <AccordionSection
+              <AccordionSection
                   title="Tasks"
                   icon={<Layers size={16} />}
                   isExpanded={expandedSections.tasks}

@@ -164,7 +164,7 @@ export interface Initiative {
   definitionOfDone?: string; // Definition of Done criteria (required for WP)
   comments?: Comment[];
   
-  // BAU-specific: Tasks (only for BAU initiatives, required for BAU)
+  // Tasks (optional for all initiative types)
   tasks?: Task[];
   
   // Audit Trail (Local history, though global log exists too)
