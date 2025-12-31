@@ -1325,6 +1325,14 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [delayRef, isDelayVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [completionTimeRef, isCompletionTimeVisible] = useIntersectionObserver({ threshold: 0.1 });
 
+  // Calculate total completed count independently (always runs, not lazy-loaded)
+  // This is needed to determine if the chart section should render
+  const totalCompletedCount = useMemo(() => {
+    return filteredInitiatives.filter(
+      i => i.status === Status.Done && i.createdAt
+    ).length;
+  }, [filteredInitiatives]);
+
   // Update visibility states when charts come into view
   React.useEffect(() => {
     if (isBurndownVisible) setShowBurndownChart(true);
@@ -1475,14 +1483,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     metricsCache.set(cacheKey_delay, result, 60000); // 1 minute TTL for this expensive calc
     return result;
   }, [debouncedInitiatives, cacheKey, showDelayChart]);
-
-  // Calculate total completed count independently (always runs, not lazy-loaded)
-  // This is needed to determine if the chart section should render
-  const totalCompletedCount = useMemo(() => {
-    return filteredInitiatives.filter(
-      i => i.status === Status.Done && i.createdAt
-    ).length;
-  }, [filteredInitiatives]);
 
   // Completion time distribution calculation (always calculate if there are completed items)
   const completionTimeDistribution = useMemo(() => {
