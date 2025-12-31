@@ -240,14 +240,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         });
         setMode('single'); // Always single mode when editing
         setTasks(initiativeToEdit.tasks || []);
-        setEffortOverride(false); // Reset override when editing
         // Reset manual flag when editing (editing mode doesn't use auto-assignment)
         assetClassManuallySetRef.current = false;
       } else {
         const defaultData = getDefaultFormData();
         setFormData(defaultData);
         setTasks([]);
-        setEffortOverride(false);
         // Reset manual flag for new initiatives
         assetClassManuallySetRef.current = false;
       }
@@ -439,7 +437,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
           // Converting WP to BAU: initialize empty tasks array
           updated.tasks = [];
           setTasks([]);
-          setEffortOverride(false);
         }
       }
       
