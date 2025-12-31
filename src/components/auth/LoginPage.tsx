@@ -69,15 +69,10 @@ export function LoginPage() {
           <div className="flex justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
-              onError={(error) => {
-                console.error('Google OAuth error:', error);
-                if (error.type === 'popup_closed') {
-                  setError('Login popup was closed');
-                } else if (error.type === 'popup_failed_to_open') {
-                  setError('Could not open login popup. Please check browser popup settings and ensure your domain is authorized in Google Cloud Console.');
-                } else {
-                  setError('Google Login Failed: Please ensure your domain is authorized in Google Cloud Console OAuth settings');
-                }
+              onError={() => {
+                // GoogleLogin onError doesn't provide error details
+                // Check console for specific error information
+                setError('Google Login Failed: Please ensure your domain is authorized in Google Cloud Console OAuth settings. Check browser console for details.');
               }}
               theme="filled_black"
               shape="rectangular"
