@@ -567,8 +567,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     </div>
                   </>
                 )}
-                {/* Add task button - visible when editable */}
-                {editable && (
+                {/* Add task button - visible when editable and no tasks exist */}
+                {editable && tasks.length === 0 && (
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -987,7 +987,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       </tr>
       
       {/* Tasks dropdown row for all initiatives with tasks */}
-      {tasksExpanded && tasks.length > 0 && (
+      {tasksExpanded && (
         <tr className="bg-purple-50/30">
           <td colSpan={8} className="px-3 py-2 border-b border-slate-200">
             <div className="space-y-1.5">
