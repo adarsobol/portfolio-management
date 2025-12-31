@@ -4,8 +4,10 @@ import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRig
 import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge, getStatusRowColor, getPriorityRowColor, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
-import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks } from '../../utils';
+import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
+import { sheetsSync } from '../../services';
+import { logger } from '../../utils/logger';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
@@ -245,6 +247,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       console.warn(`Task ${taskId} not found in initiative ${initiativeId}`);
       return;
     }
+
+    // Check edit permissions for this specific task
+    if (!canEditTask(initiative, taskToUpdate)) {
+      const editScope = config.rolePermissions?.[currentUser.role]?.editTasks;
+      if (editScope === 'own') {
+        alert('You can only edit tasks that you own.');
+      } else {
+        alert('You do not have permission to edit tasks.');
+      }
+      return;
+    }
     
     console.log('Task to update:', taskToUpdate, 'new value:', value);
     
@@ -272,16 +285,71 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     }
   };
   
-  const handleDeleteTask = (initiativeId: string, taskId: string) => {
+  const canDeleteTask = (item: Initiative, task: Task): boolean => {
+    return canDeleteTaskItem(config, currentUser.role, task.ownerId, item.ownerId, currentUser.id);
+  };
+
+  const canEditTask = (item: Initiative, task: Task): boolean => {
+    // For task-level editing, check task ownership specifically
+    // If user can edit all tasks, allow
+    if (canEditAllTasks(config, currentUser.role)) return true;
+    // Otherwise, check if user can edit this specific task
+    return canEditTaskItem(config, currentUser.role, task.ownerId, item.ownerId, currentUser.id);
+  };
+
+  const handleDeleteTask = async (initiativeId: string, taskId: string) => {
     const initiative = filteredInitiatives.find(i => i.id === initiativeId);
     if (!initiative || !initiative.tasks) return;
     
-    const updatedTasks = initiative.tasks.filter(task => task.id !== taskId);
-    const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
-    
-    // Update tasks and actual effort (planned effort is manually set for BAU initiatives)
-    handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
-    handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
+    const task = initiative.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Check delete permissions
+    if (!canDeleteTask(initiative, task)) {
+      const deleteScope = config.rolePermissions?.[currentUser.role]?.deleteTasks;
+      if (deleteScope === 'own') {
+        alert('You can only delete tasks that you own.');
+      } else {
+        alert('You do not have permission to delete tasks.');
+      }
+      return;
+    }
+
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this task?\n\nYou can restore it from the Trash later.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      // Soft delete in Google Sheets
+      const result = await sheetsSync.deleteTask(taskId);
+      
+      if (result.success) {
+        // Update local state to mark task as deleted
+        const updatedTasks = initiative.tasks.map(t => 
+          t.id === taskId 
+            ? { ...t, status: Status.Deleted, deletedAt: result.deletedAt } 
+            : t
+        );
+        const totalActualEffort = updatedTasks
+          .filter(t => t.status !== Status.Deleted)
+          .reduce((sum, t) => sum + (t.actualEffort || 0), 0);
+        
+        // Update tasks and actual effort
+        handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
+        handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
+      } else {
+        alert('Failed to delete task. Please try again.');
+        logger.error('Failed to delete task', { context: 'TaskTable.handleDeleteTask', taskId, initiativeId });
+      }
+    } catch (error) {
+      logger.error('Failed to delete task', { context: 'TaskTable.handleDeleteTask', error: error instanceof Error ? error : new Error(String(error)), taskId, initiativeId });
+      alert('Failed to delete task. Please try again.');
+    }
   };
 
   const getOwnerNameById = (id?: string) => getOwnerName(users, id);
@@ -871,10 +939,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <td colSpan={8} className="px-3 py-2 border-b border-slate-200">
             <div className="space-y-1.5">
               {/* Tasks List */}
-              {tasks.length > 0 && (
+              {tasks.filter(t => t.status !== Status.Deleted).length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.length})</div>
-                  {tasks.map((task, taskIndex) => (
+                  <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.filter(t => t.status !== Status.Deleted).length})</div>
+                  {tasks.filter(task => task.status !== Status.Deleted).map((task, taskIndex) => (
                     <div key={task.id} className="bg-purple-50/30 border-l-4 border-l-purple-400 border border-purple-200 rounded-md shadow-sm hover:shadow transition-shadow relative ml-8">
                       <div className="flex items-center">
                         {/* Column 1: ID - Empty, matching initiative ID column width */}
@@ -1182,7 +1250,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                       </div>
                       {/* Delete Button - positioned absolutely on the right */}
-                      {editable && (
+                      {canDeleteTask(item, task) && (
                         <button
                           onClick={() => handleDeleteTask(item.id, task.id)}
                           className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors z-10"

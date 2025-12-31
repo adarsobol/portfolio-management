@@ -7,9 +7,10 @@ import {
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative } from '../../utils';
+import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative, canDeleteTaskItem } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
-import { slackService } from '../../services';
+import { slackService, sheetsSync } from '../../services';
+import { logger } from '../../utils/logger';
 import { BulkInitiativeSpreadsheetModal } from './BulkInitiativeSpreadsheetModal';
 
 // ============================================================================
@@ -763,8 +764,49 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     ));
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
+  const deleteTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !initiativeToEdit) return;
+
+    // Check delete permissions
+    if (!canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id)) {
+      const deleteScope = config.rolePermissions?.[currentUser.role]?.deleteTasks;
+      if (deleteScope === 'own') {
+        alert('You can only delete tasks that you own.');
+      } else {
+        alert('You do not have permission to delete tasks.');
+      }
+      return;
+    }
+
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this task?\n\nYou can restore it from the Trash later.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      // Soft delete in Google Sheets
+      const result = await sheetsSync.deleteTask(taskId);
+      
+      if (result.success) {
+        // Update local state to mark task as deleted
+        setTasks(prev => prev.map(t => 
+          t.id === taskId 
+            ? { ...t, status: Status.Deleted, deletedAt: result.deletedAt } 
+            : t
+        ));
+      } else {
+        alert('Failed to delete task. Please try again.');
+        logger.error('Failed to delete task', { context: 'InitiativeModal.deleteTask', taskId });
+      }
+    } catch (error) {
+      logger.error('Failed to delete task', { context: 'InitiativeModal.deleteTask', error: error instanceof Error ? error : new Error(String(error)), taskId });
+      alert('Failed to delete task. Please try again.');
+    }
   };
 
   const duplicateTask = (taskId: string) => {
@@ -1945,7 +1987,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     
                     {/* Task List */}
                     <div className="space-y-2">
-                      {tasks.map((task, index) => (
+                      {tasks.filter(task => task.status !== Status.Deleted).map((task, index) => (
                         <div key={task.id} className="border border-slate-300 rounded-lg overflow-hidden">
                           {/* Task Header - Collapsible */}
                           <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 flex items-center justify-between">
@@ -1995,7 +2037,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               >
                                 <Copy size={16} />
                               </button>
-                              {tasks.length > 1 && (
+                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
                                 <button
                                   type="button"
                                   onClick={() => deleteTask(task.id)}
@@ -2012,7 +2054,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           {expandedTasks.has(task.id) && (
                             <div className="bg-white p-4 space-y-4">
                               {/* Delete button at top of expanded section */}
-                              {tasks.length > 1 && (
+                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
                                 <div className="flex justify-end pb-3 border-b border-slate-200">
                                   <button
                                     type="button"

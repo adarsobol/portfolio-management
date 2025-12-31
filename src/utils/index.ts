@@ -174,13 +174,56 @@ export const hasEditAccess = (level: TabAccessLevel): boolean => {
 };
 
 /**
+ * Normalize role string to match Role enum values
+ * Handles potential mismatches between API role strings and enum values
+ */
+const normalizeRole = (role: Role | string): Role | null => {
+  const roleStr = String(role).trim();
+  // Try exact match first
+  if (Object.values(Role).includes(roleStr as Role)) {
+    return roleStr as Role;
+  }
+  // Try case-insensitive match
+  const normalized = Object.values(Role).find(
+    r => r.toLowerCase() === roleStr.toLowerCase()
+  );
+  if (normalized) {
+    return normalized;
+  }
+  return null;
+};
+
+/**
  * Get permission value for a role, with fallback to default
  */
 export const getPermission = (config: AppConfig, role: Role, key: PermissionKey): PermissionValue => {
-  const perms = config.rolePermissions[role];
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/30bff00f-1252-4a6a-a1a1-ff6715802d11',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/index.ts:getPermission',message:'Getting permission value',data:{role,key,hasConfig:!!config,hasRolePermissions:!!config?.rolePermissions,hasPermsForRole:!!perms,permValue:perms?.[key]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,C'})}).catch(()=>{});
-  // #endregion
+  // Normalize role to ensure it matches enum values
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) {
+    console.warn(`[getPermission] Invalid role: "${role}". Available roles:`, Object.values(Role));
+    // Return default based on permission type
+    if (key.startsWith('access')) {
+      return 'none';
+    }
+    return 'no';
+  }
+
+  const perms = config.rolePermissions[normalizedRole];
+  
+  // Debug logging for delete permission checks
+  if (key === 'deleteTasks') {
+    console.log('[getPermission] Delete permission check:', {
+      role,
+      normalizedRole,
+      key,
+      hasConfig: !!config,
+      hasRolePermissions: !!config?.rolePermissions,
+      hasPermsForRole: !!perms,
+      permValue: perms?.[key],
+      allRoleKeys: Object.keys(config.rolePermissions || {})
+    });
+  }
+  
   if (!perms) {
     // Return default based on permission type
     if (key.startsWith('access')) {
@@ -269,6 +312,66 @@ export const canDeleteTasks = (config: AppConfig, role: Role): boolean => {
 };
 
 /**
+ * Check if user can edit a specific task item
+ * @param config - App configuration
+ * @param role - User's role
+ * @param taskOwnerId - ID of the task owner (optional, may not be set)
+ * @param initiativeOwnerId - ID of the initiative owner
+ * @param currentUserId - ID of the current user
+ * @returns true if user can edit the task
+ */
+export const canEditTaskItem = (config: AppConfig, role: Role, taskOwnerId: string | undefined, initiativeOwnerId: string, currentUserId: string): boolean => {
+  const editScope = getTaskManagementScope(config, role, 'editTasks');
+  
+  if (editScope === 'yes') {
+    // Can edit any task
+    return true;
+  } else if (editScope === 'own') {
+    // Can edit only own tasks
+    // Priority: Check task owner first, then fall back to initiative owner if task has no owner
+    if (taskOwnerId) {
+      // Task has an owner - must match current user
+      return taskOwnerId === currentUserId;
+    }
+    // Task has no owner - check if user owns the initiative
+    return initiativeOwnerId === currentUserId;
+  }
+  
+  // Cannot edit
+  return false;
+};
+
+/**
+ * Check if user can delete a specific task item
+ * @param config - App configuration
+ * @param role - User's role
+ * @param taskOwnerId - ID of the task owner (optional, may not be set)
+ * @param initiativeOwnerId - ID of the initiative owner
+ * @param currentUserId - ID of the current user
+ * @returns true if user can delete the task
+ */
+export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: string | undefined, initiativeOwnerId: string, currentUserId: string): boolean => {
+  const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
+  
+  if (deleteScope === 'yes') {
+    // Can delete any task
+    return true;
+  } else if (deleteScope === 'own') {
+    // Can delete only own tasks
+    // Priority: Check task owner first, then fall back to initiative owner if task has no owner
+    if (taskOwnerId) {
+      // Task has an owner - must match current user
+      return taskOwnerId === currentUserId;
+    }
+    // Task has no owner - check if user owns the initiative
+    return initiativeOwnerId === currentUserId;
+  }
+  
+  // Cannot delete
+  return false;
+};
+
+/**
  * Check if user can delete a specific initiative
  * @param config - App configuration
  * @param role - User's role
@@ -278,6 +381,19 @@ export const canDeleteTasks = (config: AppConfig, role: Role): boolean => {
  */
 export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwnerId: string, currentUserId: string): boolean => {
   const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
+  
+  // Debug logging for delete permission checks
+  console.log('[canDeleteInitiative] Permission check:', {
+    role,
+    RoleTeamLead: Role.TeamLead,
+    roleMatches: role === Role.TeamLead,
+    deleteScope,
+    initiativeOwnerId,
+    currentUserId,
+    ownerMatch: initiativeOwnerId === currentUserId,
+    configRolePermissions: config.rolePermissions?.[role],
+    deleteTasksValue: config.rolePermissions?.[role]?.deleteTasks
+  });
   
   if (deleteScope === 'yes') {
     // Can delete any initiative
