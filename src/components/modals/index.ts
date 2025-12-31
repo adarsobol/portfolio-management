@@ -3,4 +3,5 @@ export { default as AtRiskReasonModal } from './AtRiskReasonModal';
 export { default as ConflictResolutionModal } from './ConflictResolutionModal';
 export { FeedbackModal } from './FeedbackModal';
 export { WeeklyEffortWarningModal } from './WeeklyEffortWarningModal';
+export { EffortExceededModal } from './EffortExceededModal';
 

@@ -15,6 +15,7 @@ import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
 import AtRiskReasonModal from './components/modals/AtRiskReasonModal';
 import { WeeklyEffortWarningModal } from './components/modals/WeeklyEffortWarningModal';
+import { EffortExceededModal } from './components/modals/EffortExceededModal';
 
 // Components
 import { TopNav } from './components/shared/TopNav';
@@ -539,6 +540,8 @@ export default function App() {
   const [weeklyEffortFlags, setWeeklyEffortFlags] = useState<Map<string, ValidationResult>>(new Map());
   const [showEffortWarningPopup, setShowEffortWarningPopup] = useState(false);
   const [currentEffortFlag, setCurrentEffortFlag] = useState<ValidationResult | null>(null);
+  const [showEffortExceededModal, setShowEffortExceededModal] = useState(false);
+  const [effortExceededInitiative, setEffortExceededInitiative] = useState<Initiative | null>(null);
 
   // Optimistic Updates State
   const [optimisticUpdates, setOptimisticUpdates] = useState<Map<string, {
@@ -1739,6 +1742,50 @@ export default function App() {
           updated.lastWeeklyUpdate = i.lastWeeklyUpdate;
         }
         
+        // Clear notification state if originalEstimatedEffort is updated
+        if (field === 'originalEstimatedEffort') {
+          const notificationKey = `effortExceededNotified_${updated.id}`;
+          localStorage.removeItem(notificationKey);
+        }
+        
+        // Check if actual effort exceeds original allocated effort
+        if (field === 'actualEffort' || field === 'tasks') {
+          const actualEffort = updated.actualEffort || 0;
+          const originalEffort = updated.originalEstimatedEffort || 0;
+          
+          // Only check if both values are defined and > 0, and actual exceeds original
+          if (originalEffort > 0 && actualEffort > originalEffort) {
+            // Check if notification has already been shown for this initiative
+            const notificationKey = `effortExceededNotified_${updated.id}`;
+            const alreadyNotified = localStorage.getItem(notificationKey);
+            
+            if (!alreadyNotified) {
+              // Mark as notified in localStorage
+              localStorage.setItem(notificationKey, 'true');
+              
+              // Create notification
+              addNotification(createNotification(
+                NotificationType.EffortExceeded,
+                'Effort Exceeded',
+                `${updated.title} actual effort (${actualEffort.toFixed(2)}w) exceeds original allocation (${originalEffort.toFixed(2)}w)`,
+                updated.id,
+                updated.title,
+                updated.ownerId,
+                { 
+                  actualEffort, 
+                  originalEffort, 
+                  variance: actualEffort - originalEffort,
+                  variancePercent: ((actualEffort - originalEffort) / originalEffort * 100).toFixed(1)
+                }
+              ));
+              
+              // Show modal
+              setEffortExceededInitiative(updated);
+              setShowEffortExceededModal(true);
+            }
+          }
+        }
+        
         // Execute field-change workflows (including effort-based transitions)
         if (field === 'status') {
           executeFieldChangeWorkflows(updated, 'status');
@@ -2572,6 +2619,15 @@ export default function App() {
           setCurrentEffortFlag(null);
         }}
         validationResult={currentEffortFlag}
+      />
+
+      <EffortExceededModal
+        isOpen={showEffortExceededModal}
+        onClose={() => {
+          setShowEffortExceededModal(false);
+          setEffortExceededInitiative(null);
+        }}
+        initiative={effortExceededInitiative}
       />
 
       {/* Support Widget - floating help button */}

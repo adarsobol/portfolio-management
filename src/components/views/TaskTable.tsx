@@ -773,6 +773,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[150px]">
           {editable ? (
             <div className="flex items-center gap-1.5">
+              {/* Effort exceeded flag */}
+              {(item.actualEffort || 0) > (item.originalEstimatedEffort || 0) && (item.originalEstimatedEffort || 0) > 0 && (
+                <div className="flex-shrink-0" title={`Actual effort (${(item.actualEffort || 0).toFixed(2)}w) exceeds original allocation (${(item.originalEstimatedEffort || 0).toFixed(2)}w)`}>
+                  <AlertTriangle size={14} className="text-red-500" />
+                </div>
+              )}
               <div className="flex items-center gap-0.5">
                 <button
                   type="button"
@@ -905,10 +911,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <span className="text-slate-400 text-xs font-medium flex-shrink-0">{displayUnit === 'days' ? 'd' : 'w'}</span>
             </div>
           ) : (
-            <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-slate-50 px-2 py-1 rounded">
-              {displayUnit === 'days' 
-                ? `${weeksToDays(item.actualEffort || 0).toFixed(1)}/${weeksToDays(item.estimatedEffort || 0).toFixed(1)}d`
-                : `${item.actualEffort}/${item.estimatedEffort}w`}
+            <div className="flex items-center gap-1.5 justify-end">
+              {/* Effort exceeded flag for read-only view */}
+              {(item.actualEffort || 0) > (item.originalEstimatedEffort || 0) && (item.originalEstimatedEffort || 0) > 0 && (
+                <div className="flex-shrink-0" title={`Actual effort (${(item.actualEffort || 0).toFixed(2)}w) exceeds original allocation (${(item.originalEstimatedEffort || 0).toFixed(2)}w)`}>
+                  <AlertTriangle size={14} className="text-red-500" />
+                </div>
+              )}
+              <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-slate-50 px-2 py-1 rounded">
+                {displayUnit === 'days' 
+                  ? `${weeksToDays(item.actualEffort || 0).toFixed(1)}/${weeksToDays(item.estimatedEffort || 0).toFixed(1)}d`
+                  : `${item.actualEffort}/${item.estimatedEffort}w`}
+              </div>
             </div>
           )}
           {item.originalEstimatedEffort !== item.estimatedEffort && (

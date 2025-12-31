@@ -398,6 +398,7 @@ export enum NotificationType {
   WeeklyUpdateReminder = 'weekly_update_reminder',
   OverlookedItem = 'overlooked_item',
   WeeklyEffortExceeded = 'weekly_effort_exceeded',
+  EffortExceeded = 'effort_exceeded',
   // Support ticket notifications
   SupportTicketNew = 'support_ticket_new',
   SupportTicketReply = 'support_ticket_reply',
