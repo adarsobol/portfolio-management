@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router-dom';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, ChevronDown } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag } from './types';
@@ -526,6 +526,9 @@ export default function App() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Initiative | null>(null);
+  const [newButtonDropdownOpen, setNewButtonDropdownOpen] = useState(false);
+  const [initialModalMode, setInitialModalMode] = useState<'single' | 'bulk'>('single');
+  const newButtonRef = useRef<HTMLDivElement>(null);
   
   // At Risk Reason Modal State
   const [isAtRiskModalOpen, setIsAtRiskModalOpen] = useState(false);
@@ -607,6 +610,20 @@ export default function App() {
       setEditingItem(null);
     }
   }, [location.pathname, isModalOpen, editingItem]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (newButtonRef.current && !newButtonRef.current.contains(event.target as Node)) {
+        setNewButtonDropdownOpen(false);
+      }
+    };
+
+    if (newButtonDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [newButtonDropdownOpen]);
 
   // Wrapper function to restrict view changes when Team Lead view is enabled
   const handleViewChange = (view: ViewType) => {
@@ -2127,9 +2144,49 @@ export default function App() {
               currentUserEmail={currentUser.email}
             />
             {canCreate && (
-              <button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                <Plus size={16} /><span>New</span>
-              </button>
+              <div className="relative" ref={newButtonRef}>
+                <button 
+                  onClick={() => setNewButtonDropdownOpen(!newButtonDropdownOpen)} 
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  <Plus size={16} /><span>New</span>
+                  <ChevronDown size={14} className={`transition-transform ${newButtonDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {newButtonDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
+                    <button
+                      onClick={() => {
+                        setInitialModalMode('single');
+                        setEditingItem(null);
+                        setIsModalOpen(true);
+                        setNewButtonDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <Plus size={16} className="text-blue-600" />
+                      <div>
+                        <p className="font-medium">New Item</p>
+                        <p className="text-xs text-slate-400">Single initiative</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInitialModalMode('bulk');
+                        setEditingItem(null);
+                        setIsModalOpen(true);
+                        setNewButtonDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
+                    >
+                      <Plus size={16} className="text-indigo-600" />
+                      <div>
+                        <p className="font-medium">Plan Mode</p>
+                        <p className="text-xs text-slate-400">Spreadsheet view</p>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -2280,9 +2337,49 @@ export default function App() {
               currentUserEmail={currentUser.email}
             />
             {canCreate && (
-              <button onClick={() => { setEditingItem(null); setIsModalOpen(true); }} className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                <Plus size={16} /><span>New</span>
-              </button>
+              <div className="relative" ref={newButtonRef}>
+                <button 
+                  onClick={() => setNewButtonDropdownOpen(!newButtonDropdownOpen)} 
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  <Plus size={16} /><span>New</span>
+                  <ChevronDown size={14} className={`transition-transform ${newButtonDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {newButtonDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
+                    <button
+                      onClick={() => {
+                        setInitialModalMode('single');
+                        setEditingItem(null);
+                        setIsModalOpen(true);
+                        setNewButtonDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <Plus size={16} className="text-blue-600" />
+                      <div>
+                        <p className="font-medium">New Item</p>
+                        <p className="text-xs text-slate-400">Single initiative</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInitialModalMode('bulk');
+                        setEditingItem(null);
+                        setIsModalOpen(true);
+                        setNewButtonDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
+                    >
+                      <Plus size={16} className="text-indigo-600" />
+                      <div>
+                        <p className="font-medium">Plan Mode</p>
+                        <p className="text-xs text-slate-400">Spreadsheet view</p>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -2417,6 +2514,7 @@ export default function App() {
         onDelete={handleDeleteInitiative}
         effortDisplayUnit={effortDisplayUnit}
         setEffortDisplayUnit={setEffortDisplayUnit}
+        initialMode={editingItem ? 'single' : initialModalMode}
       />
       
       <AtRiskReasonModal

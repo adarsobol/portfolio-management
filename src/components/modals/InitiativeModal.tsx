@@ -10,6 +10,7 @@ import {
 import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService } from '../../services';
+import { BulkInitiativeSpreadsheetModal } from './BulkInitiativeSpreadsheetModal';
 
 // ============================================================================
 // ACCORDION SECTION COMPONENT
@@ -79,12 +80,15 @@ interface BulkEntryRow {
   status: Status;
   eta: string;
   estimatedEffort: number;
-  // Expandable fields
+  // Hierarchy fields
   l2_pillar: string;
   l3_responsibility: string;
   l4_target: string;
   secondaryOwner: string;
-  isExpanded: boolean;
+  // Additional fields
+  definitionOfDone?: string;
+  unplannedTags?: UnplannedTag[];
+  dependencies?: Dependency[];
   // Trade-off fields
   hasTradeOff: boolean;
   tradeOffTargetId: string;
@@ -108,11 +112,12 @@ interface InitiativeModalProps {
   onDelete?: (id: string) => void;
   effortDisplayUnit?: 'weeks' | 'days';
   setEffortDisplayUnit?: (unit: 'weeks' | 'days') => void;
+  initialMode?: 'single' | 'bulk';
 }
 
 const InitiativeModal: React.FC<InitiativeModalProps> = ({
   isOpen, onClose, onSave, currentUser, initiativeToEdit, rolePermissions, config, users, allInitiatives, onDelete,
-  effortDisplayUnit = 'weeks', setEffortDisplayUnit
+  effortDisplayUnit = 'weeks', setEffortDisplayUnit, initialMode = 'single'
 }) => {
   const isEditMode = !!initiativeToEdit;
   const permissions = rolePermissions[currentUser.role];
@@ -122,7 +127,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // ============================================================================
   
   // Mode Toggle: 'single' or 'bulk'
-  const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const [mode, setMode] = useState<'single' | 'bulk'>(initialMode);
   
   // Single Mode Form State
   const [formData, setFormData] = useState<Partial<Initiative>>({});
@@ -221,7 +226,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       l3_responsibility: defaultResp,
       l4_target: '',
       secondaryOwner: '',
-      isExpanded: false,
+      definitionOfDone: '',
+      unplannedTags: [],
+      dependencies: [],
       // Trade-off defaults
       hasTradeOff: false,
       tradeOffTargetId: '',
@@ -248,6 +255,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         setTasks([]);
         // Reset manual flag for new initiatives
         assetClassManuallySetRef.current = false;
+        // Set mode from initialMode prop
+        setMode(initialMode);
       }
       setErrors({});
       setActiveTab('details');
@@ -263,7 +272,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       setBulkRows([createEmptyBulkRow(), createEmptyBulkRow()]);
       setBulkErrors({});
     }
-  }, [isOpen, initiativeToEdit, getDefaultFormData, createEmptyBulkRow]);
+  }, [isOpen, initiativeToEdit, getDefaultFormData, createEmptyBulkRow, initialMode]);
 
   // Close actions menu when clicking outside
   useEffect(() => {
@@ -641,11 +650,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     }
   };
 
-  const toggleRowExpanded = (rowId: string) => {
-    setBulkRows(prev => prev.map(row => 
-      row.id === rowId ? { ...row, isExpanded: !row.isExpanded } : row
-    ));
-  };
 
   const validateBulkRows = (): boolean => {
     const newErrors: Record<string, Record<string, string>> = {};
@@ -695,6 +699,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         l2_pillar: row.l2_pillar,
         l3_responsibility: row.l3_responsibility,
         l4_target: row.l4_target,
+        definitionOfDone: row.definitionOfDone || undefined,
+        dependencies: row.dependencies && row.dependencies.length > 0 ? row.dependencies : undefined,
+        unplannedTags: row.unplannedTags && row.unplannedTags.length > 0 ? row.unplannedTags : undefined,
         workType: WorkType.Planned, // Default to Planned
         lastUpdated: now,
         comments: [],
@@ -954,7 +961,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         isOpen ? 'translate-x-0' : 'translate-x-full'
       } ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div className={`bg-white h-full shadow-2xl overflow-hidden flex flex-col border-l border-slate-200 transition-all duration-300 ${
-          mode === 'bulk' ? 'w-[900px] max-w-[95vw]' : 'w-[600px] max-w-[90vw]'
+          mode === 'bulk' ? 'w-[95vw] max-w-[95vw]' : 'w-[600px] max-w-[90vw]'
         }`}>
         
         {/* ================================================================ */}
@@ -976,33 +983,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
               )}
             </div>
             
-            {/* Mode Toggle - only show when creating new */}
-            {!isEditMode && !isReadOnly && (
-              <div className="flex bg-slate-700/50 rounded-lg p-1 ml-4">
-                <button
-                  type="button"
-                  onClick={() => setMode('single')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                    mode === 'single' 
-                      ? 'bg-white text-slate-800 shadow-sm' 
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  Single
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('bulk')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                    mode === 'bulk' 
-                      ? 'bg-white text-slate-800 shadow-sm' 
-                      : 'text-slate-300 hover:text-white'
-                  }`}
-                >
-                  Bulk
-                </button>
-              </div>
-            )}
           </div>
           
           <div className="flex items-center gap-2">
@@ -2458,351 +2438,23 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         )}
 
         {/* ================================================================ */}
-        {/* BODY - BULK MODE */}
+        {/* BODY - PLAN MODE (SPREADSHEET) */}
         {/* ================================================================ */}
         {mode === 'bulk' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {/* Shared Settings */}
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Users size={16} className="text-slate-500" />
-                <span className="text-sm font-semibold text-slate-700">Shared Settings (applies to all)</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Quarter</label>
-                  <select
-                    value={bulkSharedSettings.quarter}
-                    onChange={(e) => setBulkSharedSettings(prev => ({ ...prev, quarter: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Asset Class</label>
-                  <select
-                    value={bulkSharedSettings.l1_assetClass}
-                    onChange={(e) => setBulkSharedSettings(prev => ({ ...prev, l1_assetClass: e.target.value as AssetClass }))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Object.values(AssetClass).map(ac => <option key={ac} value={ac}>{ac}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Bulk Table */}
-            <div className="p-4">
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                {/* Table Header */}
-                <div className="bg-slate-100 border-b border-slate-200">
-                  <div className="grid grid-cols-[2fr_120px_70px_90px_110px_70px_50px] gap-2 px-3 py-2 text-xs font-semibold text-slate-600">
-                    <div>Title *</div>
-                    <div>Owner *</div>
-                    <div>Priority</div>
-                    <div>Status</div>
-                    <div>ETA *</div>
-                    <div>Effort</div>
-                    <div></div>
-                  </div>
-                </div>
-
-                {/* Table Rows */}
-                <div className="divide-y divide-slate-100">
-                  {bulkRows.map((row, index) => (
-                    <div key={row.id}>
-                      {/* Main Row */}
-                      <div className="grid grid-cols-[2fr_120px_70px_90px_110px_70px_50px] gap-2 px-3 py-2 items-center hover:bg-slate-50">
-                        <div>
-                          <input
-                            type="text"
-                            value={row.title}
-                            onChange={(e) => handleBulkRowChange(row.id, 'title', e.target.value)}
-                            placeholder={`Initiative ${index + 1}...`}
-                            className={`w-full rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              bulkErrors[row.id]?.title ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                            }`}
-                          />
-                        </div>
-                        <div>
-                          <select
-                            value={row.ownerId}
-                            onChange={(e) => handleBulkRowChange(row.id, 'ownerId', e.target.value)}
-                            className={`w-full rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              bulkErrors[row.id]?.ownerId ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                            }`}
-                          >
-                            <option value="">Select...</option>
-                            {users.filter(u => u.role === Role.TeamLead).map(u => (
-                              <option key={u.id} value={u.id}>{u.name.split(' ')[0]}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <select
-                            value={row.priority}
-                            onChange={(e) => handleBulkRowChange(row.id, 'priority', e.target.value)}
-                            className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <select
-                            value={row.status}
-                            onChange={(e) => handleBulkRowChange(row.id, 'status', e.target.value)}
-                            className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <input
-                            type="date"
-                            value={row.eta || ''}
-                            onChange={(e) => handleBulkRowChange(row.id, 'eta', e.target.value)}
-                            className={`w-full rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              bulkErrors[row.id]?.eta ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                            }`}
-                          />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleBulkRowChange(row.id, 'estimatedEffort', Math.max(0, row.estimatedEffort - 0.25))}
-                              className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
-                              title="Decrease by 0.25"
-                            >
-                              <ArrowDown size={12} />
-                            </button>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.25"
-                              value={row.estimatedEffort}
-                              onChange={(e) => handleBulkRowChange(row.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
-                              className={`flex-1 rounded border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                bulkErrors[row.id]?.estimatedEffort ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                              }`}
-                            />
-                            <button
-                              onClick={() => handleBulkRowChange(row.id, 'estimatedEffort', row.estimatedEffort + 0.25)}
-                              className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
-                              title="Increase by 0.25"
-                            >
-                              <ArrowUp size={12} />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {/* Trade-off indicator badge */}
-                          {row.hasTradeOff && row.tradeOffTargetId && (
-                            <span 
-                              className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"
-                              title="Has trade-off"
-                            >
-                              <Scale size={10} />
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => toggleRowExpanded(row.id)}
-                            className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600"
-                            title="Expand row"
-                          >
-                            {row.isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                          </button>
-                          <div className="relative group">
-                            <button
-                              type="button"
-                              className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600"
-                            >
-                              <MoreVertical size={14} />
-                            </button>
-                            <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-slate-200 z-10 hidden group-hover:block">
-                              <button
-                                onClick={() => duplicateBulkRow(row.id)}
-                                className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                              >
-                                Duplicate
-                              </button>
-                              {bulkRows.length > 1 && (
-                                <button
-                                  onClick={() => removeBulkRow(row.id)}
-                                  className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Expanded Row */}
-                      {row.isExpanded && (
-                        <div className="bg-slate-50 px-3 py-3 border-t border-slate-100 space-y-3">
-                          {/* Hierarchy Fields */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">L2 Pillar</label>
-                              <select
-                                value={row.l2_pillar}
-                                onChange={(e) => {
-                                  const newPillar = e.target.value;
-                                  const pillarNode = HIERARCHY[bulkSharedSettings.l1_assetClass].find(p => p.name === newPillar);
-                                  handleBulkRowChange(row.id, 'l2_pillar', newPillar);
-                                  handleBulkRowChange(row.id, 'l3_responsibility', pillarNode?.responsibilities[0] || '');
-                                }}
-                                className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              >
-                                {HIERARCHY[bulkSharedSettings.l1_assetClass].map(p => (
-                                  <option key={p.name} value={p.name}>{p.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">L3 Responsibility</label>
-                              <select
-                                value={row.l3_responsibility}
-                                onChange={(e) => handleBulkRowChange(row.id, 'l3_responsibility', e.target.value)}
-                                className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              >
-                                {(HIERARCHY[bulkSharedSettings.l1_assetClass].find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
-                                  <option key={r} value={r}>{r}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">L4 Target</label>
-                              <input
-                                type="text"
-                                value={row.l4_target}
-                                onChange={(e) => handleBulkRowChange(row.id, 'l4_target', e.target.value)}
-                                placeholder="e.g. Identify constraints"
-                                className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-slate-600 mb-1">Secondary Owner</label>
-                              <input
-                                type="text"
-                                value={row.secondaryOwner}
-                                onChange={(e) => handleBulkRowChange(row.id, 'secondaryOwner', e.target.value)}
-                                placeholder="e.g. Stakeholder"
-                                className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Trade-off Section */}
-                          <div className={`border rounded-lg p-3 transition-colors ${
-                            row.hasTradeOff ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-white'
-                          }`}>
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={row.hasTradeOff}
-                                onChange={(e) => handleBulkRowChange(row.id, 'hasTradeOff', e.target.checked)}
-                                className="rounded text-indigo-600 focus:ring-indigo-500"
-                              />
-                              <Scale size={12} className="text-indigo-500" />
-                              <span>This initiative impacts another</span>
-                            </label>
-
-                            {row.hasTradeOff && (
-                              <div className="mt-3 grid grid-cols-3 gap-2">
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Impacted Initiative</label>
-                                  <select
-                                    value={row.tradeOffTargetId}
-                                    onChange={(e) => handleBulkRowChange(row.id, 'tradeOffTargetId', e.target.value)}
-                                    className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  >
-                                    <option value="">Select...</option>
-                                    {tradeOffCandidates.map(i => (
-                                      <option key={i.id} value={i.id}>
-                                        {i.title.length > 30 ? i.title.substring(0, 30) + '...' : i.title}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">Field</label>
-                                  <select
-                                    value={row.tradeOffField}
-                                    onChange={(e) => {
-                                      handleBulkRowChange(row.id, 'tradeOffField', e.target.value);
-                                      handleBulkRowChange(row.id, 'tradeOffValue', ''); // Reset value when field changes
-                                    }}
-                                    className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  >
-                                    <option value="eta">ETA</option>
-                                    <option value="status">Status</option>
-                                    <option value="priority">Priority</option>
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-slate-600 mb-1">New Value</label>
-                                  {row.tradeOffField === 'eta' ? (
-                                    <input
-                                      type="date"
-                                      value={row.tradeOffValue || ''}
-                                      onChange={(e) => handleBulkRowChange(row.id, 'tradeOffValue', e.target.value)}
-                                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    />
-                                  ) : row.tradeOffField === 'status' ? (
-                                    <select
-                                      value={row.tradeOffValue}
-                                      onChange={(e) => handleBulkRowChange(row.id, 'tradeOffValue', e.target.value)}
-                                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    >
-                                      <option value="">Select...</option>
-                                      {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <select
-                                      value={row.tradeOffValue}
-                                      onChange={(e) => handleBulkRowChange(row.id, 'tradeOffValue', e.target.value)}
-                                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    >
-                                      <option value="">Select...</option>
-                                      {Object.values(Priority).map(p => (
-                                        <option key={p} value={p}>{p}</option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add Row Button */}
-                <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
-                  <button
-                    type="button"
-                    onClick={addBulkRow}
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    <Plus size={16} />
-                    Add Row
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-500 mt-3">
-                Click the chevron to expand each row for additional fields (Pillar, Target, Trade-off tracking)
-              </p>
-            </div>
-          </div>
+          <BulkInitiativeSpreadsheetModal
+            rows={bulkRows}
+            onRowsChange={setBulkRows}
+            errors={bulkErrors}
+            onErrorsChange={setBulkErrors}
+            sharedSettings={bulkSharedSettings}
+            onSharedSettingsChange={setBulkSharedSettings}
+            users={users}
+            allInitiatives={allInitiatives}
+            onRowChange={handleBulkRowChange}
+            onAddRow={addBulkRow}
+            onRemoveRow={removeBulkRow}
+            onDuplicateRow={duplicateBulkRow}
+          />
         )}
 
         {/* ================================================================ */}
