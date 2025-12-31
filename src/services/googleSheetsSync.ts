@@ -1089,8 +1089,8 @@ class SheetsSyncManager {
       });
 
       // Validate snapshot data before sending
-      if (!snapshot || !snapshot.data) {
-        const errorMsg = 'Snapshot data is missing';
+      if (!snapshot) {
+        const errorMsg = 'Snapshot is missing';
         console.error('[SYNC] Snapshot validation failed:', errorMsg);
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
@@ -1098,28 +1098,56 @@ class SheetsSyncManager {
         return false;
       }
 
-      if (!Array.isArray(snapshot.data)) {
-        const errorMsg = 'Snapshot data is not an array';
-        console.error('[SYNC] Snapshot validation failed:', errorMsg, { dataType: typeof snapshot.data, data: snapshot.data });
-        logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg, dataType: typeof snapshot.data } });
-        this.status.error = `Snapshot failed: ${errorMsg}`;
-        this.notify();
-        return false;
+      // If snapshot.data is missing or empty, try to fetch current initiatives from server
+      let snapshotData = snapshot.data;
+      if (!snapshotData || !Array.isArray(snapshotData) || snapshotData.length === 0) {
+        console.log('[SYNC] Snapshot data is empty, attempting to fetch current initiatives from server...');
+        try {
+          const response = await fetch(`${API_ENDPOINT}/api/sheets/pull`, {
+            method: 'GET',
+            headers: this.getHeaders()
+          });
+          
+          if (response.ok) {
+            const pullData = await response.json();
+            if (pullData.initiatives && Array.isArray(pullData.initiatives) && pullData.initiatives.length > 0) {
+              snapshotData = pullData.initiatives;
+              console.log(`[SYNC] Fetched ${snapshotData.length} initiatives from server as fallback`);
+            } else {
+              const errorMsg = 'Snapshot data is empty and no initiatives found on server';
+              console.error('[SYNC] Snapshot validation failed:', errorMsg);
+              logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+              this.status.error = `Snapshot failed: ${errorMsg}`;
+              this.notify();
+              return false;
+            }
+          } else {
+            const errorMsg = 'Failed to fetch initiatives from server as fallback';
+            console.error('[SYNC] Snapshot validation failed:', errorMsg);
+            logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+            this.status.error = `Snapshot failed: ${errorMsg}`;
+            this.notify();
+            return false;
+          }
+        } catch (fetchError) {
+          const errorMsg = 'Snapshot data is empty and cannot fetch from server';
+          console.error('[SYNC] Snapshot validation failed:', errorMsg, fetchError);
+          logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+          this.status.error = `Snapshot failed: ${errorMsg}`;
+          this.notify();
+          return false;
+        }
       }
 
-      if (snapshot.data.length === 0) {
-        const errorMsg = 'Snapshot data array is empty. Cannot create snapshot without initiatives.';
-        console.error('[SYNC] Snapshot validation failed:', errorMsg);
-        logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
-        this.status.error = `Snapshot failed: ${errorMsg}`;
-        this.notify();
-        return false;
+      // Update snapshot with fetched data if needed
+      if (snapshotData !== snapshot.data) {
+        snapshot = { ...snapshot, data: snapshotData };
       }
 
-      console.log(`[SYNC] Validated snapshot: ${snapshot.data.length} initiatives, flattening data...`);
+      console.log(`[SYNC] Validated snapshot: ${snapshotData.length} initiatives, flattening data...`);
 
       // Flatten initiatives for sending
-      const flattenedData = snapshot.data.map((initiative, index) => {
+      const flattenedData = snapshotData.map((initiative, index) => {
         try {
           const flattened = flattenInitiative(initiative);
           if (index < 3) {
@@ -1157,8 +1185,8 @@ class SheetsSyncManager {
 
       console.log('[SYNC] Sending snapshot request:', {
         snapshotId: requestBody.snapshot.id,
-        dataCount: requestBody.snapshot.data.length,
-        firstItemKeys: requestBody.snapshot.data[0] ? Object.keys(requestBody.snapshot.data[0]).slice(0, 10) : []
+        dataCount: flattenedData.length,
+        firstItemKeys: flattenedData[0] ? Object.keys(flattenedData[0]).slice(0, 10) : []
       });
 
       const response = await fetch(`${API_ENDPOINT}/api/sheets/snapshot`, {
@@ -1186,8 +1214,22 @@ class SheetsSyncManager {
       console.log(`[SYNC] Snapshot created successfully:`, {
         tabName: result.tabName,
         count: result.count,
-        expectedCount: snapshot.data.length
+        expectedCount: snapshotData.length
       });
+      
+      // If this snapshot came from a version, mark it as synced
+      // The snapshot.id should match the version id
+      if (snapshot.id && snapshot.id.startsWith('version-')) {
+        try {
+          const { getVersionService } = await import('./versionService');
+          const versionService = getVersionService();
+          versionService.markSyncedToSheets(snapshot.id, result.tabName);
+        } catch (error) {
+          // Log but don't fail if version service is not available
+          console.warn('[SYNC] Could not mark version as synced:', error);
+        }
+      }
+      
       return true;
     } catch (error) {
       console.error('[SYNC] Snapshot creation error:', error);

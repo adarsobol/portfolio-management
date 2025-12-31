@@ -9,6 +9,7 @@ import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck } from './hooks';
 import { useUrlState } from './hooks/useUrlState';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
+import { getVersionService } from './services/versionService';
 import { validateWeeklyTeamEffort, getCurrentWeekKey, ValidationResult } from './services/weeklyEffortValidation';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
@@ -1506,6 +1507,30 @@ export default function App() {
       // Force immediate sync for new initiatives to prevent data loss on refresh
       if (existingIndex === -1) {
         sheetsSync.forceSyncNow();
+      }
+
+      // Create automatic version (debounced) after save
+      // Extract all tasks from all initiatives for complete snapshot
+      const allTasks: Task[] = [];
+      nextInitiatives.forEach(init => {
+        if (init.tasks && Array.isArray(init.tasks)) {
+          allTasks.push(...init.tasks);
+        }
+      });
+      // Deduplicate tasks by ID
+      const uniqueTasks = Array.from(
+        new Map(allTasks.map(task => [task.id, task])).values()
+      );
+      
+      try {
+        const versionService = getVersionService();
+        versionService.createVersionDebounced(nextInitiatives, uniqueTasks);
+      } catch (error) {
+        // Log but don't fail the save if versioning fails
+        logger.warn('Failed to create automatic version', { 
+          context: 'App.handleSave', 
+          error: error instanceof Error ? error : new Error(String(error)) 
+        });
       }
 
       if (tradeOffAction) {

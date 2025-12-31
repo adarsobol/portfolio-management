@@ -254,6 +254,22 @@ export interface Snapshot {
   createdBy: string;
 }
 
+// Version Management Types
+export interface VersionMetadata {
+  id: string;
+  timestamp: string;
+  initiativeCount: number;
+  taskCount: number;
+  size: number; // bytes
+  syncedToSheets: boolean;
+  sheetsTabName?: string;
+}
+
+export interface VersionedData {
+  initiatives: Initiative[];
+  tasks: Task[];
+}
+
 // Health Score History for trend tracking
 export interface HealthSnapshot {
   id: string;

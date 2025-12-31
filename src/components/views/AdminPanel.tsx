@@ -3,8 +3,10 @@ import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle
 import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
-import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue } from '../../types';
+import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata } from '../../types';
 import * as XLSX from 'xlsx';
+import { getVersionService } from '../../services/versionService';
+import { sheetsSync } from '../../services';
 
 // BadgePermission Component for visual permission display
 interface BadgePermissionProps {
@@ -1338,6 +1340,175 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <p className="text-center text-xs text-slate-400 mt-4">
                 Showing 9 of {backups.length} backups
               </p>
+            )}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* Data Versions Section */}
+      <CollapsibleSection
+        id="data-versions"
+        title="Data Versions"
+        description="Automatic local versioning of initiatives and tasks data"
+        icon={<div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg"><Clock size={16} className="text-white" /></div>}
+        gradientFrom="from-blue-50"
+        gradientTo="to-cyan-50"
+        isExpanded={expandedSections.has('data-versions')}
+        onToggle={toggleSection}
+        onFirstExpand={() => { fetchVersions(); markSectionLoaded('data-versions'); }}
+        hasLoaded={loadedSections.has('data-versions')}
+        headerActions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchVersions}
+              disabled={isLoadingVersions}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <RefreshCw size={14} className={isLoadingVersions ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+            <button
+              onClick={cleanupOldVersions}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={14} />
+              Cleanup
+            </button>
+          </div>
+        }
+      >
+        {/* Status messages */}
+        {versionError && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} />
+            {versionError}
+          </div>
+        )}
+        {versionSuccess && (
+          <div className="mx-6 mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+            <CheckCircle2 size={16} />
+            {versionSuccess}
+          </div>
+        )}
+
+        {/* Retention Settings */}
+        <div className="mx-6 mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Retention Period</p>
+              <p className="text-xs text-slate-500 mt-1">Versions older than this will be automatically cleaned up</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={retentionDays}
+                onChange={(e) => {
+                  const days = parseInt(e.target.value) || 30;
+                  setRetentionDays(days);
+                  const versionService = getVersionService();
+                  versionService.setRetentionDays(days);
+                }}
+                className="w-20 px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-sm text-slate-600">days</span>
+            </div>
+          </div>
+        </div>
+        
+        {isLoadingVersions ? (
+          <div className="text-center py-8 text-slate-400">
+            <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+            <p className="text-sm">Loading versions...</p>
+          </div>
+        ) : versions.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <Clock size={32} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No versions available</p>
+            <p className="text-xs mt-1">Versions are created automatically when you save data</p>
+          </div>
+        ) : (
+          <div className="p-4">
+            <div className="space-y-3">
+              {versions.map((version) => (
+                <div
+                  key={version.id}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        version.syncedToSheets ? 'bg-emerald-100' : 'bg-blue-100'
+                      }`}>
+                        {version.syncedToSheets ? (
+                          <CheckCircle2 size={16} className="text-emerald-600" />
+                        ) : (
+                          <Clock size={16} className="text-blue-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-700">
+                          {new Date(version.timestamp).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {version.initiativeCount} initiatives • {version.taskCount} tasks
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {version.syncedToSheets && version.sheetsTabName && (
+                        <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                          Synced
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-500">
+                        {formatBytes(version.size)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => restoreVersion(version.id)}
+                      disabled={isRestoringVersion}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                    >
+                      {isRestoringVersion ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                      Restore
+                    </button>
+                    {!version.syncedToSheets && (
+                      <button
+                        onClick={() => syncVersionToSheets(version.id)}
+                        disabled={isSyncingVersion === version.id}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
+                      >
+                        {isSyncingVersion === version.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Database size={12} />
+                        )}
+                        Sync to Sheets
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteVersion(version.id)}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {versions.length > 0 && (
+              <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>Total: {versions.length} versions</span>
+                  <span>{formatBytes(versions.reduce((sum, v) => sum + v.size, 0))}</span>
+                </div>
+              </div>
             )}
           </div>
         )}
