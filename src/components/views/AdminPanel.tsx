@@ -585,16 +585,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return;
       }
       
-      // Sync to sheets
-      const success = await sheetsSync.createSnapshot(snapshot);
+      // Queue snapshot and force immediate sync
+      sheetsSync.queueSnapshot(snapshot);
+      await sheetsSync.forceSyncNow();
       
-      if (success) {
-        versionService.markSyncedToSheets(versionId, snapshot.name);
+      // Check if sync succeeded by checking if version was marked as synced
+      // The createSnapshotTab method will automatically mark it as synced on success
+      // Wait a bit for the sync to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh versions to get updated sync status
+      fetchVersions();
+      
+      // Check if version is now synced
+      const updatedVersions = versionService.listVersions();
+      const syncedVersion = updatedVersions.find(v => v.id === versionId);
+      
+      if (syncedVersion?.syncedToSheets) {
         setVersionSuccess('Version synced to Google Sheets successfully');
         setTimeout(() => setVersionSuccess(null), 3000);
-        fetchVersions();
       } else {
-        setVersionError('Failed to sync version to Google Sheets');
+        // Check sync status for errors
+        const syncStatus = sheetsSync.getStatus();
+        if (syncStatus.error) {
+          setVersionError(`Failed to sync: ${syncStatus.error}`);
+        } else {
+          setVersionError('Sync may still be in progress. Please check again in a moment.');
+        }
         setTimeout(() => setVersionError(null), 5000);
       }
     } catch (error) {
