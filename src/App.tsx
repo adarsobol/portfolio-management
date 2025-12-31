@@ -901,7 +901,7 @@ export default function App() {
       const unplannedActuals = filteredInitiatives
         .filter(i => i.workType === WorkType.Unplanned)
         .reduce((sum, i) => sum + (i.actualEffort || 0), 0);
-      // Calculate BAU effort: only initiatives (their effort already includes tasks)
+      // Calculate BAU effort: planned effort is manually set, actual effort is auto-calculated from tasks
       const bauInitiativeEstimated = filteredInitiatives
         .filter(i => i.initiativeType === InitiativeType.BAU)
         .reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
@@ -1574,7 +1574,7 @@ export default function App() {
     }
   };
 
-  const handleInlineUpdate = (id: string, field: keyof Initiative, value: any) => {
+  const handleInlineUpdate = (id: string, field: keyof Initiative, value: any, suppressNotification?: boolean) => {
     // Intercept status changes to At Risk - show modal first
     if (field === 'status' && value === Status.AtRisk) {
       const initiative = initiatives.find(i => i.id === id);
@@ -1596,9 +1596,12 @@ export default function App() {
       timestamp: Date.now()
     }));
 
-    // Show success toast immediately for better UX
-    const fieldName = field === 'estimatedEffort' ? 'Effort' : field === 'eta' ? 'ETA' : field === 'status' ? 'Status' : field === 'priority' ? 'Priority' : field;
-    showSuccess(`${fieldName} updated successfully`);
+    // Show success toast immediately for better UX (only if not suppressed)
+    if (!suppressNotification) {
+      const isTaskUpdate = field === 'tasks';
+      const toastMessage = isTaskUpdate ? 'Task was updated' : 'Initiative was updated';
+      showSuccess(toastMessage);
+    }
 
     // Set timeout to clear optimistic marker if sync takes too long (10s)
     const timeoutId = setTimeout(() => {
@@ -1629,6 +1632,24 @@ export default function App() {
         // Log task updates for debugging
         if (field === 'tasks') {
           console.log(`[APP] Task update for ${id}: ${(value as any)?.length || 0} tasks`);
+        }
+        
+        // Create notification center entry (only if not suppressed)
+        if (!suppressNotification) {
+          const isTaskUpdate = field === 'tasks';
+          const notificationTitle = isTaskUpdate ? 'Task Updated' : 'Initiative Updated';
+          const notificationMessage = isTaskUpdate ? 'Task was updated' : 'Initiative was updated';
+          const fieldName = field === 'estimatedEffort' ? 'Effort' : field === 'eta' ? 'ETA' : field === 'status' ? 'Status' : field === 'priority' ? 'Priority' : field;
+          
+          addNotification(createNotification(
+            NotificationType.FieldChange,
+            notificationTitle,
+            notificationMessage,
+            updated.id,
+            updated.title,
+            updated.ownerId,
+            { field: fieldName, isTaskUpdate }
+          ));
         }
         
         // Track overlooked items: if ETA is pushed back, increment overlookedCount

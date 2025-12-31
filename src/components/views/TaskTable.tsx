@@ -10,7 +10,7 @@ import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
   allInitiatives?: Initiative[]; // All initiatives for trade-off dropdown (unfiltered)
-  handleInlineUpdate: (id: string, field: keyof Initiative, value: any) => void;
+  handleInlineUpdate: (id: string, field: keyof Initiative, value: any, suppressNotification?: boolean) => void;
   setEditingItem: (item: Initiative) => void;
   setIsModalOpen: (isOpen: boolean) => void;
   sortConfig: { key: string; direction: 'asc' | 'desc' } | null;
@@ -172,13 +172,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     };
     
     const updatedTasks = [...(initiative.tasks || []), newTask];
-    const totalEstimatedEffort = updatedTasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
     const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
     
-    // Update both tasks and effort totals
+    // Update tasks and actual effort (planned effort is manually set for BAU initiatives)
     handleInlineUpdate(targetInitiativeId, 'tasks', updatedTasks);
-    handleInlineUpdate(targetInitiativeId, 'estimatedEffort', totalEstimatedEffort);
-    handleInlineUpdate(targetInitiativeId, 'actualEffort', totalActualEffort);
+    handleInlineUpdate(targetInitiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
     
     // Handle trade-off if specified
     if (newTaskForm.tradeOffInitiativeId && newTaskForm.tradeOffEta) {
@@ -256,18 +254,16 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     
     console.log('Updated tasks:', updatedTasks);
     
-    // Recalculate effort totals if effort fields changed
+    // Recalculate actual effort if effort fields changed (planned effort is manually set for BAU initiatives)
     if (field === 'estimatedEffort' || field === 'actualEffort') {
-      const totalEstimatedEffort = updatedTasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
       const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
       
-      console.log('Updating effort totals:', { totalEstimatedEffort, totalActualEffort });
+      console.log('Updating actual effort:', { totalActualEffort });
       
-      // Update tasks array first, then effort totals
+      // Update tasks array first, then actual effort
       // React 18+ will batch these automatically
       handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
-      handleInlineUpdate(initiativeId, 'estimatedEffort', totalEstimatedEffort);
-      handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort);
+      handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
     } else {
       // For non-effort fields, just update tasks
       console.log('Updating tasks only');
@@ -280,13 +276,11 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     if (!initiative || !initiative.tasks) return;
     
     const updatedTasks = initiative.tasks.filter(task => task.id !== taskId);
-    const totalEstimatedEffort = updatedTasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
     const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
     
-    // Update both tasks and effort totals
+    // Update tasks and actual effort (planned effort is manually set for BAU initiatives)
     handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
-    handleInlineUpdate(initiativeId, 'estimatedEffort', totalEstimatedEffort);
-    handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort);
+    handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
   };
 
   const getOwnerNameById = (id?: string) => getOwnerName(users, id);

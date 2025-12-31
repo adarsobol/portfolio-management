@@ -12,8 +12,8 @@ const METRIC_TOOLTIPS: Record<string, { title: string; description: string; form
   },
   bauBufferHealth: {
     title: 'BAU Buffer Health',
-    description: 'Shows planned and actual effort invested in BAU initiatives. BAU initiatives are unplanned work comprised of risk and PM items. Initiative effort already includes their tasks. Percentage shows actual effort as a share of total buffer allocated for filtered users.',
-    formula: 'Planned Effort = Sum of BAU initiatives\' estimated effort\nActual Effort = Sum of BAU initiatives\' actual effort\n% of Buffer = (Actual Effort / Total Buffer) × 100\nNote: Initiative effort includes all tasks within the initiative',
+    description: 'Shows planned and actual effort invested in BAU initiatives. BAU initiatives are unplanned work comprised of risk and PM items. Planned effort is manually set. Actual effort is auto-calculated from tasks. Percentage shows actual effort as a share of total buffer allocated for filtered users.',
+    formula: 'Planned Effort = Sum of BAU initiatives\' estimated effort (manually set)\nActual Effort = Sum of BAU initiatives\' actual effort (auto-calculated from tasks)\n% of Buffer = (Actual Effort / Total Buffer) × 100\nNote: Planned effort is independent of tasks. Actual effort aggregates from tasks.',
     thresholds: 'Shows total effort invested in BAU initiatives and percentage of allocated buffer used'
   },
   capacityLoad: {
@@ -222,7 +222,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
               </span>
             </div>
           </div>
-          <p className="text-[10px] text-slate-400 italic">BAU initiatives (effort includes tasks).</p>
+          <p className="text-[10px] text-slate-400 italic">BAU initiatives: Planned effort is manually set. Actual effort includes tasks.</p>
         </div>
       </div>
 

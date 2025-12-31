@@ -172,7 +172,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   // BAU Task Management State
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [effortOverride, setEffortOverride] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
   // ============================================================================
@@ -392,21 +391,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const selectedPillarNode = availablePillars.find(p => p.name === formData.l2_pillar);
   const availableResponsibilities = selectedPillarNode ? selectedPillarNode.responsibilities : [];
 
-  // BAU Initiative: Calculate effort from tasks
+  // BAU Initiative: Calculate actual effort from tasks (planned effort is manually set)
   const isBAU = formData.initiativeType === InitiativeType.BAU;
-  const taskEstimatedEffortSum = tasks.reduce((sum, task) => sum + (task.estimatedEffort || 0), 0);
   const taskActualEffortSum = tasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
   
-  // Update formData.estimatedEffort and actualEffort when tasks change (if not overridden)
+  // Update formData.actualEffort when tasks change (planned effort is manually set)
   useEffect(() => {
-    if (isBAU && !effortOverride && tasks.length > 0) {
+    if (isBAU && tasks.length > 0) {
       setFormData(prev => ({ 
         ...prev, 
-        estimatedEffort: taskEstimatedEffortSum,
         actualEffort: taskActualEffortSum
       }));
     }
-  }, [tasks, taskEstimatedEffortSum, taskActualEffortSum, isBAU, effortOverride]);
+  }, [tasks, taskActualEffortSum, isBAU]);
 
   // Progress indicator for required fields
   const requiredFieldsCount = isBAU ? 5 : 6; // BAU doesn't require definitionOfDone
@@ -1564,35 +1561,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <div className="space-y-4">
                   {/* BAU: Effort calculation info */}
                   {isBAU && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-purple-700 font-medium">
-                          Planned from tasks: <span className="font-mono font-bold">{taskEstimatedEffortSum.toFixed(1)}w</span>
-                        </span>
-                        <label className="flex items-center gap-2 text-sm text-purple-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={effortOverride}
-                            onChange={(e) => {
-                              setEffortOverride(e.target.checked);
-                              if (!e.target.checked) {
-                                setFormData(prev => ({ 
-                                  ...prev, 
-                                  estimatedEffort: taskEstimatedEffortSum,
-                                  actualEffort: taskActualEffortSum
-                                }));
-                              }
-                            }}
-                            className="rounded text-purple-600 focus:ring-purple-500"
-                          />
-                          <span>Override</span>
-                        </label>
-                      </div>
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-purple-700 font-medium">
                           Actual from tasks: <span className="font-mono font-bold">{taskActualEffortSum.toFixed(1)}w</span>
                         </span>
                       </div>
+                      <p className="text-xs text-purple-600 mt-1 italic">Planned effort is manually set. Actual effort is auto-calculated from tasks.</p>
                     </div>
                   )}
                   
@@ -1603,60 +1578,54 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">
                         Planned Effort ({effortDisplayUnit === 'days' ? 'days' : 'weeks'}) <span className="text-red-500">*</span>
                       </label>
-                      {isBAU && !effortOverride ? (
-                        <div className="px-3 py-2 text-base font-mono text-slate-700 bg-slate-100 border border-slate-300 rounded-lg">
-                          {taskEstimatedEffortSum.toFixed(1)}w
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentWeeks = formData.estimatedEffort || 0;
-                              const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
-                              handleChange('estimatedEffort', Math.max(0, currentWeeks - decrement));
-                            }}
-                            disabled={isReadOnly || (isBAU && !effortOverride)}
-                            className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                            title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
-                          >
-                            <ArrowDown size={14} />
-                          </button>
-                          <input 
-                            disabled={isReadOnly || (isBAU && !effortOverride)}
-                            type="number"
-                            min="0"
-                            step={effortDisplayUnit === 'days' ? '1' : '0.25'}
-                            value={effortDisplayUnit === 'days' 
-                              ? weeksToDays(formData.estimatedEffort || 0).toFixed(1)
-                              : (formData.estimatedEffort || 0).toFixed(2)}
-                            onChange={(e) => {
-                              const inputValue = parseFloat(e.target.value) || 0;
-                              const weeksValue = effortDisplayUnit === 'days' 
-                                ? daysToWeeks(inputValue)
-                                : inputValue;
-                              handleChange('estimatedEffort', weeksValue);
-                            }}
-                            className={`w-20 px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                              errors.estimatedEffort ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
-                            }`}
-                            placeholder="0.0"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentWeeks = formData.estimatedEffort || 0;
-                              const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
-                              handleChange('estimatedEffort', currentWeeks + increment);
-                            }}
-                            disabled={isReadOnly || (isBAU && !effortOverride)}
-                            className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                            title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
-                          >
-                            <ArrowUp size={14} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentWeeks = formData.estimatedEffort || 0;
+                            const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            handleChange('estimatedEffort', Math.max(0, currentWeeks - decrement));
+                          }}
+                          disabled={isReadOnly}
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <input 
+                          disabled={isReadOnly}
+                          type="number"
+                          min="0"
+                          step={effortDisplayUnit === 'days' ? '1' : '0.25'}
+                          value={effortDisplayUnit === 'days' 
+                            ? weeksToDays(formData.estimatedEffort || 0).toFixed(1)
+                            : (formData.estimatedEffort || 0).toFixed(2)}
+                          onChange={(e) => {
+                            const inputValue = parseFloat(e.target.value) || 0;
+                            const weeksValue = effortDisplayUnit === 'days' 
+                              ? daysToWeeks(inputValue)
+                              : inputValue;
+                            handleChange('estimatedEffort', weeksValue);
+                          }}
+                          className={`w-20 px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            errors.estimatedEffort ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300'
+                          }`}
+                          placeholder="0.0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentWeeks = formData.estimatedEffort || 0;
+                            const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            handleChange('estimatedEffort', currentWeeks + increment);
+                          }}
+                          disabled={isReadOnly}
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                      </div>
                       {errors.estimatedEffort && (
                         <p className="text-red-600 text-xs mt-1">{errors.estimatedEffort}</p>
                       )}
