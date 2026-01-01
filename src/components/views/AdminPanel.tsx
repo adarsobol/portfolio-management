@@ -137,18 +137,18 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeSection, onSectionCha
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex-shrink-0 h-full overflow-y-auto">
-      <div className="p-4 border-b border-slate-200">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+      <div className="p-2 border-b border-slate-200">
+        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-1.5">
           <Settings size={18} className="text-slate-600" />
           Admin Panel
         </h2>
       </div>
-      <nav className="p-2 space-y-1">
+      <nav className="p-1.5 space-y-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onSectionChange(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-all ${
               activeSection === item.id
                 ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
@@ -159,7 +159,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeSection, onSectionCha
             </span>
             <span className="flex-1 text-left">{item.label}</span>
             {item.badge !== undefined && (typeof item.badge === 'number' ? item.badge > 0 : item.badge) && (
-              <span className={`px-2 py-0.5 text-xs rounded-full ${
+              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                 activeSection === item.id
                   ? 'bg-white/20 text-white'
                   : 'bg-slate-200 text-slate-600'
@@ -675,7 +675,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const isAdminAccess = currentUser.email === 'adar.sobol@pagaya.com';
   if (!isAdminAccess) {
-     return <div className="p-10 text-center text-red-500 font-bold">Access Denied</div>;
+     return <div className="p-4 text-center text-red-500 font-bold">Access Denied</div>;
   }
   
   // Valid values for validation
@@ -1150,10 +1150,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         deletedInitiativesCount={deletedInitiatives.length}
       />
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-              <div className="p-2.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-md">
+        <div className="max-w-7xl mx-auto p-3">
+          <div className="mb-3">
+            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-1.5">
+              <div className="p-1.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-md">
                 <Settings className="text-white" size={22} />
               </div>
               Admin Configuration
@@ -1164,9 +1164,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             {activeSection === 'slack' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg">
                       <MessageSquare size={16} className="text-white" />
                     </div>
                     <div>
@@ -1174,9 +1174,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
+                <div className="p-3">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
               <input 
                 type="checkbox" 
                 id="slack-enabled"
@@ -1197,7 +1197,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
             
             {config.slack?.enabled && (
-              <div className="pt-4 border-t border-slate-200">
+              <div className="pt-3 border-t border-slate-200">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Webhook URL <span className="text-red-500">*</span>
@@ -1214,13 +1214,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         enabled: prev.slack?.enabled || false
                       }
                     }))}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                    className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 font-mono text-xs"
                   />
                   <p className="text-xs text-slate-500 mt-1">Slack incoming webhook URL. The webhook determines which channel receives notifications.</p>
                 </div>
                 
-                <div className="mt-4">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                <div className="mt-2">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-2.5">
                     <p className="text-xs text-blue-800">
                       <strong>Note:</strong> Create an incoming webhook in your Slack workspace and configure it to post to your desired channel. 
                       All notifications will be sent to that channel.
@@ -1236,9 +1236,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'login-history' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-teal-50 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-teal-50 flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg">
                       <Clock size={16} className="text-white" />
                     </div>
                     <div>
@@ -1249,33 +1249,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     onClick={fetchLoginHistory}
                     disabled={isLoadingHistory}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <RefreshCw size={14} className={isLoadingHistory ? 'animate-spin' : ''} />
                     Refresh
                   </button>
                 </div>
-                <div className="p-6">
+                <div className="p-3">
                   {/* Error message */}
                   {loginHistoryError && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
             <AlertCircle size={16} />
             {loginHistoryError}
           </div>
         )}
         
         {isLoadingHistory ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-6 text-slate-400">
             <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
             <p className="text-sm">Loading login history...</p>
           </div>
         ) : loginHistoryError ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-6 text-slate-400">
             <Clock size={32} className="mx-auto mb-2 text-slate-300" />
             <p className="text-sm">Unable to load login history</p>
           </div>
         ) : loginHistory.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-6 text-slate-400">
             <Users size={32} className="mx-auto mb-2 text-slate-300" />
             <p className="text-sm font-medium text-slate-500">No login history available</p>
             <p className="text-xs text-slate-400 mt-1">User login times will appear here after users log in</p>
@@ -1285,16 +1285,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-slate-600">User</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Email</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Role</th>
-                  <th className="px-4 py-3 font-semibold text-slate-600">Last Login</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">User</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">Email</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">Role</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">Last Login</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loginHistory.map(user => (
                   <tr key={user.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <img 
                           src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
@@ -1304,13 +1304,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <span className="font-medium text-slate-700">{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{user.email}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
+                    <td className="px-3 py-2 text-slate-500">{user.email}</td>
+                    <td className="px-3 py-2">
+                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-medium">
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">
+                    <td className="px-3 py-2 text-slate-500">
                       {user.lastLogin ? (() => {
                         try {
                           const loginDate = new Date(user.lastLogin);
@@ -1345,9 +1345,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'error-logs' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
                       <AlertTriangle size={16} className="text-white" />
                     </div>
                     <div>
@@ -1364,9 +1364,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'activity-logs' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
                       <Activity size={16} className="text-white" />
                     </div>
                     <div>
@@ -1383,9 +1383,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'support-center' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-green-50 to-emerald-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
                       <MessageSquare size={16} className="text-white" />
                     </div>
                     <div>
@@ -1402,9 +1402,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'backup-management' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg">
                       <Database size={16} className="text-white" />
                     </div>
                     <div>
@@ -1416,7 +1416,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       onClick={createManualBackup}
                       disabled={isCreatingBackup}
-                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg hover:from-violet-600 hover:to-purple-600 transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg hover:from-violet-600 hover:to-purple-600 transition-colors disabled:opacity-50"
                     >
                       {isCreatingBackup ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
                       Create Backup
@@ -1424,51 +1424,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       onClick={fetchBackups}
                       disabled={isLoadingBackups}
-                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       <RefreshCw size={14} className={isLoadingBackups ? 'animate-spin' : ''} />
                       Refresh
                     </button>
                   </div>
                 </div>
-                <div className="p-6">
+                <div className="p-3">
                   {/* Status messages */}
                   {backupError && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
                       <AlertCircle size={16} />
                       {backupError}
                     </div>
                   )}
                   {backupSuccess && (
-                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+                    <div className="mb-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
                       <CheckCircle2 size={16} />
                       {backupSuccess}
                     </div>
                   )}
                   
                   {isLoadingBackups ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-6 text-slate-400">
                       <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
                       <p className="text-sm">Loading backups...</p>
                     </div>
                   ) : backups.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-6 text-slate-400">
                       <Database size={32} className="mx-auto mb-2 opacity-50" />
                       <p className="text-sm">No backups available</p>
                       <p className="text-xs mt-1">Create your first backup using the button above</p>
                     </div>
                   ) : (
                     <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {backups.slice(0, 9).map((backup) => (
                 <div
                   key={backup.date}
-                  className="border border-slate-200 rounded-lg p-4 hover:border-violet-300 hover:shadow-sm transition-all cursor-pointer"
+                  className="border border-slate-200 rounded-lg p-3 hover:border-violet-300 hover:shadow-sm transition-all cursor-pointer"
                   onClick={() => fetchBackupDetails(backup.date)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${
+                      <div className={`p-1 rounded-lg ${
                         backup.status === 'success' ? 'bg-emerald-100' :
                         backup.status === 'partial' ? 'bg-amber-100' : 'bg-red-100'
                       }`}>
@@ -1484,7 +1484,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </p>
                       </div>
                     </div>
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                       backup.status === 'success' ? 'bg-emerald-100 text-emerald-700' :
                       backup.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                     }`}>
@@ -1492,19 +1492,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </span>
                   </div>
                   
-                  <div className="flex items-center justify-between text-xs text-slate-500 mt-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
                     <span>{backup.files} files</span>
                     <span>{formatBytes(backup.totalSize)}</span>
                   </div>
                   
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex gap-2 mt-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         restoreFromBackup(backup.date);
                       }}
                       disabled={isRestoring}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1 px-1.5 py-0.5 text-xs font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
                     >
                       {isRestoring ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
                       Restore
@@ -1514,7 +1514,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         e.stopPropagation();
                         window.open(`${API_ENDPOINT}/api/backups/${backup.date}/download`, '_blank');
                       }}
-                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                      className="flex items-center justify-center gap-1 px-1.5 py-0.5 text-xs font-medium text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
                     >
                       <Download size={12} />
                     </button>
@@ -1524,7 +1524,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
             
             {backups.length > 9 && (
-              <p className="text-center text-xs text-slate-400 mt-4">
+              <p className="text-center text-xs text-slate-400 mt-3">
                 Showing 9 of {backups.length} backups
               </p>
                     )}
@@ -1536,9 +1536,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'data-versions' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
                       <Clock size={16} className="text-white" />
                     </div>
                     <div>
@@ -1550,37 +1550,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       onClick={fetchVersions}
                       disabled={isLoadingVersions}
-                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       <RefreshCw size={14} className={isLoadingVersions ? 'animate-spin' : ''} />
                       Refresh
                     </button>
                     <button
                       onClick={cleanupOldVersions}
-                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                      className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                     >
                       <Trash2 size={14} />
                       Cleanup
                     </button>
                   </div>
                 </div>
-                <div className="p-6">
+                <div className="p-3">
                   {/* Status messages */}
                   {versionError && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
                       <AlertCircle size={16} />
                       {versionError}
                     </div>
                   )}
                   {versionSuccess && (
-                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+                    <div className="mb-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
                       <CheckCircle2 size={16} />
                       {versionSuccess}
                     </div>
                   )}
 
                   {/* Retention Settings */}
-                  <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="mb-2 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-700">Retention Period</p>
@@ -1598,7 +1598,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   const versionService = getVersionService();
                   versionService.setRetentionDays(days);
                 }}
-                className="w-20 px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-20 px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-slate-600">days</span>
             </div>
@@ -1606,27 +1606,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
         
         {isLoadingVersions ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-6 text-slate-400">
             <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
             <p className="text-sm">Loading versions...</p>
           </div>
         ) : versions.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-6 text-slate-400">
             <Clock size={32} className="mx-auto mb-2 opacity-50" />
             <p className="text-sm">No versions available</p>
             <p className="text-xs mt-1">Versions are created automatically when you save data</p>
           </div>
         ) : (
-          <div className="p-4">
-            <div className="space-y-3">
+          <div className="p-3">
+            <div className="space-y-2">
               {versions.map((version) => (
                 <div
                   key={version.id}
-                  className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                  className="border border-slate-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-1.5 rounded-lg ${
                         version.syncedToSheets ? 'bg-emerald-100' : 'bg-blue-100'
                       }`}>
                         {version.syncedToSheets ? (
@@ -1646,7 +1646,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       {version.syncedToSheets && version.sheetsTabName && (
-                        <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                        <span className="px-1.5 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">
                           Synced
                         </span>
                       )}
@@ -1660,7 +1660,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       onClick={() => restoreVersion(version.id)}
                       disabled={isRestoringVersion}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
                     >
                       {isRestoringVersion ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
                       Restore
@@ -1669,7 +1669,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <button
                         onClick={() => syncVersionToSheets(version.id)}
                         disabled={isSyncingVersion === version.id}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
+                        className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
                       >
                         {isSyncingVersion === version.id ? (
                           <Loader2 size={12} className="animate-spin" />
@@ -1681,7 +1681,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     )}
                     <button
                       onClick={() => deleteVersion(version.id)}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                      className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -1691,7 +1691,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
             
             {versions.length > 0 && (
-              <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="mt-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex items-center justify-between text-xs text-slate-600">
                   <span>Total: {versions.length} versions</span>
                   <span>{formatBytes(versions.reduce((sum, v) => sum + v.size, 0))}</span>
@@ -1706,9 +1706,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'trash' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
                       <Trash2 size={16} className="text-white" />
                     </div>
                     <div>
@@ -1719,9 +1719,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="p-6">
+                <div className="p-3">
                   {deletedInitiatives.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-6 text-slate-400">
                       <Trash2 size={32} className="mx-auto mb-2 text-slate-300" />
                       <p className="text-sm font-medium text-slate-500">Trash is empty</p>
                       <p className="text-xs text-slate-400 mt-1">Deleted items will appear here</p>
@@ -1729,18 +1729,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   ) : (
                     <>
                       <div className="max-h-96 overflow-y-auto">
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {deletedInitiatives.map(initiative => (
                             <div
                               key={initiative.id}
-                              className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                              className="bg-slate-50 border border-slate-200 rounded-lg p-3 hover:shadow-sm transition-shadow"
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-medium text-slate-800 truncate">
                                     {initiative.title}
                                   </h4>
-                                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500">
+                                  <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-slate-500">
                                     <span className="flex items-center gap-1">
                                       <Users size={14} />
                                       {users.find(u => u.id === initiative.ownerId)?.name || initiative.ownerId}
@@ -1766,7 +1766,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <button
                                     onClick={() => onRestore(initiative.id)}
                                     disabled={isDataLoading}
-                                    className="ml-4 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="ml-4 flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     <RotateCcw size={14} />
                                     Restore
@@ -1777,7 +1777,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           ))}
                         </div>
                       </div>
-                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
                         <p className="text-xs text-amber-800">
                           <strong>Note:</strong> Items in trash are kept in the database with a "Deleted" status. 
                           You can restore them at any time. To permanently delete items, remove them directly from the Google Sheet.
@@ -1791,9 +1791,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'bulk-import' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg">
                       <Upload size={16} className="text-white" />
                     </div>
                     <div>
@@ -1802,19 +1802,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* User Import */}
             <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <h4 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+              <div className="px-2.5 py-1.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <h4 className="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
                   <Users size={16} className="text-blue-600" /> Bulk Import Users
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">Upload Excel/CSV with columns: Email, Name, Role</p>
               </div>
           
-          <div className="p-4 space-y-4">
-            <div className="flex items-center gap-3">
+          <div className="p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
               <input
                 ref={userFileInputRef}
                 type="file"
@@ -1825,13 +1825,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
               <label
                 htmlFor="user-file-upload"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer text-sm font-medium"
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer text-sm font-medium"
               >
                 <Upload size={16} /> Select File
               </label>
               <button
                 onClick={copyUserTemplate}
-                className="flex items-center gap-2 px-3 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-slate-400 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-2 py-1 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-slate-400 text-sm font-medium transition-colors"
                 title="Copy template to clipboard"
               >
                 <ClipboardCopy size={16} /> Copy Template
@@ -1853,16 +1853,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50 sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Status</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Email</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Name</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Role</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Status</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Email</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Name</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Role</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {userImportData.map((user, idx) => (
                         <tr key={idx} className={user.isValid ? '' : 'bg-red-50'}>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-1.5">
                             {user.isValid ? (
                               <CheckCircle2 size={14} className="text-emerald-500" />
                             ) : (
@@ -1871,9 +1871,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-2 truncate max-w-[120px]">{user.email}</td>
-                          <td className="px-3 py-2 truncate max-w-[100px]">{user.name}</td>
-                          <td className="px-3 py-2">{user.role}</td>
+                          <td className="px-2 py-1.5 truncate max-w-[120px]">{user.email}</td>
+                          <td className="px-2 py-1.5 truncate max-w-[100px]">{user.name}</td>
+                          <td className="px-2 py-1.5">{user.role}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1888,7 +1888,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     onClick={handleUserImportSubmit}
                     disabled={userImportLoading || userImportData.filter(u => u.isValid).length === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                   >
                     {userImportLoading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
                     Import {userImportData.filter(u => u.isValid).length} Users
@@ -1898,7 +1898,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
             
             {userImportResult && (
-              <div className={`p-3 rounded-lg text-sm ${userImportResult.success ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
+              <div className={`p-2.5 rounded-lg text-sm ${userImportResult.success ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
                 {userImportResult.success ? (
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={16} />
@@ -1917,15 +1917,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         
             {/* Task Import */}
             <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
-                <h4 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+              <div className="px-2.5 py-1.5 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
+                <h4 className="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
                   <ClipboardList size={16} className="text-amber-600" /> Bulk Import Tasks
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">Upload workplan Excel with initiative data</p>
               </div>
           
-          <div className="p-4 space-y-4">
-            <div className="flex items-center gap-3">
+          <div className="p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
               <input
                 ref={taskFileInputRef}
                 type="file"
@@ -1936,13 +1936,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
               <label
                 htmlFor="task-file-upload"
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 cursor-pointer text-sm font-medium"
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 cursor-pointer text-sm font-medium"
               >
                 <Upload size={16} /> Select File
               </label>
               <button
                 onClick={copyTaskTemplate}
-                className="flex items-center gap-2 px-3 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-slate-400 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-2.5 py-1.5 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-slate-400 text-sm font-medium transition-colors"
                 title="Copy template to clipboard"
               >
                 <ClipboardCopy size={16} /> Copy Template
@@ -1964,17 +1964,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50 sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Status</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Title</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Owner</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Asset</th>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Priority</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Status</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Title</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Owner</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Asset</th>
+                        <th className="px-2 py-1.5 text-left font-medium text-slate-500">Priority</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {taskImportData.map((task, idx) => (
                         <tr key={idx} className={task.isValid ? '' : 'bg-red-50'}>
-                          <td className="px-3 py-2">
+                          <td className="px-2 py-1.5">
                             {task.isValid ? (
                               <CheckCircle2 size={14} className="text-emerald-500" />
                             ) : (
@@ -1983,10 +1983,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </span>
                             )}
                           </td>
-                          <td className="px-3 py-2 truncate max-w-[150px]" title={task.title}>{task.title}</td>
-                          <td className="px-3 py-2 truncate max-w-[100px]">{task.ownerEmail}</td>
-                          <td className="px-3 py-2">{task.assetClass}</td>
-                          <td className="px-3 py-2">{task.priority}</td>
+                          <td className="px-2 py-1.5 truncate max-w-[150px]" title={task.title}>{task.title}</td>
+                          <td className="px-2 py-1.5 truncate max-w-[100px]">{task.ownerEmail}</td>
+                          <td className="px-2 py-1.5">{task.assetClass}</td>
+                          <td className="px-2 py-1.5">{task.priority}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2001,7 +2001,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     onClick={handleTaskImportSubmit}
                     disabled={taskImportLoading || taskImportData.filter(t => t.isValid).length === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                   >
                     {taskImportLoading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
                     Import {taskImportData.filter(t => t.isValid).length} Tasks
@@ -2011,7 +2011,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
             
             {taskImportResult && (
-              <div className={`p-3 rounded-lg text-sm ${taskImportResult.success ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
+              <div className={`p-2.5 rounded-lg text-sm ${taskImportResult.success ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>
                 {taskImportResult.success ? (
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={16} />
@@ -2035,9 +2035,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'value-lists' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-pink-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-pink-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
                       <List size={16} className="text-white" />
                     </div>
                     <div>
@@ -2046,9 +2046,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="p-6">
+                <div className="p-3">
                   {!loadedSections.has('value-lists') && (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-6 text-slate-400">
                       <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
                       <p className="text-sm">Loading value lists...</p>
                     </div>
@@ -2067,9 +2067,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'user-management' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
                       <Users size={16} className="text-white" />
                     </div>
                     <div>
@@ -2080,7 +2080,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <button
                     onClick={fetchUsers}
                     disabled={isLoadingUsers}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <RefreshCw size={14} className={isLoadingUsers ? 'animate-spin' : ''} />
                     Refresh
@@ -2088,14 +2088,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
                 <div className="p-0">
                   {!loadedSections.has('user-management') && (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-6 text-slate-400">
                       <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
                       <p className="text-sm">Loading users...</p>
                     </div>
                   )}
                   {loadedSections.has('user-management') && (
                     <>
-                      <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                      <div className="p-2.5 bg-slate-50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
            <div>
              <label className="block text-xs font-medium text-slate-500 mb-1">Full Name</label>
              <input 
@@ -2103,7 +2103,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                placeholder="Jane Doe"
                value={newUser.name || ''}
                onChange={(e) => setNewUser(prev => ({...prev, name: e.target.value}))}
-               className="w-full text-sm rounded border-slate-300 p-2"
+               className="w-full text-sm rounded border-slate-300 p-1.5"
              />
            </div>
            <div>
@@ -2113,7 +2113,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                placeholder="jane@company.com"
                value={newUser.email || ''}
                onChange={(e) => setNewUser(prev => ({...prev, email: e.target.value}))}
-               className="w-full text-sm rounded border-slate-300 p-2"
+               className="w-full text-sm rounded border-slate-300 p-1.5"
              />
            </div>
            <div>
@@ -2121,7 +2121,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              <select 
                value={newUser.role}
                onChange={(e) => setNewUser(prev => ({...prev, role: e.target.value as Role}))}
-               className="w-full text-sm rounded border-slate-300 p-2"
+               className="w-full text-sm rounded border-slate-300 p-1.5"
              >
                {Object.values(Role).map(r => <option key={r} value={r}>{r}</option>)}
              </select>
@@ -2131,7 +2131,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              <select 
                value={newUser.team || ''}
                onChange={(e) => setNewUser(prev => ({...prev, team: e.target.value || undefined}))}
-               className="w-full text-sm rounded border-slate-300 p-2"
+               className="w-full text-sm rounded border-slate-300 p-1.5"
              >
                <option value="">Unassigned</option>
                {teamOptions.map(team => <option key={team} value={team}>{team}</option>)}
@@ -2140,7 +2140,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <button 
              onClick={handleAddUser}
              disabled={!newUser.name || !newUser.email || isAddingUser}
-             className="bg-blue-600 text-white text-sm px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+             className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
            >
              {isAddingUser ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} 
              {isAddingUser ? 'Adding...' : 'Add User'}
@@ -2149,30 +2149,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
          {/* Error messages */}
          {usersError && (
-           <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+           <div className="mx-3 mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
              <AlertCircle size={16} />
              {usersError}
            </div>
          )}
          {userError && (
-           <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+           <div className="mx-3 mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
              <AlertCircle size={16} />
              {userError}
            </div>
          )}
 
          {isLoadingUsers ? (
-           <div className="text-center py-8 text-slate-400">
+           <div className="text-center py-6 text-slate-400">
              <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
              <p className="text-sm">Loading users...</p>
            </div>
          ) : usersError ? (
-           <div className="text-center py-8 text-slate-400">
+           <div className="text-center py-6 text-slate-400">
              <Users size={32} className="mx-auto mb-2 text-slate-300" />
              <p className="text-sm">Unable to load users</p>
            </div>
          ) : users.length === 0 ? (
-           <div className="text-center py-8 text-slate-400">
+           <div className="text-center py-6 text-slate-400">
              <Users size={32} className="mx-auto mb-2 text-slate-300" />
              <p className="text-sm font-medium text-slate-500">No users found</p>
              <p className="text-xs text-slate-400 mt-1">Add users using the form above</p>
@@ -2182,12 +2182,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              <table className="w-full text-left text-sm">
                <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                  <tr>
-                   <th className="px-6 py-3 font-semibold text-slate-600">User</th>
-                   <th className="px-6 py-3 font-semibold text-slate-600">Email</th>
-                   <th className="px-6 py-3 font-semibold text-slate-600">Role</th>
-                   <th className="px-6 py-3 font-semibold text-slate-600">Team</th>
-                   <th className="px-6 py-3 font-semibold text-slate-600">Initiatives</th>
-                   <th className="px-6 py-3 font-semibold text-slate-600 text-right">Actions</th>
+                   <th className="px-3 py-2 font-semibold text-slate-600">User</th>
+                   <th className="px-3 py-2 font-semibold text-slate-600">Email</th>
+                   <th className="px-3 py-2 font-semibold text-slate-600">Role</th>
+                   <th className="px-3 py-2 font-semibold text-slate-600">Team</th>
+                   <th className="px-3 py-2 font-semibold text-slate-600">Initiatives</th>
+                   <th className="px-3 py-2 font-semibold text-slate-600 text-right">Actions</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
@@ -2196,15 +2196,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    const userCanBeOwner = canBeOwner(u.role);
                    return (
                      <tr key={u.id} className="hover:bg-slate-50">
-                       <td className="px-6 py-3 font-medium flex items-center gap-2">
+                       <td className="px-3 py-2 font-medium flex items-center gap-2">
                          <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full bg-slate-200" />
                          {u.name}
                          {userCanBeOwner && (
                            <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can be assigned as owner">Owner</span>
                          )}
                        </td>
-                       <td className="px-6 py-3 text-slate-500">{u.email}</td>
-                       <td className="px-6 py-3">
+                       <td className="px-3 py-2 text-slate-500">{u.email}</td>
+                       <td className="px-3 py-2">
                          <select
                            value={u.role}
                            onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
@@ -2216,7 +2216,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                            ))}
                          </select>
                        </td>
-                       <td className="px-6 py-3">
+                       <td className="px-3 py-2">
                          <select
                            value={u.team || ''}
                            onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
@@ -2229,16 +2229,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                            ))}
                          </select>
                        </td>
-                       <td className="px-6 py-3">
+                       <td className="px-3 py-2">
                          {userCanBeOwner ? (
-                           <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded" title={`Assigned to ${ownerCount} initiative(s)`}>
+                           <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded" title={`Assigned to ${ownerCount} initiative(s)`}>
                              {ownerCount}
                            </span>
                          ) : (
                            <span className="text-xs text-slate-400">-</span>
                          )}
                        </td>
-                       <td className="px-6 py-3 text-right">
+                       <td className="px-3 py-2 text-right">
                          <button 
                            onClick={() => handleDeleteUser(u.id)}
                            disabled={isDeletingUser === u.id}
@@ -2263,9 +2263,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'authorization-matrix' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg">
                       <Shield size={16} className="text-white" />
                     </div>
                     <div>
@@ -2280,39 +2280,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <div className="flex">
              <button
                onClick={() => setActivePermissionTab('tabs')}
-               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+               className={`px-3 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                  activePermissionTab === 'tabs'
                    ? 'border-indigo-500 text-indigo-600 bg-white'
                    : 'border-transparent text-slate-600 hover:text-slate-800'
                }`}
              >
-               <div className="flex items-center gap-2">
+               <div className="flex items-center gap-1.5">
                  <LayoutDashboard size={16} />
                  Tab Access
                </div>
              </button>
              <button
                onClick={() => setActivePermissionTab('tasks')}
-               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+               className={`px-3 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                  activePermissionTab === 'tasks'
                    ? 'border-blue-500 text-blue-600 bg-white'
                    : 'border-transparent text-slate-600 hover:text-slate-800'
                }`}
              >
-               <div className="flex items-center gap-2">
+               <div className="flex items-center gap-1.5">
                  <ClipboardList size={16} />
                  Task Management
                </div>
              </button>
              <button
                onClick={() => setActivePermissionTab('admin')}
-               className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
+               className={`px-3 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                  activePermissionTab === 'admin'
                    ? 'border-purple-500 text-purple-600 bg-white'
                    : 'border-transparent text-slate-600 hover:text-slate-800'
                }`}
              >
-               <div className="flex items-center gap-2">
+               <div className="flex items-center gap-1.5">
                  <Shield size={16} />
                  Admin & System
                </div>
@@ -2324,9 +2324,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <table className="w-full text-left text-sm">
              <thead className="bg-slate-50 border-b border-slate-200">
                <tr>
-                 <th className="px-4 py-3 font-semibold text-slate-700 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 min-w-[150px]">Role</th>
+                 <th className="px-3 py-2 font-semibold text-slate-700 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 min-w-[150px]">Role</th>
                  {activePermissionTab === 'tabs' && tabPermissions.map(perm => (
-                   <th key={perm.key} className="px-3 py-3 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
+                   <th key={perm.key} className="px-3 py-2 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
                      <div className="flex items-center justify-center gap-1.5">
                        {perm.key === 'accessAllTasks' && <LayoutDashboard size={14} />}
                        {perm.key === 'accessDependencies' && <GitBranch size={14} />}
@@ -2338,12 +2338,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    </th>
                  ))}
                  {activePermissionTab === 'tasks' && taskManagementPermissions.map(perm => (
-                   <th key={perm.key} className="px-3 py-3 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
+                   <th key={perm.key} className="px-3 py-2 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
                      {perm.label}
                    </th>
                  ))}
                  {activePermissionTab === 'admin' && adminPermissions.map(perm => (
-                   <th key={perm.key} className="px-3 py-3 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
+                   <th key={perm.key} className="px-3 py-2 font-semibold text-slate-600 whitespace-nowrap text-center min-w-[100px]">
                      {perm.label}
                    </th>
                  ))}
@@ -2352,11 +2352,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              <tbody className="divide-y divide-slate-100">
                {Object.values(Role).map(role => (
                  <tr key={role} className="hover:bg-slate-50/50">
-                   <td className="px-4 py-3 font-medium bg-white sticky left-0 z-10 border-r border-slate-200 shadow-sm">{role}</td>
+                   <td className="px-3 py-2 font-medium bg-white sticky left-0 z-10 border-r border-slate-200 shadow-sm">{role}</td>
                    {activePermissionTab === 'tabs' && tabPermissions.map(perm => {
                      const value = getPermissionValue(role, perm.key) as TabAccessLevel;
                      return (
-                       <td key={perm.key} className="px-3 py-3 text-center">
+                       <td key={perm.key} className="px-3 py-2 text-center">
                          <BadgePermission
                            value={value}
                            onChange={(newValue) => handlePermissionChange(role, perm.key, newValue)}
@@ -2374,7 +2374,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        value = 'no';
                      }
                      return (
-                       <td key={perm.key} className="px-3 py-3 text-center">
+                       <td key={perm.key} className="px-3 py-2 text-center">
                          <BadgePermission
                            value={value as TaskManagementScope}
                            onChange={(newValue) => handlePermissionChange(role, perm.key, newValue)}
@@ -2392,7 +2392,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        value = 'no';
                      }
                      return (
-                       <td key={perm.key} className="px-3 py-3 text-center">
+                       <td key={perm.key} className="px-3 py-2 text-center">
                          <BadgePermission
                            value={value as TaskManagementScope}
                            onChange={(newValue) => handlePermissionChange(role, perm.key, newValue)}
@@ -2412,9 +2412,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {activeSection === 'capacity-planning' && (
               <div className="animate-fadeIn">
-                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50">
-                  <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg">
+                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg">
                       <Gauge size={16} className="text-white" />
                     </div>
                     <div>
@@ -2423,18 +2423,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                 </div>
-                <div className="p-6">
+                <div className="p-3">
                   <table className="w-full text-left text-sm">
            <thead className="bg-slate-50 border-b border-slate-200">
              <tr>
-               <th className="px-6 py-3 font-semibold text-slate-600">Team Lead</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Base Capacity (wks/quarter)</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Adjustment (wks)</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Adjusted Capacity</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Buffer (wks)</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Effective Capacity</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Assigned Load</th>
-               <th className="px-6 py-3 font-semibold text-slate-600">Utilization</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Team Lead</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Base Capacity (wks/quarter)</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Adjustment (wks)</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Adjusted Capacity</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Buffer (wks)</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Effective Capacity</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Assigned Load</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Utilization</th>
              </tr>
            </thead>
            <tbody className="divide-y divide-slate-100">
@@ -2452,13 +2452,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                return (
                  <tr key={user.id} className="hover:bg-slate-50">
-                   <td className="px-6 py-3 font-medium flex items-center gap-2">
+                   <td className="px-3 py-2 font-medium flex items-center gap-2">
                      <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
                         {user.name.charAt(0)}
                      </div>
                      {user.name}
                    </td>
-                   <td className="px-6 py-3">
+                   <td className="px-3 py-2">
                      <input 
                        type="number" 
                        className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -2466,7 +2466,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        onChange={(e) => setConfig((prev: AppConfig) => ({...prev, teamCapacities: {...prev.teamCapacities, [user.id]: parseFloat(e.target.value)||0}}))}
                      />
                    </td>
-                   <td className="px-6 py-3">
+                   <td className="px-3 py-2">
                      <input 
                        type="number" 
                        className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -2478,8 +2478,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        }))}
                      />
                    </td>
-                   <td className="px-6 py-3 text-slate-600 font-medium">{adjustedCapacity.toFixed(1)} wks</td>
-                   <td className="px-6 py-3">
+                   <td className="px-3 py-2 text-slate-600 font-medium">{adjustedCapacity.toFixed(1)} wks</td>
+                   <td className="px-3 py-2">
                      <input 
                        type="number" 
                        className="w-24 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -2491,15 +2491,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        }))}
                      />
                    </td>
-                   <td className="px-6 py-3 text-slate-600">{effectiveCapacity.toFixed(1)} wks</td>
-                   <td className="px-6 py-3">{load.toFixed(1)} wks</td>
-                   <td className={`px-6 py-3 ${utilColor}`}>{utilization}%</td>
+                   <td className="px-3 py-2 text-slate-600">{effectiveCapacity.toFixed(1)} wks</td>
+                   <td className="px-3 py-2">{load.toFixed(1)} wks</td>
+                   <td className={`px-3 py-2 ${utilColor}`}>{utilization}%</td>
                  </tr>
                );
              })}
            </tbody>
          </table>
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="mt-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-xs text-blue-700">
                       <strong>Note:</strong> Capacity values are per quarter. Base capacity is set by admin. Team leads can set adjustments (deductions) via their profile menu. Adjusted Capacity = Base Capacity - Adjustment. Effective Capacity = Adjusted Capacity - Buffer.
                     </p>
@@ -2515,27 +2515,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {selectedBackup && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBackup(null)}>
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+            <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center">
               <h4 className="font-bold text-slate-800">Backup Details: {selectedBackup.date}</h4>
               <button onClick={() => setSelectedBackup(null)} className="text-slate-400 hover:text-slate-600">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-slate-50 rounded-lg p-3">
+            <div className="p-3 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="bg-slate-50 rounded-lg p-2">
                   <p className="text-xs text-slate-500">Status</p>
                   <p className="font-semibold text-slate-700 capitalize">{selectedBackup.status}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
+                <div className="bg-slate-50 rounded-lg p-2.5">
                   <p className="text-xs text-slate-500">Total Size</p>
                   <p className="font-semibold text-slate-700">{formatBytes(selectedBackup.totalSize)}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
+                <div className="bg-slate-50 rounded-lg p-2.5">
                   <p className="text-xs text-slate-500">Files</p>
                   <p className="font-semibold text-slate-700">{selectedBackup.files.length}</p>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
+                <div className="bg-slate-50 rounded-lg p-2.5">
                   <p className="text-xs text-slate-500">Duration</p>
                   <p className="font-semibold text-slate-700">{selectedBackup.duration}ms</p>
                 </div>
@@ -2546,15 +2546,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-slate-500">Name</th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-500">Size</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-slate-500">Name</th>
+                      <th className="px-2 py-1.5 text-right font-medium text-slate-500">Size</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {selectedBackup.files.map((file, idx) => (
                       <tr key={idx}>
-                        <td className="px-3 py-2 text-slate-700">{file.name}</td>
-                        <td className="px-3 py-2 text-right text-slate-500">{formatBytes(file.size)}</td>
+                        <td className="px-2 py-1.5 text-slate-700">{file.name}</td>
+                        <td className="px-2 py-1.5 text-right text-slate-500">{formatBytes(file.size)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2562,7 +2562,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
               
               {selectedBackup.errors && selectedBackup.errors.length > 0 && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-xs font-medium text-red-700 mb-1">Errors:</p>
                   {selectedBackup.errors.map((err, idx) => (
                     <p key={idx} className="text-xs text-red-600">{err}</p>
@@ -2570,10 +2570,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+            <div className="px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
               <button
                 onClick={() => setSelectedBackup(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+                className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-800"
               >
                 Close
               </button>
@@ -2583,7 +2583,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   setSelectedBackup(null);
                 }}
                 disabled={isRestoring}
-                className="px-4 py-2 text-sm font-medium text-white bg-violet-500 rounded-lg hover:bg-violet-600 disabled:opacity-50"
+                className="px-3 py-1.5 text-sm font-medium text-white bg-violet-500 rounded-lg hover:bg-violet-600 disabled:opacity-50"
               >
                 Restore This Backup
               </button>
