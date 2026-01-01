@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRig
 import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge, getStatusRowColor, getPriorityRowColor, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
-import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
+import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem, getEligibleOwners } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
@@ -1090,12 +1090,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'ownerId', e.target.value)}
                                 className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
                               >
-                                {users.filter(u => 
-                                  u.role === Role.TeamLead || 
-                                  u.role === Role.Admin || 
-                                  u.role === Role.DirectorGroup || 
-                                  u.role === Role.DirectorDepartment
-                                ).map(u => (
+                                {getEligibleOwners(users).map(u => (
                                   <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                               </select>

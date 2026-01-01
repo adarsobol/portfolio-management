@@ -7,7 +7,7 @@ import {
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative, canDeleteTaskItem } from '../../utils';
+import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative, canDeleteTaskItem, getEligibleOwners } from '../../utils';
 import { getAssetClasses, getStatuses } from '../../utils/valueLists';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
@@ -1253,12 +1253,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         }`}
                       >
                         <option value="">Select...</option>
-                        {users.filter(u => 
-                          u.role === Role.TeamLead || 
-                          u.role === Role.Admin || 
-                          u.role === Role.DirectorGroup || 
-                          u.role === Role.DirectorDepartment
-                        ).map(u => (
+                        {getEligibleOwners(users).map(u => (
                           <option key={u.id} value={u.id}>{u.name}</option>
                         ))}
                       </select>
@@ -2199,12 +2194,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     }`}
                                   >
                                     <option value="">Select...</option>
-                                    {users.filter(u => 
-                                      u.role === Role.TeamLead || 
-                                      u.role === Role.Admin || 
-                                      u.role === Role.DirectorGroup || 
-                                      u.role === Role.DirectorDepartment
-                                    ).map(u => (
+                                    {getEligibleOwners(users).map(u => (
                                       <option key={u.id} value={u.id}>{u.name}</option>
                                     ))}
                                   </select>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, Role, AppConfig
 } from '../../types';
+import { getEligibleOwners } from '../../utils';
 import { HIERARCHY, QUARTERS } from '../../constants';
 import { Plus, X, Trash2, Users, ArrowDown, ArrowUp, Copy } from 'lucide-react';
 import { getAssetClasses, getDependencyTeams } from '../../utils/valueLists';
@@ -116,12 +117,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
     }
   };
 
-  const teamLeads = users.filter(u => 
-    u.role === Role.TeamLead || 
-    u.role === Role.Admin || 
-    u.role === Role.DirectorGroup || 
-    u.role === Role.DirectorDepartment
-  );
+  const teamLeads = getEligibleOwners(users);
 
   // Column definitions for the spreadsheet
   const columns = [

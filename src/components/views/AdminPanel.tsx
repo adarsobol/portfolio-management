@@ -6,6 +6,7 @@ import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata } from '../../types';
 import { migrateEnumsToConfig } from '../../utils/valueLists';
+import { canBeOwner } from '../../utils';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
@@ -2216,13 +2217,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                <tbody className="divide-y divide-slate-100">
                  {users.map(u => {
                    const ownerCount = initiatives.filter(i => i.ownerId === u.id).length;
-                   const canBeOwner = u.role === Role.TeamLead || u.role === Role.Admin || u.role === Role.DirectorGroup || u.role === Role.DirectorDepartment;
+                   const userCanBeOwner = canBeOwner(u.role);
                    return (
                      <tr key={u.id} className="hover:bg-slate-50">
                        <td className="px-6 py-3 font-medium flex items-center gap-2">
                          <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full bg-slate-200" />
                          {u.name}
-                         {canBeOwner && (
+                         {userCanBeOwner && (
                            <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can be assigned as owner">Owner</span>
                          )}
                        </td>
@@ -2253,7 +2254,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                          </select>
                        </td>
                        <td className="px-6 py-3">
-                         {canBeOwner ? (
+                         {userCanBeOwner ? (
                            <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded" title={`Assigned to ${ownerCount} initiative(s)`}>
                              {ownerCount}
                            </span>

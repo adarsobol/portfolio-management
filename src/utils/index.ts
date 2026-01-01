@@ -19,6 +19,23 @@ export const getOwnerName = (users: User[], id?: string): string => {
 };
 
 /**
+ * Check if a user role can be assigned as an owner
+ */
+export const canBeOwner = (role: Role): boolean => {
+  return role === Role.TeamLead || 
+         role === Role.Admin || 
+         role === Role.DirectorGroup || 
+         role === Role.DirectorDepartment;
+};
+
+/**
+ * Filter users to get only those who can be assigned as owners
+ */
+export const getEligibleOwners = (users: User[]): User[] => {
+  return users.filter(u => canBeOwner(u.role));
+};
+
+/**
  * Format a date object to ISO date string (YYYY-MM-DD)
  */
 export const formatDate = (date: Date): string => {
