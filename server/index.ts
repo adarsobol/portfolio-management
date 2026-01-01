@@ -644,6 +644,91 @@ const TASK_HEADERS = [
 const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin', 'team'];
 
 // ============================================
+// HELPER FUNCTIONS FOR AUTHORIZATION
+// ============================================
+
+/**
+ * Load app config from Config sheet
+ */
+async function loadAppConfig(doc: GoogleSpreadsheet): Promise<any> {
+  try {
+    let configSheet = doc.sheetsByTitle['Config'];
+    if (!configSheet) {
+      return null;
+    }
+    
+    await configSheet.loadHeaderRow();
+    const configRows = await configSheet.getRows();
+    if (configRows.length === 0) {
+      return null;
+    }
+    
+    const configRow = configRows[0];
+    const configData = configRow.get('config');
+    if (!configData) {
+      return null;
+    }
+    
+    return JSON.parse(configData);
+  } catch (error) {
+    console.error('[loadAppConfig] Error loading config:', error);
+    return null;
+  }
+}
+
+/**
+ * Normalize user ID for comparison (handles empty strings, whitespace, undefined)
+ */
+function normalizeUserId(userId: string | undefined | null): string | null {
+  if (!userId) return null;
+  const trimmed = String(userId).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Check if user can delete a task (server-side authorization)
+ */
+function canUserDeleteTask(
+  config: any,
+  userRole: string,
+  taskOwnerId: string | undefined | null,
+  initiativeOwnerId: string | undefined | null,
+  currentUserId: string
+): boolean {
+  if (!config || !config.rolePermissions) {
+    console.warn('[canUserDeleteTask] Config or rolePermissions missing');
+    return false;
+  }
+  
+  const rolePermissions = config.rolePermissions[userRole];
+  if (!rolePermissions) {
+    return false;
+  }
+  
+  const deleteScope = rolePermissions.deleteTasks;
+  
+  if (deleteScope === 'yes') {
+    return true;
+  } else if (deleteScope === 'own') {
+    const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
+    const normalizedCurrentUserId = normalizeUserId(currentUserId);
+    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
+    
+    if (!normalizedCurrentUserId) {
+      return false;
+    }
+    
+    if (normalizedTaskOwnerId) {
+      return normalizedTaskOwnerId === normalizedCurrentUserId;
+    }
+    
+    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
+  }
+  
+  return false;
+}
+
+// ============================================
 // AUTH ROUTES (Public)
 // ============================================
 
@@ -2019,6 +2104,12 @@ app.delete('/api/sheets/initiatives/:id', authenticateToken, async (req: Authent
 app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const currentUser = req.user;
+    
+    if (!currentUser) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
 
     const doc = await getDoc();
     if (!doc) {
@@ -2026,19 +2117,95 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
       return;
     }
 
-    let sheet = doc.sheetsByTitle['Tasks'];
+    // Load app config for permission checking
+    const config = await loadAppConfig(doc);
+    if (!config) {
+      console.warn('[DELETE /api/sheets/tasks/:id] Config not found, proceeding without authorization check');
+      // In production, you might want to deny access if config is missing
+      // For now, we'll proceed but log a warning
+    }
+
+    let tasksSheet = doc.sheetsByTitle['Tasks'];
     
-    if (!sheet) {
+    if (!tasksSheet) {
       res.status(404).json({ error: 'Tasks sheet not found' });
       return;
     }
 
-    const rows = await sheet.getRows();
+    await tasksSheet.loadHeaderRow();
+    const rows = await tasksSheet.getRows();
     const rowToUpdate = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
     
     if (!rowToUpdate) {
       res.status(404).json({ error: 'Task not found' });
       return;
+    }
+
+    // Get task data for authorization check
+    const taskOwnerId = rowToUpdate.get('ownerId');
+    const parentId = rowToUpdate.get('parentId'); // This is the initiative ID
+    
+    // Get initiative to check its owner
+    let initiativeOwnerId: string | undefined = undefined;
+    if (parentId) {
+      try {
+        const initiativesSheet = doc.sheetsByTitle['Initiatives'];
+        if (initiativesSheet) {
+          await initiativesSheet.loadHeaderRow();
+          const initiativeRows = await initiativesSheet.getRows();
+          const initiativeRow = initiativeRows.find((r: GoogleSpreadsheetRow) => r.get('id') === parentId);
+          if (initiativeRow) {
+            initiativeOwnerId = initiativeRow.get('ownerId');
+          }
+        }
+      } catch (error) {
+        console.error('[DELETE /api/sheets/tasks/:id] Error loading initiative:', error);
+        // Continue without initiative owner check - will rely on task owner only
+      }
+    }
+
+    // Check authorization if config is available
+    if (config) {
+      const hasPermission = canUserDeleteTask(
+        config,
+        currentUser.role,
+        taskOwnerId,
+        initiativeOwnerId,
+        currentUser.id
+      );
+      
+      if (!hasPermission) {
+        console.log(`[DELETE /api/sheets/tasks/:id] Permission denied for user ${currentUser.id} (role: ${currentUser.role}) to delete task ${id}`, {
+          taskOwnerId,
+          initiativeOwnerId,
+          currentUserId: currentUser.id,
+          deleteScope: config.rolePermissions?.[currentUser.role]?.deleteTasks
+        });
+        res.status(403).json({ 
+          error: 'You do not have permission to delete this task',
+          details: 'You can only delete tasks that you own or tasks in initiatives you own'
+        });
+        return;
+      }
+    } else {
+      // If config is not available, fall back to basic check: user must own the task or initiative
+      const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
+      const normalizedCurrentUserId = normalizeUserId(currentUser.id);
+      const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
+      
+      if (normalizedCurrentUserId) {
+        const ownsTask = normalizedTaskOwnerId === normalizedCurrentUserId;
+        const ownsInitiative = normalizedInitiativeOwnerId === normalizedCurrentUserId;
+        
+        if (!ownsTask && !ownsInitiative && currentUser.role !== 'Admin') {
+          console.log(`[DELETE /api/sheets/tasks/:id] Fallback authorization denied for user ${currentUser.id} (role: ${currentUser.role}) to delete task ${id}`);
+          res.status(403).json({ 
+            error: 'You do not have permission to delete this task',
+            details: 'You can only delete tasks that you own or tasks in initiatives you own'
+          });
+          return;
+        }
+      }
     }
 
     // Soft delete: set status to Deleted and add deletedAt timestamp
@@ -2047,10 +2214,10 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
     rowToUpdate.set('deletedAt', deletedAt);
     await rowToUpdate.save();
     
-    console.log(`Soft deleted task ${id} at ${deletedAt}`);
+    console.log(`[DELETE /api/sheets/tasks/:id] Soft deleted task ${id} at ${deletedAt} by user ${currentUser.id} (role: ${currentUser.role})`);
     res.json({ success: true, id, deletedAt });
   } catch (error) {
-    console.error('Error soft deleting task:', error);
+    console.error('[DELETE /api/sheets/tasks/:id] Error soft deleting task:', error);
     res.status(500).json({ error: String(error) });
   }
 });

@@ -2231,13 +2231,7 @@ export default function App() {
       <Routes>
         <Route path="/item/:id" element={
           <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-             <h2 className="text-2xl font-bold text-slate-800 capitalize">
-               {currentView === 'all' ? 'Comprehensive Dashboard' : 
-                currentView === 'resources' ? 'Workplan Health' : currentView}
-             </h2>
-          </div>
+            <div className="flex flex-col md:flex-row justify-end items-start md:items-center mb-8 gap-4">
           <div className="flex gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -2427,13 +2421,7 @@ export default function App() {
         } />
         <Route path="*" element={
           <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-             <h2 className="text-2xl font-bold text-slate-800 capitalize">
-               {currentView === 'all' ? 'Comprehensive Dashboard' : 
-                currentView === 'resources' ? 'Workplan Health' : currentView}
-             </h2>
-          </div>
+            <div className="flex flex-col md:flex-row justify-end items-start md:items-center mb-8 gap-4">
           <div className="flex gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />

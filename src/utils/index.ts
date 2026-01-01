@@ -211,6 +211,17 @@ const normalizeRole = (role: Role | string): Role | null => {
 };
 
 /**
+ * Normalize user ID for comparison (handles empty strings, whitespace, undefined)
+ * @param userId - User ID to normalize
+ * @returns Normalized user ID string or null if invalid/empty
+ */
+const normalizeUserId = (userId: string | undefined | null): string | null => {
+  if (!userId) return null;
+  const trimmed = String(userId).trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+/**
  * Get permission value for a role, with fallback to default
  */
 export const getPermission = (config: AppConfig, role: Role, key: PermissionKey): PermissionValue => {
@@ -346,12 +357,21 @@ export const canEditTaskItem = (config: AppConfig, role: Role, taskOwnerId: stri
   } else if (editScope === 'own') {
     // Can edit only own tasks
     // Priority: Check task owner first, then fall back to initiative owner if task has no owner
-    if (taskOwnerId) {
+    const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
+    const normalizedCurrentUserId = normalizeUserId(currentUserId);
+    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
+    
+    if (!normalizedCurrentUserId) {
+      // Current user ID is invalid
+      return false;
+    }
+    
+    if (normalizedTaskOwnerId) {
       // Task has an owner - must match current user
-      return taskOwnerId === currentUserId;
+      return normalizedTaskOwnerId === normalizedCurrentUserId;
     }
     // Task has no owner - check if user owns the initiative
-    return initiativeOwnerId === currentUserId;
+    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
   }
   
   // Cannot edit
@@ -376,12 +396,21 @@ export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: st
   } else if (deleteScope === 'own') {
     // Can delete only own tasks
     // Priority: Check task owner first, then fall back to initiative owner if task has no owner
-    if (taskOwnerId) {
+    const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
+    const normalizedCurrentUserId = normalizeUserId(currentUserId);
+    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
+    
+    if (!normalizedCurrentUserId) {
+      // Current user ID is invalid
+      return false;
+    }
+    
+    if (normalizedTaskOwnerId) {
       // Task has an owner - must match current user
-      return taskOwnerId === currentUserId;
+      return normalizedTaskOwnerId === normalizedCurrentUserId;
     }
     // Task has no owner - check if user owns the initiative
-    return initiativeOwnerId === currentUserId;
+    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
   }
   
   // Cannot delete
@@ -399,25 +428,20 @@ export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: st
 export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwnerId: string, currentUserId: string): boolean => {
   const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
   
-  // Debug logging for delete permission checks
-  console.log('[canDeleteInitiative] Permission check:', {
-    role,
-    RoleTeamLead: Role.TeamLead,
-    roleMatches: role === Role.TeamLead,
-    deleteScope,
-    initiativeOwnerId,
-    currentUserId,
-    ownerMatch: initiativeOwnerId === currentUserId,
-    configRolePermissions: config.rolePermissions?.[role],
-    deleteTasksValue: config.rolePermissions?.[role]?.deleteTasks
-  });
-  
   if (deleteScope === 'yes') {
     // Can delete any initiative
     return true;
   } else if (deleteScope === 'own') {
     // Can delete only own initiatives
-    return initiativeOwnerId === currentUserId;
+    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
+    const normalizedCurrentUserId = normalizeUserId(currentUserId);
+    
+    if (!normalizedCurrentUserId) {
+      // Current user ID is invalid
+      return false;
+    }
+    
+    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
   }
   
   // Cannot delete
