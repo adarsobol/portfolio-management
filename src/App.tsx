@@ -1525,35 +1525,39 @@ export default function App() {
               w => w.enabled && w.trigger === WorkflowTrigger.OnCreate
             );
             
-            for (const workflow of onCreateWorkflows) {
-              try {
-                const initiativeCopy = { ...item };
-                await workflowEngine.executeWorkflow(workflow, [initiativeCopy], recordChange);
-                
-                // Update the initiative if it was modified by the workflow
-                const modifiedIndex = nextInitiatives.findIndex(i => i.id === item.id);
-                if (modifiedIndex >= 0) {
-                  nextInitiatives[modifiedIndex] = initiativeCopy;
-                  item = initiativeCopy; // Update item reference for subsequent operations
-                }
-                
-                // Update workflow execution log
-                setConfig(prev => ({
-                  ...prev,
-                  workflows: (prev.workflows || []).map(w => 
-                    w.id === workflow.id 
-                      ? { 
-                          ...w, 
-                          lastRun: new Date().toISOString(),
-                          runCount: w.runCount + 1,
-                        }
-                      : w
-                  )
-                }));
-              } catch (error) {
-                logger.error(`Error executing OnCreate workflow ${workflow.name}`, { context: 'App.handleSave', error: error instanceof Error ? error : new Error(String(error)) });
-              }
-            }
+            // Execute workflows asynchronously without blocking state update
+            onCreateWorkflows.forEach(workflow => {
+              const initiativeCopy = { ...item };
+              workflowEngine.executeWorkflow(workflow, [initiativeCopy], recordChange)
+                .then(() => {
+                  // Update the initiative if it was modified by the workflow
+                  setInitiatives(prev => {
+                    const updated = [...prev];
+                    const modifiedIndex = updated.findIndex(i => i.id === item.id);
+                    if (modifiedIndex >= 0) {
+                      updated[modifiedIndex] = initiativeCopy;
+                    }
+                    return updated;
+                  });
+                  
+                  // Update workflow execution log
+                  setConfig(prev => ({
+                    ...prev,
+                    workflows: (prev.workflows || []).map(w => 
+                      w.id === workflow.id 
+                        ? { 
+                            ...w, 
+                            lastRun: new Date().toISOString(),
+                            runCount: w.runCount + 1,
+                          }
+                        : w
+                    )
+                  }));
+                })
+                .catch(error => {
+                  logger.error(`Error executing OnCreate workflow ${workflow.name}`, { context: 'App.handleSave', error: error instanceof Error ? error : new Error(String(error)) });
+                });
+            });
           }
         }
 
