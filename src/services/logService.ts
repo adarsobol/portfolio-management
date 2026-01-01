@@ -114,7 +114,7 @@ class LogService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`,
         },
         body: JSON.stringify({
           message: errorLog.message,
@@ -176,7 +176,7 @@ class LogService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`,
         },
         body: JSON.stringify({
           type: activityLog.type,
@@ -450,7 +450,7 @@ class LogService {
 
       const response = await fetch(`${API_ENDPOINT}/api/logs/errors?${queryParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`,
         },
       });
 
@@ -489,7 +489,7 @@ class LogService {
 
       const response = await fetch(`${API_ENDPOINT}/api/logs/activity?${queryParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`,
         },
       });
 
@@ -539,7 +539,7 @@ class LogService {
 
       const response = await fetch(`${API_ENDPOINT}/api/logs/search?${queryParams.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Authorization': `Bearer ${localStorage.getItem('portfolio-auth-token') || ''}`,
         },
       });
 
