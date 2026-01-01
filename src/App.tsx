@@ -1260,7 +1260,7 @@ export default function App() {
     }
 
     // Permission check: Use permission system
-    const canDelete = canDeleteInitiative(config, currentUser.role, initiative.ownerId, currentUser.id);
+    const canDelete = canDeleteInitiative(config, currentUser.role, initiative.ownerId, currentUser.id, currentUser.email);
     if (!canDelete) {
       const deleteScope = getTaskManagementScope(config, currentUser.role, 'deleteTasks');
       if (deleteScope === 'own') {

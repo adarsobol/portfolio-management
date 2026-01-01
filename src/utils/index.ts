@@ -222,6 +222,47 @@ const normalizeUserId = (userId: string | undefined | null): string | null => {
 };
 
 /**
+ * Check if two user identifiers match, handling both userId and email formats
+ * @param ownerId - The owner ID (may be userId or email)
+ * @param currentUserId - Current user's ID (userId format)
+ * @param currentUserEmail - Current user's email (optional, for email matching)
+ * @returns true if the IDs match
+ */
+const matchesUserId = (ownerId: string | null | undefined, currentUserId: string, currentUserEmail?: string): boolean => {
+  const normalizedOwnerId = normalizeUserId(ownerId);
+  const normalizedCurrentUserId = normalizeUserId(currentUserId);
+  
+  if (!normalizedOwnerId || !normalizedCurrentUserId) {
+    return false;
+  }
+  
+  // Direct ID-to-ID match
+  if (normalizedOwnerId === normalizedCurrentUserId) {
+    return true;
+  }
+  
+  // Email match: If ownerId looks like an email, compare with currentUserEmail (case-insensitive)
+  if (normalizedOwnerId.includes('@') && currentUserEmail) {
+    const normalizedOwnerEmail = normalizedOwnerId.toLowerCase().trim();
+    const normalizedCurrentEmail = String(currentUserEmail).toLowerCase().trim();
+    if (normalizedOwnerEmail === normalizedCurrentEmail) {
+      return true;
+    }
+  }
+  
+  // Reverse email match: If currentUserId looks like an email, compare with ownerId (unlikely but handle for completeness)
+  if (normalizedCurrentUserId.includes('@') && normalizedOwnerId) {
+    const normalizedCurrentEmail = normalizedCurrentUserId.toLowerCase().trim();
+    const normalizedOwnerEmail = normalizedOwnerId.toLowerCase().trim();
+    if (normalizedCurrentEmail === normalizedOwnerEmail) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+/**
  * Get permission value for a role, with fallback to default
  */
 export const getPermission = (config: AppConfig, role: Role, key: PermissionKey): PermissionValue => {
@@ -346,9 +387,10 @@ export const canDeleteTasks = (config: AppConfig, role: Role): boolean => {
  * @param taskOwnerId - ID of the task owner (optional, may not be set)
  * @param initiativeOwnerId - ID of the initiative owner
  * @param currentUserId - ID of the current user
+ * @param currentUserEmail - Email of the current user (optional, for email matching)
  * @returns true if user can edit the task
  */
-export const canEditTaskItem = (config: AppConfig, role: Role, taskOwnerId: string | undefined, initiativeOwnerId: string, currentUserId: string): boolean => {
+export const canEditTaskItem = (config: AppConfig, role: Role, taskOwnerId: string | undefined, initiativeOwnerId: string, currentUserId: string, currentUserEmail?: string): boolean => {
   const editScope = getTaskManagementScope(config, role, 'editTasks');
   
   if (editScope === 'yes') {
@@ -357,21 +399,12 @@ export const canEditTaskItem = (config: AppConfig, role: Role, taskOwnerId: stri
   } else if (editScope === 'own') {
     // Can edit only own tasks
     // Priority: Check task owner first, then fall back to initiative owner if task has no owner
-    const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
-    const normalizedCurrentUserId = normalizeUserId(currentUserId);
-    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
-    
-    if (!normalizedCurrentUserId) {
-      // Current user ID is invalid
-      return false;
-    }
-    
-    if (normalizedTaskOwnerId) {
+    if (taskOwnerId) {
       // Task has an owner - must match current user
-      return normalizedTaskOwnerId === normalizedCurrentUserId;
+      return matchesUserId(taskOwnerId, currentUserId, currentUserEmail);
     }
     // Task has no owner - check if user owns the initiative
-    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
+    return matchesUserId(initiativeOwnerId, currentUserId, currentUserEmail);
   }
   
   // Cannot edit
@@ -385,9 +418,10 @@ export const canEditTaskItem = (config: AppConfig, role: Role, taskOwnerId: stri
  * @param taskOwnerId - ID of the task owner (optional, may not be set)
  * @param initiativeOwnerId - ID of the initiative owner
  * @param currentUserId - ID of the current user
+ * @param currentUserEmail - Email of the current user (optional, for email matching)
  * @returns true if user can delete the task
  */
-export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: string | undefined, initiativeOwnerId: string, currentUserId: string): boolean => {
+export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: string | undefined, initiativeOwnerId: string, currentUserId: string, currentUserEmail?: string): boolean => {
   const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
   
   if (deleteScope === 'yes') {
@@ -396,21 +430,12 @@ export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: st
   } else if (deleteScope === 'own') {
     // Can delete only own tasks
     // Priority: Check task owner first, then fall back to initiative owner if task has no owner
-    const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
-    const normalizedCurrentUserId = normalizeUserId(currentUserId);
-    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
-    
-    if (!normalizedCurrentUserId) {
-      // Current user ID is invalid
-      return false;
-    }
-    
-    if (normalizedTaskOwnerId) {
+    if (taskOwnerId) {
       // Task has an owner - must match current user
-      return normalizedTaskOwnerId === normalizedCurrentUserId;
+      return matchesUserId(taskOwnerId, currentUserId, currentUserEmail);
     }
     // Task has no owner - check if user owns the initiative
-    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
+    return matchesUserId(initiativeOwnerId, currentUserId, currentUserEmail);
   }
   
   // Cannot delete
@@ -423,9 +448,10 @@ export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: st
  * @param role - User's role
  * @param initiativeOwnerId - ID of the initiative owner
  * @param currentUserId - ID of the current user
+ * @param currentUserEmail - Email of the current user (optional, for email matching)
  * @returns true if user can delete the initiative
  */
-export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwnerId: string, currentUserId: string): boolean => {
+export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwnerId: string, currentUserId: string, currentUserEmail?: string): boolean => {
   const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
   
   if (deleteScope === 'yes') {
@@ -433,15 +459,7 @@ export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwn
     return true;
   } else if (deleteScope === 'own') {
     // Can delete only own initiatives
-    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
-    const normalizedCurrentUserId = normalizeUserId(currentUserId);
-    
-    if (!normalizedCurrentUserId) {
-      // Current user ID is invalid
-      return false;
-    }
-    
-    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
+    return matchesUserId(initiativeOwnerId, currentUserId, currentUserEmail);
   }
   
   // Cannot delete

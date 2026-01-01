@@ -383,7 +383,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const canDelete = (): boolean => {
     if (!initiativeToEdit) return false;
     // Use permission system to check if user can delete this initiative
-    return canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id);
+    return canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id, currentUser.email);
   };
 
   const handleDelete = () => {
@@ -778,7 +778,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (!task || !initiativeToEdit) return;
 
     // Check delete permissions
-    if (!canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id)) {
+    if (!canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id, currentUser.email)) {
       const deleteScope = config.rolePermissions?.[currentUser.role]?.deleteTasks;
       if (deleteScope === 'own') {
         alert('You can only delete tasks that you own.');
@@ -2049,7 +2049,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               >
                                 <Copy size={16} />
                               </button>
-                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && initiativeToEdit && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
+                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && initiativeToEdit && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id, currentUser.email) && (
                                 <button
                                   type="button"
                                   onClick={() => deleteTask(task.id)}
@@ -2066,7 +2066,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           {expandedTasks.has(task.id) && (
                             <div className="bg-white p-4 space-y-4">
                               {/* Delete button at top of expanded section */}
-                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && initiativeToEdit && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id) && (
+                              {tasks.filter(t => t.status !== Status.Deleted).length > 1 && initiativeToEdit && canDeleteTaskItem(config, currentUser.role, task.ownerId, initiativeToEdit.ownerId, currentUser.id, currentUser.email) && (
                                 <div className="flex justify-end pb-3 border-b border-slate-200">
                                   <button
                                     type="button"

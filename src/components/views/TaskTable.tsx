@@ -287,7 +287,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   };
   
   const canDeleteTask = (item: Initiative, task: Task): boolean => {
-    return canDeleteTaskItem(config, currentUser.role, task.ownerId, item.ownerId, currentUser.id);
+    return canDeleteTaskItem(config, currentUser.role, task.ownerId, item.ownerId, currentUser.id, currentUser.email);
   };
 
   const canEditTask = (item: Initiative, task: Task): boolean => {
@@ -295,7 +295,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     // If user can edit all tasks, allow
     if (canEditAllTasks(config, currentUser.role)) return true;
     // Otherwise, check if user can edit this specific task
-    return canEditTaskItem(config, currentUser.role, task.ownerId, item.ownerId, currentUser.id);
+    return canEditTaskItem(config, currentUser.role, task.ownerId, item.ownerId, currentUser.id, currentUser.email);
   };
 
   const handleDeleteTask = async (initiativeId: string, taskId: string) => {
