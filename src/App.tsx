@@ -1260,7 +1260,7 @@ export default function App() {
       oldValue: String(oldValue ?? ''),
       newValue: String(newValue ?? ''),
       initiativeTitle: initiative.title
-    });
+    }, true); // Send immediately instead of batching
     
     return change;
   };
@@ -1691,6 +1691,11 @@ export default function App() {
       }
       return nextInitiatives;
     });
+
+    // Update editingItem if modal is open and we're editing this item
+    if (isModalOpen && editingItem && editingItem.id === item.id) {
+      setEditingItem(item);
+    }
   };
 
   // Execute workflows triggered by field changes

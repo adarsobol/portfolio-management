@@ -25,15 +25,17 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({ users }) => {
   const loadActivityLogs = async () => {
     setLoading(true);
     try {
+      console.log('[ACTIVITY LOG VIEW] Loading logs with filters:', { startDate, endDate, selectedType, selectedUserId });
       const logs = await logService.getActivityLogs({
         startDate,
         endDate,
         type: selectedType === 'all' ? undefined : selectedType,
         userId: selectedUserId === 'all' ? undefined : selectedUserId,
       });
+      console.log('[ACTIVITY LOG VIEW] Loaded logs:', logs.length, logs);
       setActivityLogs(logs);
     } catch (error) {
-      console.error('Failed to load activity logs:', error);
+      console.error('[ACTIVITY LOG VIEW] Failed to load activity logs:', error);
     } finally {
       setLoading(false);
     }

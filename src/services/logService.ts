@@ -188,9 +188,13 @@ class LogService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`[ACTIVITY LOG] Failed to send: HTTP ${response.status}`, errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
+      const result = await response.json().catch(() => ({}));
+      console.log('[ACTIVITY LOG] Successfully logged:', { type: activityLog.type, description: activityLog.description, result });
       return true;
     } catch (error) {
       // Retry with exponential backoff
@@ -362,7 +366,8 @@ class LogService {
       initiativeId?: string;
       taskId?: string;
       [key: string]: unknown;
-    }
+    },
+    immediate?: boolean
   ): void {
     const activityLog: Partial<ActivityLog> = {
       type,
@@ -376,15 +381,24 @@ class LogService {
     // Add to batch queue
     this.batchQueue.push({ type: 'activity', data: activityLog });
 
-    // Flush if batch is full
-    if (this.batchQueue.length >= this.MAX_BATCH_SIZE) {
-      this.flushBatch();
-    } else if (!this.batchTimeout) {
-      // Schedule flush after delay
-      this.batchTimeout = setTimeout(() => {
-        this.flushBatch();
+    // If immediate flag is set, flush immediately
+    if (immediate) {
+      if (this.batchTimeout) {
+        clearTimeout(this.batchTimeout);
         this.batchTimeout = null;
-      }, this.BATCH_DELAY);
+      }
+      this.flushBatch();
+    } else {
+      // Flush if batch is full
+      if (this.batchQueue.length >= this.MAX_BATCH_SIZE) {
+        this.flushBatch();
+      } else if (!this.batchTimeout) {
+        // Schedule flush after delay
+        this.batchTimeout = setTimeout(() => {
+          this.flushBatch();
+          this.batchTimeout = null;
+        }, this.BATCH_DELAY);
+      }
     }
   }
 
@@ -480,10 +494,13 @@ class LogService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch activity logs: ${response.statusText}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`[ACTIVITY LOG] Failed to fetch: HTTP ${response.status}`, errorText);
+        throw new Error(`Failed to fetch activity logs: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('[ACTIVITY LOG] Fetched logs:', { count: data.logs?.length || 0, params });
       return data.logs || [];
     } catch (error) {
       console.error('Error fetching activity logs:', error);
