@@ -3,12 +3,12 @@ import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router
 import { Search, Plus, ChevronDown } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
-import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger } from './types';
+import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck } from './hooks';
 import { useUrlState } from './hooks/useUrlState';
-import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService } from './services';
+import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService, logService } from './services';
 import { getVersionService } from './services/versionService';
 import { validateWeeklyTeamEffort, getCurrentWeekKey, ValidationResult } from './services/weeklyEffortValidation';
 import { useAuth, useToast } from './contexts';
@@ -1230,6 +1230,21 @@ export default function App() {
         logger.error('Failed to notify Slack about ETA change', { context: 'App.recordChange', error: err instanceof Error ? err : new Error(String(err)) });
       });
     }
+    
+    // Log to activity logs
+    const activityType = taskId ? ActivityType.UPDATE_TASK : ActivityType.UPDATE_INITIATIVE;
+    const description = taskId 
+      ? `Task ${field} changed from ${oldValue ?? 'N/A'} to ${newValue ?? 'N/A'}`
+      : `Initiative ${field} changed from ${oldValue ?? 'N/A'} to ${newValue ?? 'N/A'}`;
+    
+    logService.logActivity(activityType, description, {
+      initiativeId: initiative.id,
+      taskId: taskId,
+      field,
+      oldValue: String(oldValue ?? ''),
+      newValue: String(newValue ?? ''),
+      initiativeTitle: initiative.title
+    });
     
     return change;
   };
