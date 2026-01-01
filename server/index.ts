@@ -3110,11 +3110,24 @@ app.get('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
     let configSheet = doc.sheetsByTitle['Config'];
     if (!configSheet) {
       // Return default values if config sheet doesn't exist
+      const currentYear = new Date().getFullYear();
+      const defaultQuarters: string[] = [];
+      for (let year = currentYear - 1; year <= currentYear + 3; year++) {
+        for (let q = 1; q <= 4; q++) {
+          defaultQuarters.push(`Q${q} ${year}`);
+        }
+      }
+      
       res.json({
         valueLists: {
           assetClasses: ['PL', 'Auto', 'POS', 'Advisory'],
           statuses: ['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete', 'Deleted'],
-          dependencyTeams: ['R&M - Research', 'R&M - Data', 'R&M - Infra', 'Product', 'Capital Markets', 'Partnerships']
+          dependencyTeams: ['R&M - Research', 'R&M - Data', 'R&M - Infra', 'Product', 'Capital Markets', 'Partnerships'],
+          priorities: ['P0', 'P1', 'P2'],
+          workTypes: ['Planned Work', 'Unplanned Work'],
+          unplannedTags: ['Unplanned', 'Risk Item', 'PM Item', 'Both'],
+          initiativeTypes: ['WP', 'BAU'],
+          quarters: defaultQuarters
         }
       });
       return;
@@ -3162,8 +3175,24 @@ app.put('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
 
     if (!Array.isArray(valueLists.assetClasses) || 
         !Array.isArray(valueLists.statuses) || 
-        !Array.isArray(valueLists.dependencyTeams)) {
-      res.status(400).json({ error: 'Value lists must contain assetClasses, statuses, and dependencyTeams arrays' });
+        !Array.isArray(valueLists.dependencyTeams) ||
+        !Array.isArray(valueLists.priorities) ||
+        !Array.isArray(valueLists.workTypes) ||
+        !Array.isArray(valueLists.unplannedTags) ||
+        !Array.isArray(valueLists.initiativeTypes) ||
+        !Array.isArray(valueLists.quarters)) {
+      res.status(400).json({ error: 'Value lists must contain all required arrays: assetClasses, statuses, dependencyTeams, priorities, workTypes, unplannedTags, initiativeTypes, quarters' });
+      return;
+    }
+    
+    // Hierarchy and dependencyTeamCategories are optional but validated if present
+    if (valueLists.hierarchy !== undefined && (typeof valueLists.hierarchy !== 'object' || Array.isArray(valueLists.hierarchy))) {
+      res.status(400).json({ error: 'hierarchy must be an object mapping asset classes to pillar arrays' });
+      return;
+    }
+    
+    if (valueLists.dependencyTeamCategories !== undefined && !Array.isArray(valueLists.dependencyTeamCategories)) {
+      res.status(400).json({ error: 'dependencyTeamCategories must be an array' });
       return;
     }
 

@@ -7,7 +7,7 @@ import {
   Priority,
   AppConfig,
 } from '../../types';
-import { getStatuses } from '../../utils/valueLists';
+import { getStatuses, getPriorities } from '../../utils/valueLists';
 
 interface ActionBuilderProps {
   action: WorkflowActionConfig;
@@ -158,7 +158,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, onChange, config 
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {Object.values(Priority).map((p) => (
+            {getPriorities(config).map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>

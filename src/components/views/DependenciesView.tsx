@@ -18,9 +18,8 @@ import {
   History
 } from 'lucide-react';
 import { Initiative, User, Status, DependencyTeam, Dependency, AppConfig } from '../../types';
-import { DEPENDENCY_TEAM_CATEGORIES } from '../../constants';
 import { formatDateDisplay, isOverdue, getDateStatus, getDaysUntil } from '../../utils';
-import { getDependencyTeams } from '../../utils/valueLists';
+import { getDependencyTeams, getDependencyTeamCategories } from '../../utils/valueLists';
 
 interface DependenciesViewProps {
   initiatives: Initiative[];
@@ -324,7 +323,8 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
             <span className="text-xs font-medium text-slate-500">Filter by team:</span>
             {getDependencyTeams(config).map(team => {
               const stat = teamStats[team] || { count: 0, atRisk: 0, overdue: 0 };
-              const category = DEPENDENCY_TEAM_CATEGORIES.find(c => c.teams.includes(team as DependencyTeam));
+              const categories = getDependencyTeamCategories(config);
+              const category = categories.find(c => c.teams.includes(team));
               const colorClasses = category?.color === 'blue'
                 ? { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', activeBg: 'bg-blue-100' }
                 : { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', activeBg: 'bg-purple-100' };
@@ -456,7 +456,8 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
               <tbody className="divide-y divide-slate-100/50">
                 {filteredTableRows.map(row => {
                   const isExpanded = expandedRows.has(row.id);
-                  const category = DEPENDENCY_TEAM_CATEGORIES.find(c => c.teams.includes(row.team));
+                  const categories = getDependencyTeamCategories(config);
+                  const category = categories.find(c => c.teams.includes(row.team));
                   const colorClasses = category?.color === 'blue'
                     ? { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: 'text-blue-500' }
                     : { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', icon: 'text-purple-500' };

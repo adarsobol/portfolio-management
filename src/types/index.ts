@@ -249,10 +249,23 @@ export interface AppConfig {
     assetClasses: string[];
     statuses: string[];
     dependencyTeams: string[];
+    priorities: string[];
+    workTypes: string[];
+    unplannedTags: string[];
+    initiativeTypes: string[];
+    quarters: string[];
+    hierarchy?: Record<string, HierarchyNode[]>; // AssetClass -> Pillars
+    dependencyTeamCategories?: { name: string; color: string; teams: string[] }[];
     // Owners managed separately via user management
   };
   // Migration flag to track if enums have been migrated to value lists
   valueListsMigrated?: boolean;
+}
+
+// Hierarchy structure for pillars and responsibilities
+export interface HierarchyNode {
+  name: string;
+  responsibilities: string[];
 }
 
 export interface Snapshot {

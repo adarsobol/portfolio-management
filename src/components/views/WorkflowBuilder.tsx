@@ -8,14 +8,13 @@ import {
   WorkflowConditionConfig,
   WorkflowActionConfig,
   Status,
-  WorkType,
   User,
   AppConfig,
 } from '../../types';
 import { generateId } from '../../utils';
 import ConditionBuilder from './ConditionBuilder';
 import ActionBuilder from './ActionBuilder';
-import { getAssetClasses } from '../../utils/valueLists';
+import { getAssetClasses, getWorkTypes } from '../../utils/valueLists';
 
 interface WorkflowBuilderProps {
   workflow: Workflow | null;
@@ -299,17 +298,17 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
                   Work Types
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {Object.values(WorkType).map((wt) => (
+                  {getWorkTypes(config).map((wt) => (
                     <label key={wt} className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={scope?.workTypes?.includes(wt) || false}
+                        checked={scope?.workTypes?.includes(wt as any) || false}
                         onChange={(e) => {
                           const current = scope?.workTypes || [];
                           setScope({
                             ...scope,
                             workTypes: e.target.checked
-                              ? [...current, wt]
+                              ? [...current, wt as any]
                               : current.filter((w) => w !== wt),
                           });
                         }}

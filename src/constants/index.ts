@@ -1,9 +1,11 @@
-import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, InitiativeType, TaskManagementScope, PermissionKey, LegacyPermissionKey, PermissionValue } from '../types';
+import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, InitiativeType, TaskManagementScope, PermissionKey, LegacyPermissionKey, PermissionValue, HierarchyNode } from '../types';
 import { generateId } from '../utils';
 import { getDefaultValueLists } from '../utils/valueLists';
 
-// Dependency team options for external dependencies
-export const DEPENDENCY_TEAMS = Object.values(DependencyTeam);
+// QUARTERS constant - deprecated, use getQuarters(config) instead
+// Kept for backward compatibility during migration
+
+// DEPENDENCY_TEAMS removed - use getDependencyTeams(config) from utils/valueLists instead
 
 // Dependency team categories for grouped display
 export const DEPENDENCY_TEAM_CATEGORIES: { name: string; color: string; teams: DependencyTeam[] }[] = [
@@ -60,10 +62,7 @@ export const QUARTERS = [
 ];
 
 // PDF Hierarchy Data
-export interface HierarchyNode {
-  name: string;
-  responsibilities: string[];
-}
+// HierarchyNode is now exported from types/index.ts
 
 /**
  * Map team name to corresponding AssetClass

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, Role, AppConfig
+  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, AppConfig
 } from '../../types';
 import { getEligibleOwners } from '../../utils';
-import { HIERARCHY, QUARTERS } from '../../constants';
+import { getPriorities, getQuarters, getAssetClasses, getDependencyTeams, getHierarchy } from '../../utils/valueLists';
 import { Plus, X, Trash2, Users, ArrowDown, ArrowUp, Copy } from 'lucide-react';
-import { getAssetClasses, getDependencyTeams } from '../../utils/valueLists';
 
 interface BulkEntryRow {
   id: string;
@@ -152,7 +151,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
               onChange={(e) => onSharedSettingsChange({ ...sharedSettings, quarter: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
+              {getQuarters(config).map(q => <option key={q} value={q}>{q}</option>)}
             </select>
           </div>
           <div>
@@ -220,7 +219,8 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                           value={row.l2_pillar}
                           onChange={(e) => {
                             const newPillar = e.target.value;
-                            const pillarNode = HIERARCHY[sharedSettings.l1_assetClass].find(p => p.name === newPillar);
+                            const hierarchy = getHierarchy(config);
+                            const pillarNode = hierarchy[sharedSettings.l1_assetClass].find(p => p.name === newPillar);
                             onRowChange(row.id, 'l2_pillar', newPillar);
                             if (pillarNode) {
                               onRowChange(row.id, 'l3_responsibility', pillarNode.responsibilities[0] || '');
@@ -230,7 +230,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                             rowErrors.l2_pillar ? 'border-red-500 bg-red-50' : 'border-slate-200'
                           }`}
                         >
-                          {HIERARCHY[sharedSettings.l1_assetClass].map(p => (
+                          {getHierarchy(config)[sharedSettings.l1_assetClass].map(p => (
                             <option key={p.name} value={p.name}>{p.name}</option>
                           ))}
                         </select>
@@ -245,7 +245,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                             rowErrors.l3_responsibility ? 'border-red-500 bg-red-50' : 'border-slate-200'
                           }`}
                         >
-                          {(HIERARCHY[sharedSettings.l1_assetClass].find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
+                          {(getHierarchy(config)[sharedSettings.l1_assetClass].find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
                             <option key={r} value={r}>{r}</option>
                           ))}
                         </select>
@@ -284,7 +284,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                           onChange={(e) => onRowChange(row.id, 'priority', e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                          {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                          {getPriorities(config).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                       </td>
 

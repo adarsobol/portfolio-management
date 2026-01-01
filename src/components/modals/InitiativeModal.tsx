@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Initiative, User, Role, Status, Priority, WorkType, UnplannedTag, AssetClass, PermissionKey, PermissionValue, TradeOffAction, Dependency, DependencyTeam, InitiativeType, Task, AppConfig
 } from '../../types';
-import { HIERARCHY, QUARTERS, DEPENDENCY_TEAM_CATEGORIES, getAssetClassFromTeam } from '../../constants';
+import { getAssetClassFromTeam } from '../../constants';
+import { getHierarchy, getDependencyTeamCategories } from '../../utils/valueLists';
 import { 
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative, canDeleteTaskItem, getEligibleOwners } from '../../utils';
-import { getAssetClasses, getStatuses } from '../../utils/valueLists';
+import { getAssetClasses, getStatuses, getPriorities, getQuarters, getUnplannedTags, getInitiativeTypes } from '../../utils/valueLists';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
@@ -192,8 +193,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     const defaultWorkType = WorkType.Planned;
     
     const defaultAsset = AssetClass.PL;
-    const defaultPillar = HIERARCHY[defaultAsset][0].name;
-    const defaultResp = HIERARCHY[defaultAsset][0].responsibilities[0];
+    const hierarchy = getHierarchy(config);
+    const defaultPillar = hierarchy[defaultAsset][0].name;
+    const defaultResp = hierarchy[defaultAsset][0].responsibilities[0];
 
     return {
       initiativeType: InitiativeType.WP, // Default to WP
@@ -213,8 +215,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   }, [permissions]);
 
   const createEmptyBulkRow = useCallback((): BulkEntryRow => {
-    const defaultPillar = HIERARCHY[bulkSharedSettings.l1_assetClass][0]?.name || '';
-    const defaultResp = HIERARCHY[bulkSharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
+    const hierarchy = getHierarchy(config);
+    const defaultPillar = hierarchy[bulkSharedSettings.l1_assetClass][0]?.name || '';
+    const defaultResp = hierarchy[bulkSharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
     
     return {
       id: generateId(),
@@ -329,7 +332,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       
       // Only apply if different from current
       if (mappedAssetClass !== currentAssetClass) {
-        const pillars = HIERARCHY[mappedAssetClass];
+        const hierarchy = getHierarchy(config);
+        const pillars = hierarchy[mappedAssetClass];
         const defaultPillar = pillars[0]?.name || '';
         const defaultResp = pillars[0]?.responsibilities[0] || '';
 
@@ -396,7 +400,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     setShowActionsMenu(false);
   };
 
-  const availablePillars = formData.l1_assetClass ? HIERARCHY[formData.l1_assetClass] : [];
+  const hierarchy = getHierarchy(config);
+  const availablePillars = formData.l1_assetClass ? hierarchy[formData.l1_assetClass] : [];
   const selectedPillarNode = availablePillars.find(p => p.name === formData.l2_pillar);
   const availableResponsibilities = selectedPillarNode ? selectedPillarNode.responsibilities : [];
 
@@ -459,7 +464,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     // Mark that asset class was manually changed (prevents auto-override)
     assetClassManuallySetRef.current = true;
     
-    const pillars = HIERARCHY[newClass];
+    const hierarchy = getHierarchy(config);
+    const pillars = hierarchy[newClass];
     const defaultPillar = pillars[0]?.name || '';
     const defaultResp = pillars[0]?.responsibilities[0] || '';
     
@@ -473,7 +479,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   const handlePillarChange = (newPillar: string) => {
     const assetClass = formData.l1_assetClass || AssetClass.PL;
-    const pillars = HIERARCHY[assetClass];
+    const hierarchy = getHierarchy(config);
+    const pillars = hierarchy[assetClass];
     const selectedPillarNode = pillars.find(p => p.name === newPillar);
     const defaultResp = selectedPillarNode?.responsibilities[0] || '';
 
@@ -726,8 +733,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   // Update bulk rows when shared asset class changes
   useEffect(() => {
-    const defaultPillar = HIERARCHY[bulkSharedSettings.l1_assetClass][0]?.name || '';
-    const defaultResp = HIERARCHY[bulkSharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
+    const hierarchy = getHierarchy(config);
+    const defaultPillar = hierarchy[bulkSharedSettings.l1_assetClass][0]?.name || '';
+    const defaultResp = hierarchy[bulkSharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
     
     setBulkRows(prev => prev.map(row => ({
       ...row,
@@ -1221,8 +1229,11 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           onChange={(e) => handleChange('initiativeType', e.target.value as InitiativeType)}
                           className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                         >
-                          <option value={InitiativeType.WP}>WP (Work Plan)</option>
-                          <option value={InitiativeType.BAU}>BAU (Business As Usual)</option>
+                          {getInitiativeTypes(config).map(type => (
+                            <option key={type} value={type}>
+                              {type === 'WP' ? 'WP (Work Plan)' : type === 'BAU' ? 'BAU (Business As Usual)' : type}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -1285,7 +1296,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         onChange={(e) => handleChange('priority', e.target.value)}
                         className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                       >
-                        {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                        {getPriorities(config).map(p => <option key={p} value={p}>{p}</option>)}
                       </select>
                     </div>
                     <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center">
@@ -1318,7 +1329,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         }`}
                       >
                         <option value="">Select...</option>
-                        {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
+                        {getQuarters(config).map(q => <option key={q} value={q}>{q}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1351,12 +1362,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         Tags <span className="text-red-500 ml-0.5">*</span>
                       </div>
                       <div className="px-3 py-2 flex items-center gap-4">
-                        {[UnplannedTag.Unplanned, UnplannedTag.RiskItem, UnplannedTag.PMItem].map(tag => (
+                        {getUnplannedTags(config).filter(tag => tag !== UnplannedTag.Both).map(tag => (
                           <label key={tag} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                             <input 
                               type="checkbox"
                               disabled={isReadOnly}
-                              checked={formData.unplannedTags?.includes(tag)}
+                              checked={formData.unplannedTags?.includes(tag as UnplannedTag)}
                               onChange={(e) => {
                                 const currentTags = formData.unplannedTags || [];
                                 const newTags = e.target.checked 
@@ -1528,7 +1539,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white"
                       >
                         <option value="">+ Add Dependency</option>
-                        {DEPENDENCY_TEAM_CATEGORIES.flatMap(c => c.teams)
+                        {getDependencyTeamCategories(config).flatMap(c => c.teams)
                           .filter(team => !formData.dependencies?.some(d => d.team === team))
                           .map(team => (
                             <option key={team} value={team}>{team}</option>
@@ -1949,7 +1960,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                               >
                                 <option value="">Select...</option>
-                                {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                {getPriorities(config).map(p => <option key={p} value={p}>{p}</option>)}
                               </select>
                             )}
                           </div>
@@ -2220,11 +2231,11 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               <div>
                                 <label className="block text-xs font-medium text-slate-600 mb-1">Tags</label>
                                 <div className="flex gap-3">
-                                  {[UnplannedTag.Unplanned, UnplannedTag.RiskItem, UnplannedTag.PMItem].map(tag => (
+                                  {getUnplannedTags(config).filter(tag => tag !== UnplannedTag.Both).map(tag => (
                                     <label key={tag} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                                       <input
                                         type="checkbox"
-                                        checked={task.tags?.includes(tag) || false}
+                                        checked={task.tags?.includes(tag as any) || false}
                                         onChange={(e) => {
                                           const currentTags = task.tags || [];
                                           const newTags = e.target.checked

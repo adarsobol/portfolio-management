@@ -8,7 +8,7 @@ import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTas
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
-import { getStatuses } from '../../utils/valueLists';
+import { getStatuses, getPriorities } from '../../utils/valueLists';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
@@ -766,7 +766,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               onChange={(e) => handleInlineUpdate(item.id, 'priority', e.target.value)}
               className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full ${getPrioritySelectStyle(item.priority)}`}
             >
-              {Object.values(Priority).map(p => <option key={p} value={p} className="bg-white text-slate-900">{p}</option>)}
+              {getPriorities(config).map(p => <option key={p} value={p} className="bg-white text-slate-900">{p}</option>)}
             </select>
           ) : (
             <PriorityBadge priority={item.priority} />
@@ -1115,7 +1115,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
                               className={`w-full text-[11px] font-bold border focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-1.5 py-1 rounded-md cursor-pointer ${getStatusSelectStyle(task.status)}`}
                             >
-                              {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
+                              {getStatuses(config).filter(s => s !== Status.Deleted).map(s => (
                                 <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
                               ))}
                             </select>

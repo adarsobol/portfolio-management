@@ -8,7 +8,7 @@ import {
   AssetClass,
   AppConfig,
 } from '../../types';
-import { getStatuses, getAssetClasses } from '../../utils/valueLists';
+import { getStatuses, getAssetClasses, getPriorities } from '../../utils/valueLists';
 
 interface ConditionBuilderProps {
   condition: WorkflowConditionConfig;
@@ -201,7 +201,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, onChange
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {Object.values(Priority).map((p) => (
+            {getPriorities(config).map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>

@@ -11,7 +11,7 @@ interface ValueListsManagerProps {
   initiatives: Initiative[];
 }
 
-type ListType = 'assetClasses' | 'statuses' | 'dependencyTeams';
+type ListType = 'assetClasses' | 'statuses' | 'dependencyTeams' | 'priorities' | 'workTypes' | 'unplannedTags' | 'initiativeTypes' | 'quarters';
 
 interface ListConfig {
   label: string;
@@ -34,6 +34,31 @@ const LIST_CONFIGS: ListConfig[] = [
     label: 'Dependency Teams',
     field: 'dependencyTeams',
     description: 'Teams that can be dependencies for initiatives (e.g., R&M - Research, Product)'
+  },
+  {
+    label: 'Priorities',
+    field: 'priorities',
+    description: 'Priority levels for initiatives (e.g., P0, P1, P2)'
+  },
+  {
+    label: 'Work Types',
+    field: 'workTypes',
+    description: 'Types of work (e.g., Planned Work, Unplanned Work)'
+  },
+  {
+    label: 'Unplanned Tags',
+    field: 'unplannedTags',
+    description: 'Tags for unplanned work items (e.g., Unplanned, Risk Item, PM Item)'
+  },
+  {
+    label: 'Initiative Types',
+    field: 'initiativeTypes',
+    description: 'Types of initiatives (e.g., WP, BAU)'
+  },
+  {
+    label: 'Quarters',
+    field: 'quarters',
+    description: 'Quarter values for planning (e.g., Q1 2025, Q2 2025)'
   }
 ];
 
@@ -47,7 +72,12 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   const [newValue, setNewValue] = useState<Record<ListType, string>>({
     assetClasses: '',
     statuses: '',
-    dependencyTeams: ''
+    dependencyTeams: '',
+    priorities: '',
+    workTypes: '',
+    unplannedTags: '',
+    initiativeTypes: '',
+    quarters: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -62,6 +92,11 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
       assetClasses: config.valueLists?.assetClasses || [],
       statuses: config.valueLists?.statuses || [],
       dependencyTeams: config.valueLists?.dependencyTeams || [],
+      priorities: config.valueLists?.priorities || [],
+      workTypes: config.valueLists?.workTypes || [],
+      unplannedTags: config.valueLists?.unplannedTags || [],
+      initiativeTypes: config.valueLists?.initiativeTypes || [],
+      quarters: config.valueLists?.quarters || [],
       [listType]: newList
     };
     
@@ -180,10 +215,15 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
     const value = currentList[index];
     
     // Check usage
-    const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam'> = {
+    const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam' | 'priority' | 'workType' | 'unplannedTag' | 'initiativeType' | 'quarter'> = {
       assetClasses: 'assetClass',
       statuses: 'status',
-      dependencyTeams: 'dependencyTeam'
+      dependencyTeams: 'dependencyTeam',
+      priorities: 'priority',
+      workTypes: 'workType',
+      unplannedTags: 'unplannedTag',
+      initiativeTypes: 'initiativeType',
+      quarters: 'quarter'
     };
     
     const usageCount = getValueUsageCount(value, initiatives, fieldMap[listType]);
@@ -357,10 +397,15 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
               ) : (
                 list.map((value, index) => {
                   const isEditing = editingIndex?.listType === fieldKey && editingIndex.index === index;
-                  const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam'> = {
+                  const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam' | 'priority' | 'workType' | 'unplannedTag' | 'initiativeType' | 'quarter'> = {
                     assetClasses: 'assetClass',
                     statuses: 'status',
-                    dependencyTeams: 'dependencyTeam'
+                    dependencyTeams: 'dependencyTeam',
+                    priorities: 'priority',
+                    workTypes: 'workType',
+                    unplannedTags: 'unplannedTag',
+                    initiativeTypes: 'initiativeType',
+                    quarters: 'quarter'
                   };
                   const usageCount = getValueUsageCount(value, initiatives, fieldMap[fieldKey]);
 

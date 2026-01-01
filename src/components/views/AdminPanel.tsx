@@ -103,77 +103,74 @@ const BadgePermission: React.FC<BadgePermissionProps> = ({ value, onChange, type
   }
 };
 
-// CollapsibleSection Component for lazy-loading admin sections
-interface CollapsibleSectionProps {
-  id: string;
-  title: string;
-  description?: string;
-  icon: React.ReactNode;
-  gradientFrom: string;
-  gradientTo: string;
-  isExpanded: boolean;
-  onToggle: (id: string) => void;
-  headerActions?: React.ReactNode;
-  children: React.ReactNode;
-  onFirstExpand?: () => void;
-  hasLoaded?: boolean;
+// Admin Sidebar Menu Component
+interface AdminSidebarProps {
+  activeSection: string;
+  onSectionChange: (sectionId: string) => void;
+  deletedInitiativesCount: number;
 }
 
-const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
-  id,
-  title,
-  description,
-  icon,
-  gradientFrom,
-  gradientTo,
-  isExpanded,
-  onToggle,
-  headerActions,
-  children,
-  onFirstExpand,
-  hasLoaded = true,
-}) => {
-  const handleToggle = () => {
-    if (!isExpanded && onFirstExpand && !hasLoaded) {
-      onFirstExpand();
-    }
-    onToggle(id);
-  };
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: number | string;
+  category?: string;
+}
+
+const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeSection, onSectionChange, deletedInitiativesCount }) => {
+  const menuItems: MenuItem[] = [
+    { id: 'slack', label: 'Slack Integration', icon: <MessageSquare size={16} /> },
+    { id: 'login-history', label: 'Login History', icon: <Clock size={16} /> },
+    { id: 'error-logs', label: 'Error Logs', icon: <AlertTriangle size={16} /> },
+    { id: 'activity-logs', label: 'Activity Logs', icon: <Activity size={16} /> },
+    { id: 'support-center', label: 'Support Center', icon: <MessageSquare size={16} /> },
+    { id: 'backup-management', label: 'Backup Management', icon: <Database size={16} /> },
+    { id: 'data-versions', label: 'Data Versions', icon: <Clock size={16} /> },
+    { id: 'trash', label: 'Trash', icon: <Trash2 size={16} />, badge: deletedInitiativesCount },
+    { id: 'bulk-import', label: 'Bulk Import', icon: <Upload size={16} /> },
+    { id: 'value-lists', label: 'Value Lists', icon: <List size={16} /> },
+    { id: 'user-management', label: 'User Management', icon: <Users size={16} /> },
+    { id: 'authorization-matrix', label: 'Authorization', icon: <Shield size={16} /> },
+    { id: 'capacity-planning', label: 'Capacity Planning', icon: <Gauge size={16} /> },
+  ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div 
-        className={`px-6 py-4 border-b border-slate-200 bg-gradient-to-r ${gradientFrom} ${gradientTo} flex justify-between items-center cursor-pointer hover:opacity-95 transition-opacity`}
-        onClick={handleToggle}
-      >
-        <div className="flex items-center gap-3">
-          {icon}
-          <div>
-            <h3 className="font-bold text-slate-800">{title}</h3>
-            {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {headerActions && (
-            <div onClick={e => e.stopPropagation()}>
-              {headerActions}
-            </div>
-          )}
-          <div className="p-1 rounded-lg hover:bg-white/50 transition-colors">
-            {isExpanded ? (
-              <ChevronUp size={20} className="text-slate-600" />
-            ) : (
-              <ChevronDown size={20} className="text-slate-600" />
-            )}
-          </div>
-        </div>
+    <aside className="w-64 bg-white border-r border-slate-200 flex-shrink-0 h-full overflow-y-auto">
+      <div className="p-4 border-b border-slate-200">
+        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <Settings size={18} className="text-slate-600" />
+          Admin Panel
+        </h2>
       </div>
-      {isExpanded && (
-        <div className="animate-in slide-in-from-top-2 duration-200">
-          {children}
-        </div>
-      )}
-    </div>
+      <nav className="p-2 space-y-1">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => onSectionChange(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeSection === item.id
+                ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <span className={activeSection === item.id ? 'text-white' : 'text-slate-500'}>
+              {item.icon}
+            </span>
+            <span className="flex-1 text-left">{item.label}</span>
+            {item.badge !== undefined && item.badge > 0 && (
+              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                activeSection === item.id
+                  ? 'bg-white/20 text-white'
+                  : 'bg-slate-200 text-slate-600'
+              }`}>
+                {item.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+    </aside>
   );
 };
 
@@ -273,23 +270,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   }, [config, setConfig]);
   
-  // Collapsible sections state - track which sections are expanded
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  // Active section state - only one section visible at a time
+  const [activeSection, setActiveSection] = useState<string>('slack');
   
   // Track which sections have loaded their data (for lazy loading)
   const [loadedSections, setLoadedSections] = useState<Set<string>>(new Set());
   
-  const toggleSection = useCallback((sectionId: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(sectionId)) {
-        next.delete(sectionId);
-      } else {
-        next.add(sectionId);
-      }
-      return next;
-    });
-  }, []);
+  const handleSectionChange = useCallback((sectionId: string) => {
+    setActiveSection(sectionId);
+    // Trigger lazy loading if not already loaded
+    if (!loadedSections.has(sectionId)) {
+      // This will be handled by the section render functions
+    }
+  }, [loadedSections]);
   
   const markSectionLoaded = useCallback((sectionId: string) => {
     setLoadedSections(prev => new Set(prev).add(sectionId));
@@ -1127,29 +1120,61 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Team options based on asset classes + custom options
   const teamOptions = ['PL', 'Auto', 'POS', 'Advisory', 'Platform', 'Operations', 'Other'];
 
+  // Handle lazy loading when section becomes active
+  React.useEffect(() => {
+    if (!loadedSections.has(activeSection)) {
+      // Trigger lazy loading based on section
+      if (activeSection === 'login-history' && !loadedSections.has('login-history')) {
+        fetchLoginHistory();
+        markSectionLoaded('login-history');
+      } else if (activeSection === 'backup-management' && !loadedSections.has('backup-management')) {
+        fetchBackups();
+        markSectionLoaded('backup-management');
+      } else if (activeSection === 'data-versions' && !loadedSections.has('data-versions')) {
+        fetchVersions();
+        markSectionLoaded('data-versions');
+      } else if (activeSection === 'value-lists' && !loadedSections.has('value-lists')) {
+        markSectionLoaded('value-lists');
+      } else if (activeSection === 'user-management' && !loadedSections.has('user-management')) {
+        fetchUsers();
+        markSectionLoaded('user-management');
+      }
+    }
+  }, [activeSection, loadedSections]);
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-md">
-            <Settings className="text-white" size={22} />
+    <div className="h-full flex bg-[#F9FAFB]">
+      <AdminSidebar 
+        activeSection={activeSection} 
+        onSectionChange={handleSectionChange}
+        deletedInitiativesCount={deletedInitiatives.length}
+      />
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-md">
+                <Settings className="text-white" size={22} />
+              </div>
+              Admin Configuration
+            </h2>
           </div>
-          Admin Configuration
-        </h2>
 
-      </div>
-
-      {/* Slack Integration */}
-      <CollapsibleSection
-        id="slack"
-        title="Slack Integration"
-        icon={<div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg"><MessageSquare size={16} className="text-white" /></div>}
-        gradientFrom="from-purple-50"
-        gradientTo="to-indigo-50"
-        isExpanded={expandedSections.has('slack')}
-        onToggle={toggleSection}
-      >
-        <div className="p-6">
+          {/* Content Area - Show only active section */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {activeSection === 'slack' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg">
+                      <MessageSquare size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Slack Integration</h3>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <input 
@@ -1205,35 +1230,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             )}
           </div>
-        </div>
-      </CollapsibleSection>
-      
-      {/* Login History Section */}
-      <CollapsibleSection
-        id="login-history"
-        title="Login History"
-        description="Track when users last logged in"
-        icon={<div className="p-1.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg"><Clock size={16} className="text-white" /></div>}
-        gradientFrom="from-cyan-50"
-        gradientTo="to-teal-50"
-        isExpanded={expandedSections.has('login-history')}
-        onToggle={toggleSection}
-        onFirstExpand={() => { fetchLoginHistory(); markSectionLoaded('login-history'); }}
-        hasLoaded={loadedSections.has('login-history')}
-        headerActions={
-          <button
-            onClick={fetchLoginHistory}
-            disabled={isLoadingHistory}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <RefreshCw size={14} className={isLoadingHistory ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-        }
-      >
-        {/* Error message */}
-        {loginHistoryError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'login-history' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-teal-50 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg">
+                      <Clock size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Login History</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Track when users last logged in</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={fetchLoginHistory}
+                    disabled={isLoadingHistory}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <RefreshCw size={14} className={isLoadingHistory ? 'animate-spin' : ''} />
+                    Refresh
+                  </button>
+                </div>
+                <div className="p-6">
+                  {/* Error message */}
+                  {loginHistoryError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
             <AlertCircle size={16} />
             {loginHistoryError}
           </div>
@@ -1314,122 +1339,125 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </table>
           </div>
         )}
-      </CollapsibleSection>
+            </div>
+            )}
 
-      {/* Error Logs Section */}
-      <CollapsibleSection
-        id="error-logs"
-        title="Error Logs"
-        description="View and search application error logs for debugging"
-        icon={<div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg"><AlertTriangle size={16} className="text-white" /></div>}
-        gradientFrom="from-red-50"
-        gradientTo="to-rose-50"
-        isExpanded={expandedSections.has('error-logs')}
-        onToggle={toggleSection}
-      >
-        {expandedSections.has('error-logs') && (
-          <div className="p-0">
-            <ErrorLogView currentUser={currentUser} users={users} />
-          </div>
-        )}
-      </CollapsibleSection>
+            {activeSection === 'error-logs' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
+                      <AlertTriangle size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Error Logs</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">View and search application error logs for debugging</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-0">
+                  <ErrorLogView currentUser={currentUser} users={users} />
+                </div>
+              </div>
+            )}
 
-      {/* Activity Logs Section */}
-      <CollapsibleSection
-        id="activity-logs"
-        title="Activity Logs"
-        description="Track user actions and system activities"
-        icon={<div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg"><Activity size={16} className="text-white" /></div>}
-        gradientFrom="from-blue-50"
-        gradientTo="to-indigo-50"
-        isExpanded={expandedSections.has('activity-logs')}
-        onToggle={toggleSection}
-      >
-        {expandedSections.has('activity-logs') && (
-          <div className="p-0">
-            <ActivityLogView currentUser={currentUser} users={users} />
-          </div>
-        )}
-      </CollapsibleSection>
+            {activeSection === 'activity-logs' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg">
+                      <Activity size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Activity Logs</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Track user actions and system activities</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-0">
+                  <ActivityLogView currentUser={currentUser} users={users} />
+                </div>
+              </div>
+            )}
 
-      {/* Support Center Section */}
-      <CollapsibleSection
-        id="support-center"
-        title="Support Center"
-        description="Manage support tickets and user feedback"
-        icon={<div className="p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg"><MessageSquare size={16} className="text-white" /></div>}
-        gradientFrom="from-green-50"
-        gradientTo="to-emerald-50"
-        isExpanded={expandedSections.has('support-center')}
-        onToggle={toggleSection}
-      >
-        {expandedSections.has('support-center') && (
-          <div className="p-0">
-            <SupportCenter currentUser={currentUser} users={users} />
-          </div>
-        )}
-      </CollapsibleSection>
+            {activeSection === 'support-center' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+                      <MessageSquare size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Support Center</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Manage support tickets and user feedback</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-0">
+                  <SupportCenter currentUser={currentUser} users={users} />
+                </div>
+              </div>
+            )}
 
-      {/* Backup Management Section */}
-      <CollapsibleSection
-        id="backup-management"
-        title="Backup Management"
-        description="Create backups, restore data, and manage backup history"
-        icon={<div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg"><Database size={16} className="text-white" /></div>}
-        gradientFrom="from-violet-50"
-        gradientTo="to-purple-50"
-        isExpanded={expandedSections.has('backup-management')}
-        onToggle={toggleSection}
-        onFirstExpand={() => { fetchBackups(); markSectionLoaded('backup-management'); }}
-        hasLoaded={loadedSections.has('backup-management')}
-        headerActions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={createManualBackup}
-              disabled={isCreatingBackup}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg hover:from-violet-600 hover:to-purple-600 transition-colors disabled:opacity-50"
-            >
-              {isCreatingBackup ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
-              Create Backup
-            </button>
-            <button
-              onClick={fetchBackups}
-              disabled={isLoadingBackups}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <RefreshCw size={14} className={isLoadingBackups ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-          </div>
-        }
-      >
-        {/* Status messages */}
-        {backupError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-            <AlertCircle size={16} />
-            {backupError}
-          </div>
-        )}
-        {backupSuccess && (
-          <div className="mx-6 mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
-            <CheckCircle2 size={16} />
-            {backupSuccess}
-          </div>
-        )}
-        
-        {isLoadingBackups ? (
-          <div className="text-center py-8 text-slate-400">
-            <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
-            <p className="text-sm">Loading backups...</p>
-          </div>
-        ) : backups.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <Database size={32} className="mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No backups available</p>
-            <p className="text-xs mt-1">Create your first backup using the button above</p>
-          </div>
-        ) : (
-          <div className="p-4">
+            {activeSection === 'backup-management' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-violet-500 to-purple-500 rounded-lg">
+                      <Database size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Backup Management</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Create backups, restore data, and manage backup history</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={createManualBackup}
+                      disabled={isCreatingBackup}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg hover:from-violet-600 hover:to-purple-600 transition-colors disabled:opacity-50"
+                    >
+                      {isCreatingBackup ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
+                      Create Backup
+                    </button>
+                    <button
+                      onClick={fetchBackups}
+                      disabled={isLoadingBackups}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      <RefreshCw size={14} className={isLoadingBackups ? 'animate-spin' : ''} />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {/* Status messages */}
+                  {backupError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      {backupError}
+                    </div>
+                  )}
+                  {backupSuccess && (
+                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+                      <CheckCircle2 size={16} />
+                      {backupSuccess}
+                    </div>
+                  )}
+                  
+                  {isLoadingBackups ? (
+                    <div className="text-center py-8 text-slate-400">
+                      <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+                      <p className="text-sm">Loading backups...</p>
+                    </div>
+                  ) : backups.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      <Database size={32} className="mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No backups available</p>
+                      <p className="text-xs mt-1">Create your first backup using the button above</p>
+                    </div>
+                  ) : (
+                    <div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {backups.slice(0, 9).map((backup) => (
                 <div
@@ -1498,59 +1526,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <p className="text-center text-xs text-slate-400 mt-4">
                 Showing 9 of {backups.length} backups
               </p>
+                    )}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-          </div>
-        )}
-      </CollapsibleSection>
 
-      {/* Data Versions Section */}
-      <CollapsibleSection
-        id="data-versions"
-        title="Data Versions"
-        description="Automatic local versioning of initiatives and tasks data"
-        icon={<div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg"><Clock size={16} className="text-white" /></div>}
-        gradientFrom="from-blue-50"
-        gradientTo="to-cyan-50"
-        isExpanded={expandedSections.has('data-versions')}
-        onToggle={toggleSection}
-        onFirstExpand={() => { fetchVersions(); markSectionLoaded('data-versions'); }}
-        hasLoaded={loadedSections.has('data-versions')}
-        headerActions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={fetchVersions}
-              disabled={isLoadingVersions}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <RefreshCw size={14} className={isLoadingVersions ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            <button
-              onClick={cleanupOldVersions}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              <Trash2 size={14} />
-              Cleanup
-            </button>
-          </div>
-        }
-      >
-        {/* Status messages */}
-        {versionError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-            <AlertCircle size={16} />
-            {versionError}
-          </div>
-        )}
-        {versionSuccess && (
-          <div className="mx-6 mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
-            <CheckCircle2 size={16} />
-            {versionSuccess}
-          </div>
-        )}
+            {activeSection === 'data-versions' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                      <Clock size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Data Versions</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Automatic local versioning of initiatives and tasks data</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchVersions}
+                      disabled={isLoadingVersions}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      <RefreshCw size={14} className={isLoadingVersions ? 'animate-spin' : ''} />
+                      Refresh
+                    </button>
+                    <button
+                      onClick={cleanupOldVersions}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                      Cleanup
+                    </button>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {/* Status messages */}
+                  {versionError && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      {versionError}
+                    </div>
+                  )}
+                  {versionSuccess && (
+                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+                      <CheckCircle2 size={16} />
+                      {versionSuccess}
+                    </div>
+                  )}
 
-        {/* Retention Settings */}
-        <div className="mx-6 mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  {/* Retention Settings */}
+                  <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-700">Retention Period</p>
@@ -1670,7 +1699,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
           </div>
         )}
-      </CollapsibleSection>
+              </div>
+            )}
 
       {/* Backup Details Modal */}
       {selectedBackup && (
@@ -1753,99 +1783,106 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
-      {/* Trash Section */}
-      <CollapsibleSection
-        id="trash"
-        title="Trash"
-        description={`${deletedInitiatives.length} deleted initiative${deletedInitiatives.length !== 1 ? 's' : ''} - restore or permanently remove items`}
-        icon={<div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg"><Trash2 size={16} className="text-white" /></div>}
-        gradientFrom="from-red-50"
-        gradientTo="to-rose-50"
-        isExpanded={expandedSections.has('trash')}
-        onToggle={toggleSection}
-      >
-        {deletedInitiatives.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <Trash2 size={32} className="mx-auto mb-2 text-slate-300" />
-            <p className="text-sm font-medium text-slate-500">Trash is empty</p>
-            <p className="text-xs text-slate-400 mt-1">Deleted items will appear here</p>
-          </div>
-        ) : (
-          <div className="max-h-96 overflow-y-auto p-4">
-            <div className="space-y-3">
-              {deletedInitiatives.map(initiative => (
-                <div
-                  key={initiative.id}
-                  className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-slate-800 truncate">
-                        {initiative.title}
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <Users size={14} />
-                          {users.find(u => u.id === initiative.ownerId)?.name || initiative.ownerId}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar size={14} />
-                          {initiative.l2_pillar}
-                        </span>
-                        {initiative.deletedAt && (
-                          <span className="flex items-center gap-1 text-red-500">
-                            <Clock size={14} />
-                            Deleted {formatRelativeTime(initiative.deletedAt)}
-                          </span>
-                        )}
-                      </div>
-                      {initiative.deletedAt && (
-                        <p className="text-xs text-slate-400 mt-1">
-                          Deleted on {new Date(initiative.deletedAt).toLocaleString()}
-                        </p>
-                      )}
+            {activeSection === 'trash' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-red-50 to-rose-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg">
+                      <Trash2 size={16} className="text-white" />
                     </div>
-                    {onRestore && (
-                      <button
-                        onClick={() => onRestore(initiative.id)}
-                        disabled={isDataLoading}
-                        className="ml-4 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <RotateCcw size={14} />
-                        Restore
-                      </button>
-                    )}
+                    <div>
+                      <h3 className="font-bold text-slate-800">Trash</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {deletedInitiatives.length} deleted initiative{deletedInitiatives.length !== 1 ? 's' : ''} - restore or permanently remove items
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Info notice */}
-        {deletedInitiatives.length > 0 && (
-          <div className="mx-4 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-xs text-amber-800">
-              <strong>Note:</strong> Items in trash are kept in the database with a "Deleted" status. 
-              You can restore them at any time. To permanently delete items, remove them directly from the Google Sheet.
-            </p>
-          </div>
-        )}
-      </CollapsibleSection>
+                <div className="p-6">
+                  {deletedInitiatives.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400">
+                      <Trash2 size={32} className="mx-auto mb-2 text-slate-300" />
+                      <p className="text-sm font-medium text-slate-500">Trash is empty</p>
+                      <p className="text-xs text-slate-400 mt-1">Deleted items will appear here</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="max-h-96 overflow-y-auto">
+                        <div className="space-y-3">
+                          {deletedInitiatives.map(initiative => (
+                            <div
+                              key={initiative.id}
+                              className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-slate-800 truncate">
+                                    {initiative.title}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-slate-500">
+                                    <span className="flex items-center gap-1">
+                                      <Users size={14} />
+                                      {users.find(u => u.id === initiative.ownerId)?.name || initiative.ownerId}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Calendar size={14} />
+                                      {initiative.l2_pillar}
+                                    </span>
+                                    {initiative.deletedAt && (
+                                      <span className="flex items-center gap-1 text-red-500">
+                                        <Clock size={14} />
+                                        Deleted {formatRelativeTime(initiative.deletedAt)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {initiative.deletedAt && (
+                                    <p className="text-xs text-slate-400 mt-1">
+                                      Deleted on {new Date(initiative.deletedAt).toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                                {onRestore && (
+                                  <button
+                                    onClick={() => onRestore(initiative.id)}
+                                    disabled={isDataLoading}
+                                    className="ml-4 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <RotateCcw size={14} />
+                                    Restore
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-xs text-amber-800">
+                          <strong>Note:</strong> Items in trash are kept in the database with a "Deleted" status. 
+                          You can restore them at any time. To permanently delete items, remove them directly from the Google Sheet.
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
-      {/* Bulk Import Section */}
-      <CollapsibleSection
-        id="bulk-import"
-        title="Bulk Import"
-        description="Import users and tasks from Excel/CSV files"
-        icon={<div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg"><Upload size={16} className="text-white" /></div>}
-        gradientFrom="from-amber-50"
-        gradientTo="to-orange-50"
-        isExpanded={expandedSections.has('bulk-import')}
-        onToggle={toggleSection}
-      >
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {activeSection === 'bulk-import' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg">
+                      <Upload size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Bulk Import</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Import users and tasks from Excel/CSV files</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* User Import */}
             <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -2071,55 +2108,73 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
             </div>
           </div>
-        </div>
-      </CollapsibleSection>
+                </div>
+              </div>
+            )}
 
-      {/* Value Lists Management */}
-      <CollapsibleSection
-        id="value-lists"
-        title="Value Lists Management"
-        description="Manage editable value lists for asset classes, statuses, and dependency teams"
-        icon={<div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg"><List size={16} className="text-white" /></div>}
-        gradientFrom="from-purple-50"
-        gradientTo="to-pink-50"
-        isExpanded={expandedSections.has('value-lists')}
-        onToggle={toggleSection}
-        onFirstExpand={() => markSectionLoaded('value-lists')}
-        hasLoaded={loadedSections.has('value-lists')}
-      >
-        <div className="p-6">
-          <ValueListsManager
-            config={config}
-            onUpdate={setConfig}
-            initiatives={initiatives}
-          />
-        </div>
-      </CollapsibleSection>
+            {activeSection === 'value-lists' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-pink-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
+                      <List size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Value Lists Management</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Manage editable value lists for asset classes, statuses, and dependency teams</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {!loadedSections.has('value-lists') && (
+                    <div className="text-center py-8 text-slate-400">
+                      <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+                      <p className="text-sm">Loading value lists...</p>
+                    </div>
+                  )}
+                  {loadedSections.has('value-lists') && (
+                    <ValueListsManager
+                      config={config}
+                      onUpdate={setConfig}
+                      initiatives={initiatives}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
 
-      {/* User Management */}
-      <CollapsibleSection
-        id="user-management"
-        title="User Management"
-        description="Add, edit, or remove users and assign roles"
-        icon={<div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg"><Users size={16} className="text-white" /></div>}
-        gradientFrom="from-blue-50"
-        gradientTo="to-cyan-50"
-        isExpanded={expandedSections.has('user-management')}
-        onToggle={toggleSection}
-        onFirstExpand={() => { fetchUsers(); markSectionLoaded('user-management'); }}
-        hasLoaded={loadedSections.has('user-management')}
-        headerActions={
-          <button
-            onClick={fetchUsers}
-            disabled={isLoadingUsers}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            <RefreshCw size={14} className={isLoadingUsers ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-        }
-      >
-         <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+
+            {activeSection === 'user-management' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-cyan-50 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                      <Users size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">User Management</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Add, edit, or remove users and assign roles</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={fetchUsers}
+                    disabled={isLoadingUsers}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <RefreshCw size={14} className={isLoadingUsers ? 'animate-spin' : ''} />
+                    Refresh
+                  </button>
+                </div>
+                <div className="p-0">
+                  {!loadedSections.has('user-management') && (
+                    <div className="text-center py-8 text-slate-400">
+                      <Loader2 size={32} className="mx-auto mb-2 animate-spin" />
+                      <p className="text-sm">Loading users...</p>
+                    </div>
+                  )}
+                  {loadedSections.has('user-management') && (
+                    <>
+                      <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
            <div>
              <label className="block text-xs font-medium text-slate-500 mb-1">Full Name</label>
              <input 
@@ -2279,20 +2334,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              </table>
            </div>
          )}
-      </CollapsibleSection>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
-      {/* Authorization Matrix */}
-      <CollapsibleSection
-        id="authorization-matrix"
-        title="Authorization Levels Management Center"
-        description="Click badges to cycle through permission levels. Organized by category for easier management."
-        icon={<div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg"><Shield size={16} className="text-white" /></div>}
-        gradientFrom="from-indigo-50"
-        gradientTo="to-purple-50"
-        isExpanded={expandedSections.has('authorization-matrix')}
-        onToggle={toggleSection}
-      >
-         {/* Tabs */}
+            {activeSection === 'authorization-matrix' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg">
+                      <Shield size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Authorization Levels Management Center</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Click badges to cycle through permission levels. Organized by category for easier management.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-0">
+                  {/* Tabs */}
          <div className="border-b border-slate-200 bg-slate-50">
            <div className="flex">
              <button
@@ -2423,20 +2485,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              </tbody>
            </table>
          </div>
-      </CollapsibleSection>
+                </div>
+              </div>
+            )}
 
-      {/* Capacity Table */}
-      <CollapsibleSection
-        id="capacity-planning"
-        title="Team Capacity Planning (Per Quarter)"
-        description="Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead **per quarter**"
-        icon={<div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg"><Gauge size={16} className="text-white" /></div>}
-        gradientFrom="from-emerald-50"
-        gradientTo="to-teal-50"
-        isExpanded={expandedSections.has('capacity-planning')}
-        onToggle={toggleSection}
-      >
-         <table className="w-full text-left text-sm">
+            {activeSection === 'capacity-planning' && (
+              <div className="animate-fadeIn">
+                <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-50 to-teal-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg">
+                      <Gauge size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800">Team Capacity Planning (Per Quarter)</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead **per quarter**</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <table className="w-full text-left text-sm">
            <thead className="bg-slate-50 border-b border-slate-200">
              <tr>
                <th className="px-6 py-3 font-semibold text-slate-600">Team Lead</th>
@@ -2511,12 +2578,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
              })}
            </tbody>
          </table>
-         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-           <p className="text-xs text-blue-700">
-             <strong>Note:</strong> Capacity values are per quarter. Base capacity is set by admin. Team leads can set adjustments (deductions) via their profile menu. Adjusted Capacity = Base Capacity - Adjustment. Effective Capacity = Adjusted Capacity - Buffer.
-           </p>
-         </div>
-      </CollapsibleSection>
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs text-blue-700">
+                      <strong>Note:</strong> Capacity values are per quarter. Base capacity is set by admin. Team leads can set adjustments (deductions) via their profile menu. Adjusted Capacity = Base Capacity - Adjustment. Effective Capacity = Adjusted Capacity - Buffer.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
