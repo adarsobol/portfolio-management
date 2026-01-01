@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Filter } from 'lucide-react';
-import { AssetClass, User, UnplannedTag } from '../../types';
+import { AssetClass, User, UnplannedTag, AppConfig } from '../../types';
+import { getAssetClasses } from '../../utils/valueLists';
 
 interface FilterBarProps {
   filterAssetClass: string;
@@ -15,6 +16,7 @@ interface FilterBarProps {
   viewLayout: 'table' | 'tree';
   setViewLayout: (layout: 'table' | 'tree') => void;
   users: User[];
+  config: AppConfig;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -23,7 +25,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   filterWorkType, setFilterWorkType,
   searchQuery, resetFilters,
   currentView: _currentView, viewLayout: _viewLayout, setViewLayout: _setViewLayout,
-  users
+  users,
+  config
 }) => {
   // Reserved for future layout toggle functionality
   void _currentView; void _viewLayout; void _setViewLayout;
@@ -110,7 +113,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors min-w-[140px]"
         >
           <option value="">All Asset Classes</option>
-          {Object.values(AssetClass).map(ac => <option key={ac} value={ac}>{ac}</option>)}
+          {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
         </select>
 
         {/* Owner Filter - Avatar Circles */}

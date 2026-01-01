@@ -638,6 +638,7 @@ export const WorkflowsView: React.FC<WorkflowsViewProps> = ({
             setEditingWorkflow(null);
           }}
           currentUser={currentUser}
+          config={config}
         />
       )}
     </div>

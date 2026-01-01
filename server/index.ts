@@ -3092,6 +3092,133 @@ app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req: A
 });
 
 // ============================================
+// VALUE LISTS MANAGEMENT ENDPOINTS (Admin only)
+// ============================================
+
+// GET /api/config/value-lists - Get current value lists (all authenticated users can read)
+app.get('/api/config/value-lists', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // All authenticated users can read value lists (they need them for dropdowns)
+    // Only admins can modify them via PUT endpoint
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    let configSheet = doc.sheetsByTitle['Config'];
+    if (!configSheet) {
+      // Return default values if config sheet doesn't exist
+      res.json({
+        valueLists: {
+          assetClasses: ['PL', 'Auto', 'POS', 'Advisory'],
+          statuses: ['Not Started', 'In Progress', 'At Risk', 'Done', 'Obsolete', 'Deleted'],
+          dependencyTeams: ['R&M - Research', 'R&M - Data', 'R&M - Infra', 'Product', 'Capital Markets', 'Partnerships']
+        }
+      });
+      return;
+    }
+
+    await configSheet.loadHeaderRow();
+    const configRows = await configSheet.getRows();
+    if (configRows.length > 0) {
+      const configRow = configRows[0];
+      try {
+        const configData = configRow.get('config');
+        if (configData) {
+          const config = JSON.parse(configData);
+          res.json({ valueLists: config.valueLists || null });
+          return;
+        }
+      } catch (e) {
+        console.error('Error parsing config:', e);
+      }
+    }
+
+    res.json({ valueLists: null });
+  } catch (error) {
+    console.error('Error getting value lists:', error);
+    res.status(500).json({ error: 'Failed to get value lists' });
+  }
+});
+
+// PUT /api/config/value-lists - Update value lists
+app.put('/api/config/value-lists', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can update value lists
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const { valueLists } = req.body;
+    
+    // Validate value lists structure
+    if (!valueLists || typeof valueLists !== 'object') {
+      res.status(400).json({ error: 'Invalid value lists data' });
+      return;
+    }
+
+    if (!Array.isArray(valueLists.assetClasses) || 
+        !Array.isArray(valueLists.statuses) || 
+        !Array.isArray(valueLists.dependencyTeams)) {
+      res.status(400).json({ error: 'Value lists must contain assetClasses, statuses, and dependencyTeams arrays' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    let configSheet = doc.sheetsByTitle['Config'];
+    if (!configSheet) {
+      configSheet = await doc.addSheet({
+        title: 'Config',
+        headerValues: ['config']
+      });
+    }
+
+    await configSheet.loadHeaderRow();
+    const configRows = await configSheet.getRows();
+    
+    let config: any = {};
+    if (configRows.length > 0) {
+      const configRow = configRows[0];
+      try {
+        const configData = configRow.get('config');
+        if (configData) {
+          config = JSON.parse(configData);
+        }
+      } catch (e) {
+        console.error('Error parsing existing config:', e);
+      }
+    }
+
+    // Update value lists in config
+    config.valueLists = valueLists;
+    config.valueListsMigrated = true;
+
+    // Save updated config
+    const configJson = JSON.stringify(config);
+    if (configRows.length > 0) {
+      const configRow = configRows[0];
+      configRow.set('config', configJson);
+      await configRow.save();
+    } else {
+      await configSheet.addRow({ config: configJson });
+    }
+
+    res.json({ success: true, valueLists });
+  } catch (error) {
+    console.error('Error updating value lists:', error);
+    res.status(500).json({ error: 'Failed to update value lists' });
+  }
+});
+
+// ============================================
 // BACKUP & RESTORE ENDPOINTS (Admin only)
 // ============================================
 
@@ -4713,6 +4840,9 @@ setTimeout(() => {
   console.log(`  POST /api/logs/activity          - Store activity log`);
   console.log(`  GET  /api/logs/activity          - Get activity logs`);
   console.log(`  GET  /api/logs/search            - Search logs`);
+  console.log(`\nConfig Endpoints (Admin only):`);
+  console.log(`  GET  /api/config/value-lists     - Get value lists`);
+  console.log(`  PUT  /api/config/value-lists     - Update value lists`);
   console.log(`\nSupport Endpoints:`);
   console.log(`  POST /api/support/tickets        - Create support ticket`);
   console.log(`  GET  /api/support/tickets        - Get support tickets (admin)`);

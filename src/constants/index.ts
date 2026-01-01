@@ -1,5 +1,6 @@
 import { AssetClass, Initiative, Priority, Role, Status, UnplannedTag, User, WorkType, AppConfig, WorkflowTrigger, WorkflowCondition, WorkflowAction, DependencyTeam, InitiativeType, TaskManagementScope, PermissionKey, LegacyPermissionKey, PermissionValue } from '../types';
 import { generateId } from '../utils';
+import { getDefaultValueLists } from '../utils/valueLists';
 
 // Dependency team options for external dependencies
 export const DEPENDENCY_TEAMS = Object.values(DependencyTeam);
@@ -885,5 +886,7 @@ export const INITIAL_CONFIG: AppConfig = {
   weeklyEffortValidation: {
     enabled: true,
     thresholdPercent: 15
-  }
+  },
+  valueLists: getDefaultValueLists(),
+  valueListsMigrated: false
 };

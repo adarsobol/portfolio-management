@@ -5,14 +5,17 @@ import {
   WorkflowActionConfig,
   Status,
   Priority,
+  AppConfig,
 } from '../../types';
+import { getStatuses } from '../../utils/valueLists';
 
 interface ActionBuilderProps {
   action: WorkflowActionConfig;
   onChange: (action: WorkflowActionConfig) => void;
+  config: AppConfig;
 }
 
-const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, onChange }) => {
+const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, onChange, config }) => {
   const handleTypeChange = (type: WorkflowAction) => {
     const baseAction: WorkflowActionConfig = { type };
     
@@ -135,7 +138,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, onChange }) => {
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {Object.values(Status).filter(s => s !== Status.Deleted).map((s) => (
+            {getStatuses(config).filter(s => s !== Status.Deleted).map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>

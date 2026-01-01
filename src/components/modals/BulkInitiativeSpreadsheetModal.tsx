@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, Role
+  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, Role, AppConfig
 } from '../../types';
 import { HIERARCHY, QUARTERS } from '../../constants';
 import { Plus, X, Trash2, Users, ArrowDown, ArrowUp, Copy } from 'lucide-react';
+import { getAssetClasses, getDependencyTeams } from '../../utils/valueLists';
 
 interface BulkEntryRow {
   id: string;
@@ -42,10 +43,12 @@ interface BulkInitiativeSpreadsheetModalProps {
   onAddRow: () => void;
   onRemoveRow: (rowId: string) => void;
   onDuplicateRow: (rowId: string) => void;
+  config: AppConfig;
 }
 
 export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetModalProps> = ({
   rows,
+  config,
   onRowsChange: _onRowsChange,
   errors,
   onErrorsChange: _onErrorsChange,
@@ -158,7 +161,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
               onChange={(e) => onSharedSettingsChange({ ...sharedSettings, l1_assetClass: e.target.value as AssetClass })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {Object.values(AssetClass).map(ac => <option key={ac} value={ac}>{ac}</option>)}
+              {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
             </select>
           </div>
         </div>
@@ -417,7 +420,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                             onChange={(e) => updateDependency(row.id, depIndex, 'team', e.target.value)}
                             className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           >
-                            {Object.values(DependencyTeam).map(team => (
+                            {getDependencyTeams(config).map(team => (
                               <option key={team} value={team}>{team}</option>
                             ))}
                           </select>

@@ -8,6 +8,7 @@ import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTas
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
+import { getStatuses } from '../../utils/valueLists';
 
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
@@ -747,7 +748,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                onChange={(e) => handleInlineUpdate(item.id, 'status', e.target.value)}
                className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full ${getStatusSelectStyle(item.status)}`}
              >
-               {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s} className="bg-white text-slate-900">{s}</option>)}
+               {getStatuses(config).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s} className="bg-white text-slate-900">{s}</option>)}
              </select>
           ) : (
              <StatusBadge status={item.status} />

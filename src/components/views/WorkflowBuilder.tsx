@@ -11,16 +11,19 @@ import {
   AssetClass,
   WorkType,
   User,
+  AppConfig,
 } from '../../types';
 import { generateId } from '../../utils';
 import ConditionBuilder from './ConditionBuilder';
 import ActionBuilder from './ActionBuilder';
+import { getAssetClasses } from '../../utils/valueLists';
 
 interface WorkflowBuilderProps {
   workflow: Workflow | null;
   onSave: (workflow: Workflow) => void;
   onClose: () => void;
   currentUser: User;
+  config: AppConfig;
 }
 
 const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
@@ -28,6 +31,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
   onSave,
   onClose,
   currentUser,
+  config,
 }) => {
   const [name, setName] = useState(workflow?.name || '');
   const [description, setDescription] = useState(workflow?.description || '');
@@ -238,6 +242,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
               <ConditionBuilder
                 condition={condition}
                 onChange={setCondition}
+                config={config}
               />
             ) : (
               <button
@@ -257,7 +262,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
           {/* Action Section */}
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">THEN</h3>
-            <ActionBuilder action={action} onChange={setAction} />
+            <ActionBuilder action={action} onChange={setAction} config={config} />
           </div>
 
           {/* Scope Section */}
@@ -269,7 +274,7 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
                   Asset Classes
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {Object.values(AssetClass).map((ac) => (
+                  {getAssetClasses(config).map((ac) => (
                     <label key={ac} className="flex items-center gap-2">
                       <input
                         type="checkbox"

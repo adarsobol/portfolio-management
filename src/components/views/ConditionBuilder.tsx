@@ -6,14 +6,17 @@ import {
   Status,
   Priority,
   AssetClass,
+  AppConfig,
 } from '../../types';
+import { getStatuses, getAssetClasses } from '../../utils/valueLists';
 
 interface ConditionBuilderProps {
   condition: WorkflowConditionConfig;
   onChange: (condition: WorkflowConditionConfig) => void;
+  config: AppConfig;
 }
 
-const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, onChange }) => {
+const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, onChange, config }) => {
   const handleTypeChange = (type: WorkflowCondition) => {
     const baseCondition: WorkflowConditionConfig = { type };
     
@@ -79,6 +82,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, onChange
                 <ConditionBuilder
                   condition={child}
                   onChange={(updated) => updateChildCondition(index, updated)}
+                  config={config}
                 />
               </div>
               <button
@@ -178,7 +182,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, onChange
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {Object.values(Status).filter(s => s !== Status.Deleted).map((s) => (
+            {getStatuses(config).filter(s => s !== Status.Deleted).map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -277,7 +281,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ condition, onChange
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            {Object.values(AssetClass).map((ac) => (
+            {getAssetClasses(config).map((ac) => (
               <option key={ac} value={ac}>
                 {ac}
               </option>

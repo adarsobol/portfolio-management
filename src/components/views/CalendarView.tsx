@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, AlertTriangle, PlayCircle, CheckCircle, Edit, Check, X, History } from 'lucide-react';
-import { Initiative, Status, InitiativeType, Priority, User } from '../../types';
+import { Initiative, Status, InitiativeType, Priority, User, AppConfig } from '../../types';
+import { getStatuses } from '../../utils/valueLists';
 
 interface CalendarViewProps {
   filteredInitiatives: Initiative[];
@@ -18,6 +19,7 @@ interface CalendarViewProps {
   totalInitiativesCount: number;
   onFilterChange?: (filters: { owners?: string[]; assetClass?: string; workType?: string; status?: Status | null }) => void;
   showToast?: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  config: AppConfig;
 }
 
 // Helper functions
@@ -111,7 +113,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   searchQuery,
   totalInitiativesCount,
   onFilterChange,
-  showToast
+  showToast,
+  config
 }) => {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -325,7 +328,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Change Status
           </div>
-          {Object.values(Status).filter(status => status !== Status.Deleted).map(status => (
+          {getStatuses(config).filter(status => status !== Status.Deleted).map(status => (
             <button
               key={status}
               onClick={() => handleStatusChange(status)}

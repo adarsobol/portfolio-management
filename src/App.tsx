@@ -99,6 +99,42 @@ export default function App() {
   }, [initiatives]);
   const [config, setConfig] = useLocalStorage<AppConfig>('portfolio-config', INITIAL_CONFIG);
   
+  // Load value lists from backend on startup (all authenticated users need them)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const loadValueLists = async () => {
+      try {
+        const token = localStorage.getItem('portfolio-auth-token');
+        const response = await fetch(`${API_ENDPOINT}/api/config/value-lists`, {
+          headers: {
+            'Authorization': `Bearer ${token || ''}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.valueLists) {
+            // Merge backend value lists with local config
+            // Backend is source of truth for value lists
+            setConfig(prev => ({
+              ...prev,
+              valueLists: data.valueLists,
+              valueListsMigrated: true
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load value lists from backend:', error);
+        // Continue with local config if backend fails
+      }
+    };
+
+    loadValueLists();
+  }, [isAuthenticated, setConfig]);
+  
   // Audit State (changeLog is maintained for internal tracking but not displayed in UI)
   const [changeLog, setChangeLog] = useState<ChangeRecord[]>([]);
   void changeLog; // Used by setChangeLog for internal tracking
@@ -2306,6 +2342,7 @@ export default function App() {
                 searchQuery={searchQuery} resetFilters={resetFilters}
                 currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
                 users={users}
+                config={config}
              />
 
              {currentView === 'resources' ? (
@@ -2334,6 +2371,7 @@ export default function App() {
                 searchQuery={searchQuery}
                 totalInitiativesCount={initiatives.length}
                 showToast={(message: string) => showSuccess(message)}
+                config={config}
                />
              ) : currentView === 'workflows' ? (
                <WorkflowsView
@@ -2350,6 +2388,7 @@ export default function App() {
                <DependenciesView
                  initiatives={filteredInitiatives}
                  users={users}
+                 config={config}
                  onInitiativeClick={(initiative) => {
                    setEditingItem(initiative);
                    setIsModalOpen(true);
@@ -2499,6 +2538,7 @@ export default function App() {
                 searchQuery={searchQuery} resetFilters={resetFilters}
                 currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
                 users={users}
+                config={config}
              />
 
              {currentView === 'resources' ? (
@@ -2527,6 +2567,7 @@ export default function App() {
                 searchQuery={searchQuery}
                 totalInitiativesCount={initiatives.length}
                 showToast={(message: string) => showSuccess(message)}
+                config={config}
                />
              ) : currentView === 'workflows' ? (
                <WorkflowsView
@@ -2543,6 +2584,7 @@ export default function App() {
                <DependenciesView
                  initiatives={filteredInitiatives}
                  users={users}
+                 config={config}
                  onInitiativeClick={(initiative) => {
                    setEditingItem(initiative);
                    setIsModalOpen(true);

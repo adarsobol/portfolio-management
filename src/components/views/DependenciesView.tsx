@@ -17,15 +17,17 @@ import {
   ArrowDown,
   History
 } from 'lucide-react';
-import { Initiative, User, Status, DependencyTeam, Dependency } from '../../types';
+import { Initiative, User, Status, DependencyTeam, Dependency, AppConfig } from '../../types';
 import { DEPENDENCY_TEAM_CATEGORIES } from '../../constants';
 import { formatDateDisplay, isOverdue, getDateStatus, getDaysUntil } from '../../utils';
+import { getDependencyTeams } from '../../utils/valueLists';
 
 interface DependenciesViewProps {
   initiatives: Initiative[];
   users: User[];
   onInitiativeClick: (initiative: Initiative) => void;
   onInitiativeUpdate?: (initiative: Initiative) => void;
+  config: AppConfig;
 }
 
 type SortField = 'team' | 'title' | 'eta' | 'status';
@@ -56,7 +58,8 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
   initiatives,
   users,
   onInitiativeClick,
-  onInitiativeUpdate
+  onInitiativeUpdate,
+  config
 }) => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<DependencyTeam | ''>('');
@@ -190,8 +193,8 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
   const teamStats = useMemo(() => {
     const stats: Record<DependencyTeam, { count: number; atRisk: number; overdue: number }> = {} as any;
     
-    Object.values(DependencyTeam).forEach(team => {
-      stats[team] = { count: 0, atRisk: 0, overdue: 0 };
+    getDependencyTeams(config).forEach(team => {
+      stats[team as DependencyTeam] = { count: 0, atRisk: 0, overdue: 0 };
     });
 
     initiatives.forEach(initiative => {
@@ -316,7 +319,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
           {/* Team Filter Pills */}
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
             <span className="text-xs font-medium text-slate-500">Filter by team:</span>
-            {Object.values(DependencyTeam).map(team => {
+            {getDependencyTeams(config).map(team => {
               const stat = teamStats[team];
               const category = DEPENDENCY_TEAM_CATEGORIES.find(c => c.teams.includes(team));
               const colorClasses = category?.color === 'blue'

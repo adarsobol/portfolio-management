@@ -244,6 +244,15 @@ export interface AppConfig {
     thresholdPercent: number; // Default: 15
     quarterStartDate?: string; // ISO date string for current quarter start
   };
+  // Editable value lists (migrated from enums)
+  valueLists?: {
+    assetClasses: string[];
+    statuses: string[];
+    dependencyTeams: string[];
+    // Owners managed separately via user management
+  };
+  // Migration flag to track if enums have been migrated to value lists
+  valueListsMigrated?: boolean;
 }
 
 export interface Snapshot {

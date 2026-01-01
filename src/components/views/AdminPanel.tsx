@@ -1,9 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, ChevronDown, ChevronUp, List } from 'lucide-react';
 import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
+import { ValueListsManager } from './ValueListsManager';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata } from '../../types';
+import { migrateEnumsToConfig } from '../../utils/valueLists';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
@@ -259,6 +261,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   void _onClearCache; // Reserved for cache clearing feature
   const [newUser, setNewUser] = useState<Partial<User>>({ role: Role.TeamLead });
+  
+  // Migrate enums to config on mount if needed
+  React.useEffect(() => {
+    if (!config.valueListsMigrated) {
+      const migratedConfig = migrateEnumsToConfig(config);
+      if (migratedConfig !== config) {
+        setConfig(migratedConfig);
+      }
+    }
+  }, [config, setConfig]);
   
   // Collapsible sections state - track which sections are expanded
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -2061,6 +2073,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       </CollapsibleSection>
 
+      {/* Value Lists Management */}
+      <CollapsibleSection
+        id="value-lists"
+        title="Value Lists Management"
+        description="Manage editable value lists for asset classes, statuses, and dependency teams"
+        icon={<div className="p-1.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg"><List size={16} className="text-white" /></div>}
+        gradientFrom="from-purple-50"
+        gradientTo="to-pink-50"
+        isExpanded={expandedSections.has('value-lists')}
+        onToggle={toggleSection}
+        onFirstExpand={() => markSectionLoaded('value-lists')}
+        hasLoaded={loadedSections.has('value-lists')}
+      >
+        <div className="p-6">
+          <ValueListsManager
+            config={config}
+            onUpdate={setConfig}
+            initiatives={initiatives}
+          />
+        </div>
+      </CollapsibleSection>
+
       {/* User Management */}
       <CollapsibleSection
         id="user-management"
@@ -2175,54 +2209,71 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    <th className="px-6 py-3 font-semibold text-slate-600">Email</th>
                    <th className="px-6 py-3 font-semibold text-slate-600">Role</th>
                    <th className="px-6 py-3 font-semibold text-slate-600">Team</th>
+                   <th className="px-6 py-3 font-semibold text-slate-600">Initiatives</th>
                    <th className="px-6 py-3 font-semibold text-slate-600 text-right">Actions</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
-                 {users.map(u => (
-                   <tr key={u.id} className="hover:bg-slate-50">
-                     <td className="px-6 py-3 font-medium flex items-center gap-2">
-                       <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full bg-slate-200" />
-                       {u.name}
-                     </td>
-                     <td className="px-6 py-3 text-slate-500">{u.email}</td>
-                     <td className="px-6 py-3">
-                       <select
-                         value={u.role}
-                         onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
-                         disabled={isUpdatingUser === u.id}
-                         className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                       >
-                         {Object.values(Role).map(r => (
-                           <option key={r} value={r}>{r}</option>
-                         ))}
-                       </select>
-                     </td>
-                     <td className="px-6 py-3">
-                       <select
-                         value={u.team || ''}
-                         onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
-                         disabled={isUpdatingUser === u.id}
-                         className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                       >
-                         <option value="">Unassigned</option>
-                         {teamOptions.map(team => (
-                           <option key={team} value={team}>{team}</option>
-                         ))}
-                       </select>
-                     </td>
-                     <td className="px-6 py-3 text-right">
-                       <button 
-                         onClick={() => handleDeleteUser(u.id)}
-                         disabled={isDeletingUser === u.id}
-                         className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                         title="Remove User"
-                       >
-                         {isDeletingUser === u.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                       </button>
-                     </td>
-                   </tr>
-                 ))}
+                 {users.map(u => {
+                   const ownerCount = initiatives.filter(i => i.ownerId === u.id).length;
+                   const canBeOwner = u.role === Role.TeamLead || u.role === Role.Admin || u.role === Role.DirectorGroup || u.role === Role.DirectorDepartment;
+                   return (
+                     <tr key={u.id} className="hover:bg-slate-50">
+                       <td className="px-6 py-3 font-medium flex items-center gap-2">
+                         <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full bg-slate-200" />
+                         {u.name}
+                         {canBeOwner && (
+                           <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Can be assigned as owner">Owner</span>
+                         )}
+                       </td>
+                       <td className="px-6 py-3 text-slate-500">{u.email}</td>
+                       <td className="px-6 py-3">
+                         <select
+                           value={u.role}
+                           onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
+                           disabled={isUpdatingUser === u.id}
+                           className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                           {Object.values(Role).map(r => (
+                             <option key={r} value={r}>{r}</option>
+                           ))}
+                         </select>
+                       </td>
+                       <td className="px-6 py-3">
+                         <select
+                           value={u.team || ''}
+                           onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
+                           disabled={isUpdatingUser === u.id}
+                           className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                           <option value="">Unassigned</option>
+                           {teamOptions.map(team => (
+                             <option key={team} value={team}>{team}</option>
+                           ))}
+                         </select>
+                       </td>
+                       <td className="px-6 py-3">
+                         {canBeOwner ? (
+                           <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded" title={`Assigned to ${ownerCount} initiative(s)`}>
+                             {ownerCount}
+                           </span>
+                         ) : (
+                           <span className="text-xs text-slate-400">-</span>
+                         )}
+                       </td>
+                       <td className="px-6 py-3 text-right">
+                         <button 
+                           onClick={() => handleDeleteUser(u.id)}
+                           disabled={isDeletingUser === u.id}
+                           className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                           title="Remove User"
+                         >
+                           {isDeletingUser === u.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                         </button>
+                       </td>
+                     </tr>
+                   );
+                 })}
                </tbody>
              </table>
            </div>

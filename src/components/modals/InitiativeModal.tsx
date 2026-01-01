@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative, canDeleteTaskItem } from '../../utils';
+import { getAssetClasses, getStatuses, getDependencyTeams } from '../../utils/valueLists';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
@@ -1297,7 +1298,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         onChange={(e) => handleChange('status', e.target.value)}
                         className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                       >
-                        {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
+                        {getStatuses(config).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                   </div>
@@ -1398,7 +1399,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         onChange={(e) => handleAssetClassChange(e.target.value as AssetClass)}
                         className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                       >
-                        {Object.values(AssetClass).map(ac => <option key={ac} value={ac}>{ac}</option>)}
+                        {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
                       </select>
                     </div>
                     <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center">
@@ -1939,7 +1940,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                               >
                                 <option value="">Select...</option>
-                                {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
+                                {getStatuses(config).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                               </select>
                             ) : (
                               <select
@@ -2210,7 +2211,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     onChange={(e) => updateTask(task.id, 'status', e.target.value)}
                                     className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-300"
                                   >
-                                    {Object.values(Status).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
+                                    {getStatuses(config).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s}>{s}</option>)}
                                   </select>
                                 </div>
                               </div>
@@ -2491,6 +2492,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
             onAddRow={addBulkRow}
             onRemoveRow={removeBulkRow}
             onDuplicateRow={duplicateBulkRow}
+            config={config}
           />
         )}
 
