@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Plus, Trash2, Edit2, Check, X, AlertCircle, GripVertical, Download, Upload, RotateCcw, Loader2 } from 'lucide-react';
 import { AppConfig, Initiative } from '../../types';
-import { getValueUsageCount, validateValueList, getDefaultValueLists } from '../../utils/valueLists';
+import { getValueUsageCount, validateValueList, getDefaultValueLists, getPriorities, getUnplannedTags, getInitiativeTypes, getQuarters, getAssetClasses, getStatuses, getDependencyTeams, getWorkTypes, ensureRequiredValuesInConfig } from '../../utils/valueLists';
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
@@ -84,20 +84,41 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const getList = useCallback((listType: ListType): string[] => {
-    return config.valueLists?.[listType] || [];
+    // Use getter functions that ensure required UI values are included for data integrity
+    switch (listType) {
+      case 'assetClasses':
+        return getAssetClasses(config);
+      case 'statuses':
+        return getStatuses(config);
+      case 'dependencyTeams':
+        return getDependencyTeams(config);
+      case 'priorities':
+        return getPriorities(config);
+      case 'workTypes':
+        return getWorkTypes(config);
+      case 'unplannedTags':
+        return getUnplannedTags(config);
+      case 'initiativeTypes':
+        return getInitiativeTypes(config);
+      case 'quarters':
+        return getQuarters(config);
+      default:
+        return [];
+    }
   }, [config]);
 
   const updateList = useCallback(async (listType: ListType, newList: string[]) => {
+    // Use getList to ensure we're working with lists that include required UI values
     const updatedValueLists = {
-      assetClasses: config.valueLists?.assetClasses || [],
-      statuses: config.valueLists?.statuses || [],
-      dependencyTeams: config.valueLists?.dependencyTeams || [],
-      priorities: config.valueLists?.priorities || [],
-      workTypes: config.valueLists?.workTypes || [],
-      unplannedTags: config.valueLists?.unplannedTags || [],
-      initiativeTypes: config.valueLists?.initiativeTypes || [],
-      quarters: config.valueLists?.quarters || [],
-      [listType]: newList
+      assetClasses: getList('assetClasses'),
+      statuses: getList('statuses'),
+      dependencyTeams: getList('dependencyTeams'),
+      priorities: getList('priorities'),
+      workTypes: getList('workTypes'),
+      unplannedTags: getList('unplannedTags'),
+      initiativeTypes: getList('initiativeTypes'),
+      quarters: getList('quarters'),
+      [listType]: newList // Override with the new list (which should include required values from getList)
     };
     
     // Update local state immediately for responsive UI
@@ -288,8 +309,91 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
     event.target.value = ''; // Reset input
   }, [updateList]);
 
+  const handleEnsureRequiredValues = useCallback(async () => {
+    if (!window.confirm('This will ensure all required enum values (P0/P1/P2, WP/BAU, etc.) are present in the value lists. Continue?')) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const updatedConfig = ensureRequiredValuesInConfig(config);
+      onUpdate(updatedConfig);
+
+      // Save to backend
+      const token = localStorage.getItem('portfolio-auth-token');
+      const updatedValueLists = {
+        assetClasses: updatedConfig.valueLists?.assetClasses || [],
+        statuses: updatedConfig.valueLists?.statuses || [],
+        dependencyTeams: updatedConfig.valueLists?.dependencyTeams || [],
+        priorities: updatedConfig.valueLists?.priorities || [],
+        workTypes: updatedConfig.valueLists?.workTypes || [],
+        unplannedTags: updatedConfig.valueLists?.unplannedTags || [],
+        initiativeTypes: updatedConfig.valueLists?.initiativeTypes || [],
+        quarters: updatedConfig.valueLists?.quarters || []
+      };
+
+      const response = await fetch(`${API_ENDPOINT}/api/config/value-lists`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token || ''}`
+        },
+        body: JSON.stringify({ valueLists: updatedValueLists })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save value lists');
+      }
+
+      alert('Required values have been ensured in all value lists.');
+    } catch (error) {
+      console.error('Error ensuring required values:', error);
+      setSaveError(error instanceof Error ? error.message : 'Failed to ensure required values');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [config, onUpdate]);
+
   return (
     <div className="space-y-6">
+      {/* One-time ensure required values button */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-blue-900 mb-1">Ensure Required Values</h4>
+            <p className="text-sm text-blue-700 mb-3">
+              Ensure all required enum values are present in the value lists:
+              <br />• Priorities: P0, P1, P2
+              <br />• Initiative Types: WP, BAU
+              <br />• Work Types: Planned Work, Unplanned Work
+              <br />• Statuses: Not Started, In Progress, At Risk, Done, Obsolete, Deleted
+              <br />• Asset Classes: PL, Auto, POS, Advisory
+              <br />• Unplanned Tags: Unplanned, Risk Item, PM Item, Both
+            </p>
+            <button
+              onClick={handleEnsureRequiredValues}
+              disabled={isSaving}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Ensuring required values...</span>
+                </>
+              ) : (
+                <>
+                  <RotateCcw size={16} />
+                  <span>Ensure Required Values</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Save status indicator */}
       {(isSaving || saveError) && (
         <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${

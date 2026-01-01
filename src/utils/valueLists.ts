@@ -3,82 +3,112 @@ import { HIERARCHY, DEPENDENCY_TEAM_CATEGORIES } from '../constants';
 
 /**
  * Get asset classes from config or fall back to enum
+ * Ensures all enum values are always included for data integrity
  */
 export function getAssetClasses(config: AppConfig): string[] {
+  const requiredValues = Object.values(AssetClass);
   if (config.valueLists?.assetClasses && config.valueLists.assetClasses.length > 0) {
-    return config.valueLists.assetClasses;
+    return ensureRequiredValues(config.valueLists.assetClasses, requiredValues);
   }
-  return Object.values(AssetClass);
+  return requiredValues;
 }
 
 /**
  * Get statuses from config or fall back to enum
+ * Ensures all enum values are always included for data integrity
  */
 export function getStatuses(config: AppConfig): string[] {
+  const requiredValues = Object.values(Status);
   if (config.valueLists?.statuses && config.valueLists.statuses.length > 0) {
-    return config.valueLists.statuses;
+    return ensureRequiredValues(config.valueLists.statuses, requiredValues);
   }
-  return Object.values(Status);
+  return requiredValues;
 }
 
 /**
  * Get dependency teams from config or fall back to enum
+ * Ensures all enum values are always included for data integrity
  */
 export function getDependencyTeams(config: AppConfig): string[] {
+  const requiredValues = Object.values(DependencyTeam);
   if (config.valueLists?.dependencyTeams && config.valueLists.dependencyTeams.length > 0) {
-    return config.valueLists.dependencyTeams;
+    return ensureRequiredValues(config.valueLists.dependencyTeams, requiredValues);
   }
-  return Object.values(DependencyTeam);
+  return requiredValues;
+}
+
+/**
+ * Ensure value list includes all required UI values (for data integrity)
+ * Merges existing values with required enum values, ensuring required values are always present
+ */
+function ensureRequiredValues(existingValues: string[] | undefined, requiredValues: string[]): string[] {
+  if (!existingValues || existingValues.length === 0) {
+    return requiredValues;
+  }
+  
+  // Merge: start with required values, then add any additional existing values
+  const merged = [...requiredValues];
+  existingValues.forEach(val => {
+    if (!merged.includes(val)) {
+      merged.push(val);
+    }
+  });
+  
+  return merged;
 }
 
 /**
  * Get priorities from config or fall back to enum
+ * Ensures all enum values (P0, P1, P2) are always included for data integrity
  */
 export function getPriorities(config: AppConfig): string[] {
+  const requiredValues = Object.values(Priority);
   if (config.valueLists?.priorities && config.valueLists.priorities.length > 0) {
-    return config.valueLists.priorities;
+    return ensureRequiredValues(config.valueLists.priorities, requiredValues);
   }
-  return Object.values(Priority);
+  return requiredValues;
 }
 
 /**
  * Get work types from config or fall back to enum
+ * Ensures all enum values (Planned Work, Unplanned Work) are always included for data integrity
  */
 export function getWorkTypes(config: AppConfig): string[] {
+  const requiredValues = Object.values(WorkType);
   if (config.valueLists?.workTypes && config.valueLists.workTypes.length > 0) {
-    return config.valueLists.workTypes;
+    return ensureRequiredValues(config.valueLists.workTypes, requiredValues);
   }
-  return Object.values(WorkType);
+  return requiredValues;
 }
 
 /**
  * Get unplanned tags from config or fall back to enum
+ * Ensures all enum values (Unplanned, Risk Item, PM Item, Both) are always included for data integrity
  */
 export function getUnplannedTags(config: AppConfig): string[] {
+  const requiredValues = Object.values(UnplannedTag);
   if (config.valueLists?.unplannedTags && config.valueLists.unplannedTags.length > 0) {
-    return config.valueLists.unplannedTags;
+    return ensureRequiredValues(config.valueLists.unplannedTags, requiredValues);
   }
-  return Object.values(UnplannedTag);
+  return requiredValues;
 }
 
 /**
  * Get initiative types from config or fall back to enum
+ * Ensures all enum values (WP, BAU) are always included for data integrity
  */
 export function getInitiativeTypes(config: AppConfig): string[] {
+  const requiredValues = Object.values(InitiativeType);
   if (config.valueLists?.initiativeTypes && config.valueLists.initiativeTypes.length > 0) {
-    return config.valueLists.initiativeTypes;
+    return ensureRequiredValues(config.valueLists.initiativeTypes, requiredValues);
   }
-  return Object.values(InitiativeType);
+  return requiredValues;
 }
 
 /**
- * Get quarters from config or fall back to constant
+ * Generate default quarters (current year -1 to current year +3)
  */
-export function getQuarters(config: AppConfig): string[] {
-  if (config.valueLists?.quarters && config.valueLists.quarters.length > 0) {
-    return config.valueLists.quarters;
-  }
-  // Default quarters - generate from current year
+function generateDefaultQuarters(): string[] {
   const currentYear = new Date().getFullYear();
   const quarters: string[] = [];
   for (let year = currentYear - 1; year <= currentYear + 3; year++) {
@@ -87,6 +117,25 @@ export function getQuarters(config: AppConfig): string[] {
     }
   }
   return quarters;
+}
+
+/**
+ * Get quarters from config or fall back to constant
+ * Ensures default quarters are always included for data integrity
+ */
+export function getQuarters(config: AppConfig): string[] {
+  const requiredQuarters = generateDefaultQuarters();
+  if (config.valueLists?.quarters && config.valueLists.quarters.length > 0) {
+    // Merge: ensure all default quarters are present, then add any additional custom quarters
+    const merged = [...requiredQuarters];
+    config.valueLists.quarters.forEach(q => {
+      if (!merged.includes(q)) {
+        merged.push(q);
+      }
+    });
+    return merged;
+  }
+  return requiredQuarters;
 }
 
 /**
@@ -267,6 +316,68 @@ export function getDefaultValueLists() {
       color: cat.color,
       teams: cat.teams.map(team => team as string)
     }))
+  };
+}
+
+/**
+ * Ensure all required enum values are present in the config value lists
+ * This is a one-time function to ensure data integrity
+ */
+export function ensureRequiredValuesInConfig(config: AppConfig): AppConfig {
+  const currentValueLists = config.valueLists || {};
+  
+  // Ensure required values for each list
+  const updatedValueLists = {
+    assetClasses: ensureRequiredValues(
+      currentValueLists.assetClasses,
+      Object.values(AssetClass)
+    ),
+    statuses: ensureRequiredValues(
+      currentValueLists.statuses,
+      Object.values(Status)
+    ),
+    dependencyTeams: ensureRequiredValues(
+      currentValueLists.dependencyTeams,
+      Object.values(DependencyTeam)
+    ),
+    priorities: ensureRequiredValues(
+      currentValueLists.priorities,
+      Object.values(Priority)
+    ),
+    workTypes: ensureRequiredValues(
+      currentValueLists.workTypes,
+      Object.values(WorkType)
+    ),
+    unplannedTags: ensureRequiredValues(
+      currentValueLists.unplannedTags,
+      Object.values(UnplannedTag)
+    ),
+    initiativeTypes: ensureRequiredValues(
+      currentValueLists.initiativeTypes,
+      Object.values(InitiativeType)
+    ),
+    quarters: (() => {
+      const requiredQuarters = generateDefaultQuarters();
+      if (currentValueLists.quarters && currentValueLists.quarters.length > 0) {
+        const merged = [...requiredQuarters];
+        currentValueLists.quarters.forEach((q: string) => {
+          if (!merged.includes(q)) {
+            merged.push(q);
+          }
+        });
+        return merged;
+      }
+      return requiredQuarters;
+    })(),
+    // Preserve optional fields
+    hierarchy: currentValueLists.hierarchy,
+    dependencyTeamCategories: currentValueLists.dependencyTeamCategories
+  };
+
+  return {
+    ...config,
+    valueLists: updatedValueLists,
+    valueListsMigrated: true
   };
 }
 
