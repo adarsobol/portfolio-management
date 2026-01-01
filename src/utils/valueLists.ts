@@ -324,41 +324,41 @@ export function getDefaultValueLists() {
  * This is a one-time function to ensure data integrity
  */
 export function ensureRequiredValuesInConfig(config: AppConfig): AppConfig {
-  const currentValueLists = config.valueLists || {};
+  const currentValueLists = config.valueLists;
   
   // Ensure required values for each list
   const updatedValueLists = {
     assetClasses: ensureRequiredValues(
-      currentValueLists.assetClasses,
+      currentValueLists?.assetClasses,
       Object.values(AssetClass)
     ),
     statuses: ensureRequiredValues(
-      currentValueLists.statuses,
+      currentValueLists?.statuses,
       Object.values(Status)
     ),
     dependencyTeams: ensureRequiredValues(
-      currentValueLists.dependencyTeams,
+      currentValueLists?.dependencyTeams,
       Object.values(DependencyTeam)
     ),
     priorities: ensureRequiredValues(
-      currentValueLists.priorities,
+      currentValueLists?.priorities,
       Object.values(Priority)
     ),
     workTypes: ensureRequiredValues(
-      currentValueLists.workTypes,
+      currentValueLists?.workTypes,
       Object.values(WorkType)
     ),
     unplannedTags: ensureRequiredValues(
-      currentValueLists.unplannedTags,
+      currentValueLists?.unplannedTags,
       Object.values(UnplannedTag)
     ),
     initiativeTypes: ensureRequiredValues(
-      currentValueLists.initiativeTypes,
+      currentValueLists?.initiativeTypes,
       Object.values(InitiativeType)
     ),
     quarters: (() => {
       const requiredQuarters = generateDefaultQuarters();
-      if (currentValueLists.quarters && currentValueLists.quarters.length > 0) {
+      if (currentValueLists?.quarters && currentValueLists.quarters.length > 0) {
         const merged = [...requiredQuarters];
         currentValueLists.quarters.forEach((q: string) => {
           if (!merged.includes(q)) {
@@ -370,8 +370,8 @@ export function ensureRequiredValuesInConfig(config: AppConfig): AppConfig {
       return requiredQuarters;
     })(),
     // Preserve optional fields
-    hierarchy: currentValueLists.hierarchy,
-    dependencyTeamCategories: currentValueLists.dependencyTeamCategories
+    hierarchy: currentValueLists?.hierarchy,
+    dependencyTeamCategories: currentValueLists?.dependencyTeamCategories
   };
 
   return {
