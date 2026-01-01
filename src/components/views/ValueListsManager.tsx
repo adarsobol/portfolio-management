@@ -59,12 +59,14 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
 
   const updateList = useCallback(async (listType: ListType, newList: string[]) => {
     const updatedValueLists = {
-      ...config.valueLists,
+      assetClasses: config.valueLists?.assetClasses || [],
+      statuses: config.valueLists?.statuses || [],
+      dependencyTeams: config.valueLists?.dependencyTeams || [],
       [listType]: newList
     };
     
     // Update local state immediately for responsive UI
-    const updatedConfig = {
+    const updatedConfig: AppConfig = {
       ...config,
       valueLists: updatedValueLists
     };
@@ -197,13 +199,6 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
     updateList(listType, updatedList);
   }, [getList, initiatives, updateList]);
 
-  const handleMove = useCallback((listType: ListType, fromIndex: number, toIndex: number) => {
-    const currentList = getList(listType);
-    const updatedList = [...currentList];
-    const [moved] = updatedList.splice(fromIndex, 1);
-    updatedList.splice(toIndex, 0, moved);
-    updateList(listType, updatedList);
-  }, [getList, updateList]);
 
   const handleReset = useCallback((listType: ListType) => {
     if (!window.confirm(`Reset ${LIST_CONFIGS.find(c => c.field === listType)?.label} to default values?`)) {

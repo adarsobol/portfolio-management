@@ -8,7 +8,6 @@ import {
   WorkflowConditionConfig,
   WorkflowActionConfig,
   Status,
-  AssetClass,
   WorkType,
   User,
   AppConfig,
@@ -278,13 +277,13 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({
                     <label key={ac} className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={scope?.assetClasses?.includes(ac) || false}
+                        checked={scope?.assetClasses?.includes(ac as any) || false}
                         onChange={(e) => {
                           const current = scope?.assetClasses || [];
                           setScope({
                             ...scope,
                             assetClasses: e.target.checked
-                              ? [...current, ac]
+                              ? [...current, ac as any]
                               : current.filter((a) => a !== ac),
                           });
                         }}

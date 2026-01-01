@@ -331,7 +331,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           {getStatuses(config).filter(status => status !== Status.Deleted).map(status => (
             <button
               key={status}
-              onClick={() => handleStatusChange(status)}
+              onClick={() => handleStatusChange(status as Status)}
               className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-100 flex items-center gap-2 ${
                 contextMenu.item?.status === status ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700'
               }`}

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Filter } from 'lucide-react';
-import { AssetClass, User, UnplannedTag, AppConfig } from '../../types';
+import { User, UnplannedTag, AppConfig } from '../../types';
 import { getAssetClasses } from '../../utils/valueLists';
 
 interface FilterBarProps {

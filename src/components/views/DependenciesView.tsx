@@ -191,26 +191,29 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
 
   // Stats by team
   const teamStats = useMemo(() => {
-    const stats: Record<DependencyTeam, { count: number; atRisk: number; overdue: number }> = {} as any;
+    const stats: Record<string, { count: number; atRisk: number; overdue: number }> = {};
     
     getDependencyTeams(config).forEach(team => {
-      stats[team as DependencyTeam] = { count: 0, atRisk: 0, overdue: 0 };
+      stats[team] = { count: 0, atRisk: 0, overdue: 0 };
     });
 
     initiatives.forEach(initiative => {
       initiative.dependencies?.forEach(dep => {
-        stats[dep.team].count++;
-        if (initiative.status === Status.AtRisk) {
-          stats[dep.team].atRisk++;
-        }
-        if (dep.eta && isOverdue(dep.eta)) {
-          stats[dep.team].overdue++;
+        const teamKey = dep.team as string;
+        if (stats[teamKey]) {
+          stats[teamKey].count++;
+          if (initiative.status === Status.AtRisk) {
+            stats[teamKey].atRisk++;
+          }
+          if (dep.eta && isOverdue(dep.eta)) {
+            stats[teamKey].overdue++;
+          }
         }
       });
     });
 
     return stats;
-  }, [initiatives]);
+  }, [initiatives, config]);
 
   // General stats
   const _stats = useMemo(() => ({
@@ -320,8 +323,8 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
             <span className="text-xs font-medium text-slate-500">Filter by team:</span>
             {getDependencyTeams(config).map(team => {
-              const stat = teamStats[team];
-              const category = DEPENDENCY_TEAM_CATEGORIES.find(c => c.teams.includes(team));
+              const stat = teamStats[team] || { count: 0, atRisk: 0, overdue: 0 };
+              const category = DEPENDENCY_TEAM_CATEGORIES.find(c => c.teams.includes(team as DependencyTeam));
               const colorClasses = category?.color === 'blue'
                 ? { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', activeBg: 'bg-blue-100' }
                 : { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', activeBg: 'bg-purple-100' };
@@ -330,7 +333,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
               return (
                 <button
                   key={team}
-                  onClick={() => setSelectedTeamFilter(isActive ? '' : team)}
+                  onClick={() => setSelectedTeamFilter(isActive ? '' : (team as DependencyTeam))}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all border ${
                     isActive
                       ? `${colorClasses.activeBg} ${colorClasses.border} ${colorClasses.text} ring-1 ring-indigo-400`

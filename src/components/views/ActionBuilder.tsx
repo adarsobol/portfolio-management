@@ -74,6 +74,7 @@ const ActionBuilder: React.FC<ActionBuilderProps> = ({ action, onChange, config 
                 <ActionBuilder
                   action={subAction}
                   onChange={(updated) => updateSubAction(index, updated)}
+                  config={config}
                 />
               </div>
               <button
