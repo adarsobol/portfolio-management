@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, ChevronDown, ChevronUp, List } from 'lucide-react';
+import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, List } from 'lucide-react';
 import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
@@ -158,7 +158,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeSection, onSectionCha
               {item.icon}
             </span>
             <span className="flex-1 text-left">{item.label}</span>
-            {item.badge !== undefined && item.badge > 0 && (
+            {item.badge !== undefined && (typeof item.badge === 'number' ? item.badge > 0 : item.badge) && (
               <span className={`px-2 py-0.5 text-xs rounded-full ${
                 activeSection === item.id
                   ? 'bg-white/20 text-white'
@@ -1339,7 +1339,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </table>
           </div>
         )}
-            </div>
+                </div>
+              </div>
             )}
 
             {activeSection === 'error-logs' && (
@@ -1699,89 +1700,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
           </div>
         )}
+                </div>
               </div>
             )}
-
-      {/* Backup Details Modal */}
-      {selectedBackup && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBackup(null)}>
-            <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <h4 className="font-bold text-slate-800">Backup Details: {selectedBackup.date}</h4>
-                <button onClick={() => setSelectedBackup(null)} className="text-slate-400 hover:text-slate-600">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[60vh]">
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs text-slate-500">Status</p>
-                    <p className="font-semibold text-slate-700 capitalize">{selectedBackup.status}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs text-slate-500">Total Size</p>
-                    <p className="font-semibold text-slate-700">{formatBytes(selectedBackup.totalSize)}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs text-slate-500">Files</p>
-                    <p className="font-semibold text-slate-700">{selectedBackup.files.length}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-xs text-slate-500">Duration</p>
-                    <p className="font-semibold text-slate-700">{selectedBackup.duration}ms</p>
-                  </div>
-                </div>
-                
-                <h5 className="font-semibold text-slate-700 mb-2">Files:</h5>
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium text-slate-500">Name</th>
-                        <th className="px-3 py-2 text-right font-medium text-slate-500">Size</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {selectedBackup.files.map((file, idx) => (
-                        <tr key={idx}>
-                          <td className="px-3 py-2 text-slate-700">{file.name}</td>
-                          <td className="px-3 py-2 text-right text-slate-500">{formatBytes(file.size)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {selectedBackup.errors && selectedBackup.errors.length > 0 && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-xs font-medium text-red-700 mb-1">Errors:</p>
-                    {selectedBackup.errors.map((err, idx) => (
-                      <p key={idx} className="text-xs text-red-600">{err}</p>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
-                <button
-                  onClick={() => setSelectedBackup(null)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
-                >
-                  Close
-                </button>
-                <button
-                  onClick={() => {
-                    restoreFromBackup(selectedBackup.date);
-                    setSelectedBackup(null);
-                  }}
-                  disabled={isRestoring}
-                  className="px-4 py-2 text-sm font-medium text-white bg-violet-500 rounded-lg hover:bg-violet-600 disabled:opacity-50"
-                >
-                  Restore This Backup
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
             {activeSection === 'trash' && (
               <div className="animate-fadeIn">
@@ -2589,6 +2510,87 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Backup Details Modal */}
+      {selectedBackup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedBackup(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+              <h4 className="font-bold text-slate-800">Backup Details: {selectedBackup.date}</h4>
+              <button onClick={() => setSelectedBackup(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-500">Status</p>
+                  <p className="font-semibold text-slate-700 capitalize">{selectedBackup.status}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-500">Total Size</p>
+                  <p className="font-semibold text-slate-700">{formatBytes(selectedBackup.totalSize)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-500">Files</p>
+                  <p className="font-semibold text-slate-700">{selectedBackup.files.length}</p>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-500">Duration</p>
+                  <p className="font-semibold text-slate-700">{selectedBackup.duration}ms</p>
+                </div>
+              </div>
+              
+              <h5 className="font-semibold text-slate-700 mb-2">Files:</h5>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-slate-500">Name</th>
+                      <th className="px-3 py-2 text-right font-medium text-slate-500">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {selectedBackup.files.map((file, idx) => (
+                      <tr key={idx}>
+                        <td className="px-3 py-2 text-slate-700">{file.name}</td>
+                        <td className="px-3 py-2 text-right text-slate-500">{formatBytes(file.size)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {selectedBackup.errors && selectedBackup.errors.length > 0 && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs font-medium text-red-700 mb-1">Errors:</p>
+                  {selectedBackup.errors.map((err, idx) => (
+                    <p key={idx} className="text-xs text-red-600">{err}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                onClick={() => setSelectedBackup(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  restoreFromBackup(selectedBackup.date);
+                  setSelectedBackup(null);
+                }}
+                disabled={isRestoring}
+                className="px-4 py-2 text-sm font-medium text-white bg-violet-500 rounded-lg hover:bg-violet-600 disabled:opacity-50"
+              >
+                Restore This Backup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
