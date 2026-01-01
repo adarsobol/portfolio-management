@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Filter } from 'lucide-react';
-import { User, UnplannedTag, AppConfig } from '../../types';
+import { User, UnplannedTag, AppConfig, Role } from '../../types';
 import { getAssetClasses } from '../../utils/valueLists';
 
 interface FilterBarProps {
@@ -31,9 +31,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   // Reserved for future layout toggle functionality
   void _currentView; void _viewLayout; void _setViewLayout;
 
-  // Get owners who have initiatives (Team Leads)
+  // Get owners who can be assigned to initiatives
   const availableOwners = useMemo(() => {
-    return users.filter(u => u.role === 'Team Lead' || u.role === 'Admin');
+    return users.filter(u => 
+      u.role === Role.TeamLead || 
+      u.role === Role.Admin || 
+      u.role === Role.DirectorGroup || 
+      u.role === Role.DirectorDepartment
+    );
   }, [users]);
 
   const toggleOwner = (ownerId: string) => {

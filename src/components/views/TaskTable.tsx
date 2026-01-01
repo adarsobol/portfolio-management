@@ -1090,7 +1090,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'ownerId', e.target.value)}
                                 className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
                               >
-                                {users.filter(u => u.role === Role.TeamLead).map(u => (
+                                {users.filter(u => 
+                                  u.role === Role.TeamLead || 
+                                  u.role === Role.Admin || 
+                                  u.role === Role.DirectorGroup || 
+                                  u.role === Role.DirectorDepartment
+                                ).map(u => (
                                   <option key={u.id} value={u.id}>{u.name}</option>
                                 ))}
                               </select>

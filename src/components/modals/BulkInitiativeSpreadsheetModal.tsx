@@ -116,7 +116,12 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
     }
   };
 
-  const teamLeads = users.filter(u => u.role === Role.TeamLead);
+  const teamLeads = users.filter(u => 
+    u.role === Role.TeamLead || 
+    u.role === Role.Admin || 
+    u.role === Role.DirectorGroup || 
+    u.role === Role.DirectorDepartment
+  );
 
   // Column definitions for the spreadsheet
   const columns = [

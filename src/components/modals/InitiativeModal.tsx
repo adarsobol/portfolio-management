@@ -1253,7 +1253,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         }`}
                       >
                         <option value="">Select...</option>
-                        {users.filter(u => u.role === Role.TeamLead).map(u => (
+                        {users.filter(u => 
+                          u.role === Role.TeamLead || 
+                          u.role === Role.Admin || 
+                          u.role === Role.DirectorGroup || 
+                          u.role === Role.DirectorDepartment
+                        ).map(u => (
                           <option key={u.id} value={u.id}>{u.name}</option>
                         ))}
                       </select>
@@ -2194,7 +2199,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     }`}
                                   >
                                     <option value="">Select...</option>
-                                    {users.filter(u => u.role === Role.TeamLead).map(u => (
+                                    {users.filter(u => 
+                                      u.role === Role.TeamLead || 
+                                      u.role === Role.Admin || 
+                                      u.role === Role.DirectorGroup || 
+                                      u.role === Role.DirectorDepartment
+                                    ).map(u => (
                                       <option key={u.id} value={u.id}>{u.name}</option>
                                     ))}
                                   </select>
