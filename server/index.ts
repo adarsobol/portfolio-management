@@ -3308,7 +3308,64 @@ app.get('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
         const configData = configRow.get('config');
         if (configData) {
           const config = JSON.parse(configData);
-          res.json({ valueLists: config.valueLists || null });
+          const valueLists = config.valueLists || {};
+          
+          // Ensure required UI values are included for data integrity
+          // Priority: P0, P1, P2
+          if (valueLists.priorities) {
+            const requiredPriorities = ['P0', 'P1', 'P2'];
+            const mergedPriorities = [...requiredPriorities];
+            valueLists.priorities.forEach((p: string) => {
+              if (!mergedPriorities.includes(p)) {
+                mergedPriorities.push(p);
+              }
+            });
+            valueLists.priorities = mergedPriorities;
+          }
+          
+          // Initiative Types: WP, BAU
+          if (valueLists.initiativeTypes) {
+            const requiredInitiativeTypes = ['WP', 'BAU'];
+            const mergedInitiativeTypes = [...requiredInitiativeTypes];
+            valueLists.initiativeTypes.forEach((t: string) => {
+              if (!mergedInitiativeTypes.includes(t)) {
+                mergedInitiativeTypes.push(t);
+              }
+            });
+            valueLists.initiativeTypes = mergedInitiativeTypes;
+          }
+          
+          // Unplanned Tags: Unplanned, Risk Item, PM Item, Both
+          if (valueLists.unplannedTags) {
+            const requiredUnplannedTags = ['Unplanned', 'Risk Item', 'PM Item', 'Both'];
+            const mergedUnplannedTags = [...requiredUnplannedTags];
+            valueLists.unplannedTags.forEach((tag: string) => {
+              if (!mergedUnplannedTags.includes(tag)) {
+                mergedUnplannedTags.push(tag);
+              }
+            });
+            valueLists.unplannedTags = mergedUnplannedTags;
+          }
+          
+          // Quarters: Ensure default quarters are included
+          if (valueLists.quarters) {
+            const currentYear = new Date().getFullYear();
+            const defaultQuarters: string[] = [];
+            for (let year = currentYear - 1; year <= currentYear + 3; year++) {
+              for (let q = 1; q <= 4; q++) {
+                defaultQuarters.push(`Q${q} ${year}`);
+              }
+            }
+            const mergedQuarters = [...defaultQuarters];
+            valueLists.quarters.forEach((q: string) => {
+              if (!mergedQuarters.includes(q)) {
+                mergedQuarters.push(q);
+              }
+            });
+            valueLists.quarters = mergedQuarters;
+          }
+          
+          res.json({ valueLists });
           return;
         }
       } catch (e) {
@@ -3391,6 +3448,61 @@ app.put('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
       } catch (e) {
         console.error('Error parsing existing config:', e);
       }
+    }
+
+    // Ensure required UI values are included for data integrity
+    // Priority: P0, P1, P2
+    const requiredPriorities = ['P0', 'P1', 'P2'];
+    if (valueLists.priorities) {
+      const mergedPriorities = [...requiredPriorities];
+      valueLists.priorities.forEach((p: string) => {
+        if (!mergedPriorities.includes(p)) {
+          mergedPriorities.push(p);
+        }
+      });
+      valueLists.priorities = mergedPriorities;
+    }
+    
+    // Initiative Types: WP, BAU
+    const requiredInitiativeTypes = ['WP', 'BAU'];
+    if (valueLists.initiativeTypes) {
+      const mergedInitiativeTypes = [...requiredInitiativeTypes];
+      valueLists.initiativeTypes.forEach((t: string) => {
+        if (!mergedInitiativeTypes.includes(t)) {
+          mergedInitiativeTypes.push(t);
+        }
+      });
+      valueLists.initiativeTypes = mergedInitiativeTypes;
+    }
+    
+    // Unplanned Tags: Unplanned, Risk Item, PM Item, Both
+    const requiredUnplannedTags = ['Unplanned', 'Risk Item', 'PM Item', 'Both'];
+    if (valueLists.unplannedTags) {
+      const mergedUnplannedTags = [...requiredUnplannedTags];
+      valueLists.unplannedTags.forEach((tag: string) => {
+        if (!mergedUnplannedTags.includes(tag)) {
+          mergedUnplannedTags.push(tag);
+        }
+      });
+      valueLists.unplannedTags = mergedUnplannedTags;
+    }
+    
+    // Quarters: Ensure default quarters are included
+    if (valueLists.quarters) {
+      const currentYear = new Date().getFullYear();
+      const defaultQuarters: string[] = [];
+      for (let year = currentYear - 1; year <= currentYear + 3; year++) {
+        for (let q = 1; q <= 4; q++) {
+          defaultQuarters.push(`Q${q} ${year}`);
+        }
+      }
+      const mergedQuarters = [...defaultQuarters];
+      valueLists.quarters.forEach((q: string) => {
+        if (!mergedQuarters.includes(q)) {
+          mergedQuarters.push(q);
+        }
+      });
+      valueLists.quarters = mergedQuarters;
     }
 
     // Update value lists in config

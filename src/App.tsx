@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router
 import { Search, Plus, ChevronDown } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
-import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task } from './types';
+import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck } from './hooks';
@@ -119,6 +119,8 @@ export default function App() {
           if (data.valueLists) {
             // Merge backend value lists with local config
             // Backend is source of truth for value lists
+            // Note: getPriorities, getUnplannedTags, getInitiativeTypes, getQuarters
+            // will automatically ensure required UI values are included
             setConfig(prev => ({
               ...prev,
               valueLists: data.valueLists,
@@ -1503,22 +1505,57 @@ export default function App() {
         }
         
         nextInitiatives[existingIndex] = item;
-      } else {
-        // New initiative: check for duplicates before adding (safety check)
-        const duplicateExists = nextInitiatives.some(i => i.id === item.id);
-        if (duplicateExists) {
-          console.warn(`[DEBUG] handleSave: Initiative ${item.id} already exists, updating instead of adding`);
-          const duplicateIndex = nextInitiatives.findIndex(i => i.id === item.id);
-          nextInitiatives[duplicateIndex] = item;
         } else {
-          // New initiative: initialize overlookedCount to 0 and set createdAt if not already set
-          item.overlookedCount = 0;
-          if (!item.createdAt) {
-            item.createdAt = new Date().toISOString();
+          // New initiative: check for duplicates before adding (safety check)
+          const duplicateExists = nextInitiatives.some(i => i.id === item.id);
+          if (duplicateExists) {
+            console.warn(`[DEBUG] handleSave: Initiative ${item.id} already exists, updating instead of adding`);
+            const duplicateIndex = nextInitiatives.findIndex(i => i.id === item.id);
+            nextInitiatives[duplicateIndex] = item;
+          } else {
+            // New initiative: initialize overlookedCount to 0 and set createdAt if not already set
+            item.overlookedCount = 0;
+            if (!item.createdAt) {
+              item.createdAt = new Date().toISOString();
+            }
+            nextInitiatives.push(item);
+            
+            // Execute OnCreate workflows for new initiatives
+            const onCreateWorkflows = (config.workflows || []).filter(
+              w => w.enabled && w.trigger === WorkflowTrigger.OnCreate
+            );
+            
+            for (const workflow of onCreateWorkflows) {
+              try {
+                const initiativeCopy = { ...item };
+                await workflowEngine.executeWorkflow(workflow, [initiativeCopy], recordChange);
+                
+                // Update the initiative if it was modified by the workflow
+                const modifiedIndex = nextInitiatives.findIndex(i => i.id === item.id);
+                if (modifiedIndex >= 0) {
+                  nextInitiatives[modifiedIndex] = initiativeCopy;
+                  item = initiativeCopy; // Update item reference for subsequent operations
+                }
+                
+                // Update workflow execution log
+                setConfig(prev => ({
+                  ...prev,
+                  workflows: (prev.workflows || []).map(w => 
+                    w.id === workflow.id 
+                      ? { 
+                          ...w, 
+                          lastRun: new Date().toISOString(),
+                          runCount: w.runCount + 1,
+                        }
+                      : w
+                  )
+                }));
+              } catch (error) {
+                logger.error(`Error executing OnCreate workflow ${workflow.name}`, { context: 'App.handleSave', error: error instanceof Error ? error : new Error(String(error)) });
+              }
+            }
           }
-          nextInitiatives.push(item);
         }
-      }
 
       // Update localStorage cache
       const cached = localStorage.getItem('portfolio-initiatives-cache');

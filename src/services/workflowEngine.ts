@@ -238,6 +238,13 @@ export class WorkflowEngine {
           initiative.estimatedEffort = action.value;
         }
         break;
+
+      case 'set_asset_class':
+        if (action.value && initiative.l1_assetClass !== action.value) {
+          recordChange(initiative, 'Asset Class', initiative.l1_assetClass, action.value);
+          initiative.l1_assetClass = action.value as any;
+        }
+        break;
     }
   }
 }

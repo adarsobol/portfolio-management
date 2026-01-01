@@ -347,7 +347,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       
       return prev;
     });
-  }, [formData.ownerId, formData.l1_assetClass, isEditMode, config.workflows, users]);
+  }, [formData.ownerId, formData.l1_assetClass, isEditMode, config, users]);
 
   // ============================================================================
   // DERIVED DATA

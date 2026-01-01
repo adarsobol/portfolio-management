@@ -83,6 +83,12 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Get raw list from config (without merging required values) - used for editing
+  const getRawList = useCallback((listType: ListType): string[] => {
+    return config.valueLists?.[listType] || [];
+  }, [config]);
+
+  // Get display list (with required values merged) - used for display and validation
   const getList = useCallback((listType: ListType): string[] => {
     // Use getter functions that ensure required UI values are included for data integrity
     switch (listType) {
@@ -108,23 +114,31 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   }, [config]);
 
   const updateList = useCallback(async (listType: ListType, newList: string[]) => {
-    // Use getList to ensure we're working with lists that include required UI values
+    // Get all raw lists from config (without merging required values)
+    const currentRawLists = {
+      assetClasses: getRawList('assetClasses'),
+      statuses: getRawList('statuses'),
+      dependencyTeams: getRawList('dependencyTeams'),
+      priorities: getRawList('priorities'),
+      workTypes: getRawList('workTypes'),
+      unplannedTags: getRawList('unplannedTags'),
+      initiativeTypes: getRawList('initiativeTypes'),
+      quarters: getRawList('quarters'),
+    };
+    
+    // Update the specific list
     const updatedValueLists = {
-      assetClasses: getList('assetClasses'),
-      statuses: getList('statuses'),
-      dependencyTeams: getList('dependencyTeams'),
-      priorities: getList('priorities'),
-      workTypes: getList('workTypes'),
-      unplannedTags: getList('unplannedTags'),
-      initiativeTypes: getList('initiativeTypes'),
-      quarters: getList('quarters'),
-      [listType]: newList // Override with the new list (which should include required values from getList)
+      ...currentRawLists,
+      [listType]: newList // Save the raw list (backend will merge required values)
     };
     
     // Update local state immediately for responsive UI
     const updatedConfig: AppConfig = {
       ...config,
-      valueLists: updatedValueLists
+      valueLists: {
+        ...config.valueLists,
+        ...updatedValueLists
+      }
     };
     onUpdate(updatedConfig);
 
@@ -147,7 +161,25 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
         throw new Error(errorData.error || 'Failed to save value lists');
       }
 
-      // Success - value lists are now saved to backend
+      // Success - reload value lists from backend to get the updated config
+      const reloadResponse = await fetch(`${API_ENDPOINT}/api/config/value-lists`, {
+        headers: {
+          'Authorization': `Bearer ${token || ''}`
+        }
+      });
+
+      if (reloadResponse.ok) {
+        const reloadData = await reloadResponse.json();
+        if (reloadData.valueLists) {
+          const reloadedConfig: AppConfig = {
+            ...config,
+            valueLists: reloadData.valueLists,
+            valueListsMigrated: true
+          };
+          onUpdate(reloadedConfig);
+        }
+      }
+
       setSaveError(null);
     } catch (error) {
       console.error('Error saving value lists to backend:', error);
@@ -157,14 +189,15 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
     } finally {
       setIsSaving(false);
     }
-  }, [config, onUpdate]);
+  }, [config, onUpdate, getRawList]);
 
   const handleAdd = useCallback((listType: ListType) => {
     const value = newValue[listType].trim();
     if (!value) return;
 
-    const currentList = getList(listType);
-    const validation = validateValueList(value, currentList);
+    // Use display list for validation (includes required values)
+    const displayList = getList(listType);
+    const validation = validateValueList(value, displayList);
     
     if (!validation.valid) {
       setErrors(prev => ({ ...prev, [`${listType}-new`]: validation.error || 'Invalid value' }));
@@ -177,20 +210,23 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
       return newErrors;
     });
 
-    updateList(listType, [...currentList, value]);
+    // Use raw list for adding (without required values merged)
+    const rawList = getRawList(listType);
+    updateList(listType, [...rawList, value]);
     setNewValue(prev => ({ ...prev, [listType]: '' }));
-  }, [newValue, getList, updateList]);
+  }, [newValue, getList, getRawList, updateList]);
 
   const handleEditStart = useCallback((listType: ListType, index: number) => {
-    const currentList = getList(listType);
+    // Use raw list for editing (without required values merged)
+    const rawList = getRawList(listType);
     setEditingIndex({ listType, index });
-    setEditValue(currentList[index]);
+    setEditValue(rawList[index]);
     setErrors(prev => {
       const newErrors = { ...prev };
       delete newErrors[`${listType}-${index}`];
       return newErrors;
     });
-  }, [getList]);
+  }, [getRawList]);
 
   const handleEditSave = useCallback(() => {
     if (!editingIndex) return;
@@ -202,20 +238,23 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
       return;
     }
 
-    const currentList = getList(listType);
-    const validation = validateValueList(value, currentList.filter((_, i) => i !== index));
+    // Use raw list for validation (check against other items in raw list)
+    const rawList = getRawList(listType);
+    const otherItems = rawList.filter((_, i) => i !== index);
+    const validation = validateValueList(value, otherItems);
     
     if (!validation.valid) {
       setErrors(prev => ({ ...prev, [`${listType}-${index}`]: validation.error || 'Invalid value' }));
       return;
     }
 
-    const updatedList = [...currentList];
+    // Update the raw list
+    const updatedList = [...rawList];
     updatedList[index] = value;
     updateList(listType, updatedList);
     setEditingIndex(null);
     setEditValue('');
-  }, [editingIndex, editValue, getList, updateList]);
+  }, [editingIndex, editValue, getRawList, updateList]);
 
   const handleEditCancel = useCallback(() => {
     setEditingIndex(null);
@@ -232,8 +271,9 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   }, [editingIndex]);
 
   const handleDelete = useCallback((listType: ListType, index: number) => {
-    const currentList = getList(listType);
-    const value = currentList[index];
+    // Use raw list for deletion (without required values merged)
+    const rawList = getRawList(listType);
+    const value = rawList[index];
     
     // Check usage
     const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam' | 'priority' | 'workType' | 'unplannedTag' | 'initiativeType' | 'quarter'> = {
@@ -256,9 +296,9 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
       }
     }
 
-    const updatedList = currentList.filter((_, i) => i !== index);
+    const updatedList = rawList.filter((_, i) => i !== index);
     updateList(listType, updatedList);
-  }, [getList, initiatives, updateList]);
+  }, [getRawList, initiatives, updateList]);
 
 
   const handleReset = useCallback((listType: ListType) => {
@@ -270,7 +310,8 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   }, [updateList]);
 
   const handleExport = useCallback((listType: ListType) => {
-    const currentList = getList(listType);
+    // Export raw list (without required values merged)
+    const currentList = getRawList(listType);
     const data = JSON.stringify(currentList, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -279,7 +320,7 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
     a.download = `${listType}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [getList]);
+  }, [getRawList]);
 
   const handleImport = useCallback((listType: ListType, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -416,7 +457,8 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
       )}
 
       {LIST_CONFIGS.map(({ label, field, description }) => {
-        const list = getList(field);
+        // Use raw list for display in the editor (without required values merged)
+        const list = getRawList(field);
         const fieldKey = field as ListType;
 
         return (
@@ -570,7 +612,6 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
                             onClick={() => handleDelete(fieldKey, index)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                             title={usageCount > 0 ? `Delete (used ${usageCount}x)` : 'Delete'}
-                            disabled={usageCount > 0 && !window.confirm}
                           >
                             <Trash2 size={14} />
                           </button>
