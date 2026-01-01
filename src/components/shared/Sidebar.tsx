@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch } from 'lucide-react';
 import { User, ViewType, AppConfig } from '../../types';
-import { TeamLeadViewToggle } from './TeamLeadViewToggle';
 import { canViewTab, canAccessAdmin } from '../../utils';
 import { daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
 
@@ -12,8 +11,6 @@ interface SidebarProps {
   config: AppConfig;
   setConfig: (config: AppConfig | ((prev: AppConfig) => AppConfig)) => void;
   onLogout: () => void;
-  isTeamLeadView: boolean;
-  onToggleTeamLeadView: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -22,9 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser, 
   config,
   setConfig,
-  onLogout,
-  isTeamLeadView,
-  onToggleTeamLeadView
+  onLogout
 }) => {
   const canAccessWorkplanHealth = canViewTab(config, currentUser.role, 'accessWorkplanHealth');
   const canAccessAdminPanel = canAccessAdmin(config, currentUser.role);
@@ -150,17 +145,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav className="flex-1 p-3 space-y-1">
         <NavButton view="all" icon={LayoutDashboard} label="All Tasks" activeGradient="from-blue-500 to-blue-600" />
         <NavButton view="dependencies" icon={GitBranch} label="Dependencies" activeGradient="from-indigo-500 to-indigo-600" />
-        {!isTeamLeadView && (
-          <>
-            <NavButton view="timeline" icon={Calendar} label="Timeline" activeGradient="from-purple-500 to-purple-600" />
-            <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-amber-500 to-amber-600" />
-            {canAccessWorkplanHealth && (
-              <NavButton view="resources" icon={Gauge} label="Workplan Health" activeGradient="from-cyan-500 to-cyan-600" />
-            )}
-            {canAccessAdminPanel && (
-              <NavButton view="admin" icon={Settings} label="Admin" activeGradient="from-slate-600 to-slate-700" />
-            )}
-          </>
+        <NavButton view="timeline" icon={Calendar} label="Timeline" activeGradient="from-purple-500 to-purple-600" />
+        <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-amber-500 to-amber-600" />
+        {canAccessWorkplanHealth && (
+          <NavButton view="resources" icon={Gauge} label="Workplan Health" activeGradient="from-cyan-500 to-cyan-600" />
+        )}
+        {canAccessAdminPanel && (
+          <NavButton view="admin" icon={Settings} label="Admin" activeGradient="from-slate-600 to-slate-700" />
         )}
       </nav>
       <div className="p-3 border-t border-slate-800/50 bg-slate-950/50">
@@ -175,10 +166,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <p className="text-[10px] text-slate-500 truncate font-medium">{currentUser.role}</p>
           </div>
         </div>
-        <TeamLeadViewToggle 
-          isEnabled={isTeamLeadView}
-          onToggle={onToggleTeamLeadView}
-        />
         
         {/* Capacity Adjustment */}
         {(hasCapacity || true) && (

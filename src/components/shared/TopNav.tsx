@@ -13,8 +13,6 @@ interface TopNavProps {
   config: AppConfig;
   setConfig: (config: AppConfig | ((prev: AppConfig) => AppConfig)) => void;
   onLogout: () => void;
-  isTeamLeadView: boolean;
-  onToggleTeamLeadView: () => void;
   weeklyEffortFlags?: Map<string, ValidationResult>;
 }
 
@@ -25,8 +23,6 @@ export const TopNav: React.FC<TopNavProps> = ({
   config,
   setConfig,
   onLogout,
-  isTeamLeadView,
-  onToggleTeamLeadView,
   weeklyEffortFlags
 }) => {
   const location = useLocation();
@@ -174,17 +170,13 @@ export const TopNav: React.FC<TopNavProps> = ({
         <div className="flex items-center gap-1 flex-wrap lg:flex-nowrap flex-1 min-w-0">
           <NavButton view="all" icon={LayoutDashboard} label="All Tasks" activeGradient="from-blue-500 to-blue-600" />
           <NavButton view="dependencies" icon={GitBranch} label="Dependencies" activeGradient="from-indigo-500 to-indigo-600" />
-          {!isTeamLeadView && (
-            <>
-              <NavButton view="timeline" icon={Calendar} label="Timeline" activeGradient="from-purple-500 to-purple-600" />
-              <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-amber-500 to-amber-600" />
-              {canAccessWorkplanHealth && (
-                <NavButton view="resources" icon={Gauge} label="Workplan Health" activeGradient="from-cyan-500 to-cyan-600" />
-              )}
-              {canAccessAdminPanel && (
-                <NavButton view="admin" icon={Settings} label="Admin" activeGradient="from-slate-600 to-slate-700" />
-              )}
-            </>
+          <NavButton view="timeline" icon={Calendar} label="Timeline" activeGradient="from-purple-500 to-purple-600" />
+          <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-amber-500 to-amber-600" />
+          {canAccessWorkplanHealth && (
+            <NavButton view="resources" icon={Gauge} label="Workplan Health" activeGradient="from-cyan-500 to-cyan-600" />
+          )}
+          {canAccessAdminPanel && (
+            <NavButton view="admin" icon={Settings} label="Admin" activeGradient="from-slate-600 to-slate-700" />
           )}
         </div>
       </div>
@@ -228,40 +220,6 @@ export const TopNav: React.FC<TopNavProps> = ({
                 <p className="text-[10px] text-slate-500 font-medium">{currentUser.role}</p>
               </div>
               <div className="px-2 py-1.5 space-y-2">
-                <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
-                  <label className="flex items-center justify-between cursor-pointer group">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-slate-300 group-hover:text-slate-200 transition-colors">
-                        TL View
-                      </span>
-                      {isTeamLeadView && (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 rounded font-medium">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={isTeamLeadView}
-                        onChange={onToggleTeamLeadView}
-                        className="sr-only"
-                      />
-                      <div
-                        className={`w-10 h-5 rounded-full transition-colors duration-200 ${
-                          isTeamLeadView ? 'bg-indigo-600' : 'bg-slate-700'
-                        }`}
-                      >
-                        <div
-                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${
-                            isTeamLeadView ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </div>
-                    </div>
-                  </label>
-                </div>
-                
                 {/* Capacity Adjustment */}
                 {(hasCapacity || true) && (
                   <div className="p-2 bg-slate-800/30 rounded-lg border border-slate-700/50">

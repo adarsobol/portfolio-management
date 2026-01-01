@@ -8,6 +8,5 @@ export { CommentPopover } from './CommentPopover';
 export { PresenceIndicator } from './PresenceIndicator';
 export { ErrorBoundary } from './ErrorBoundary';
 export { LoadingSpinner } from './LoadingSpinner';
-export { TeamLeadViewToggle } from './TeamLeadViewToggle';
 export { SupportWidget } from './SupportWidget';
 export { OnboardingTour } from './OnboardingTour';

@@ -522,8 +522,6 @@ export default function App() {
   // Effort Display Unit State (Days vs Weeks)
   const [effortDisplayUnit, setEffortDisplayUnit] = useLocalStorage<'weeks' | 'days'>('effort-display-unit', 'weeks');
   
-  // Team Lead View Simulation (for testing/development)
-  const [isTeamLeadView, setIsTeamLeadView] = useLocalStorage<boolean>('portfolio-team-lead-view', false); 
   const [searchQuery, setSearchQuery] = useState('');
   
   // Filter State
@@ -682,12 +680,8 @@ export default function App() {
     }
   }, [newButtonDropdownOpen]);
 
-  // Wrapper function to restrict view changes when Team Lead view is enabled
+  // Wrapper function to handle view changes
   const handleViewChange = (view: ViewType) => {
-    if (isTeamLeadView && view !== 'all' && view !== 'dependencies') {
-      return; // Prevent navigation to restricted views
-    }
-    
     // Map view to route
     const routeMap: Record<ViewType, string> = {
       'all': '/dashboard',
@@ -700,13 +694,6 @@ export default function App() {
     
     navigate(routeMap[view] || '/dashboard');
   };
-
-  // Team Lead View Restriction - restrict navigation to only 'all' and 'dependencies'
-  useEffect(() => {
-    if (isTeamLeadView && currentView !== 'all' && currentView !== 'dependencies') {
-      setCurrentView('all');
-    }
-  }, [isTeamLeadView, currentView]);
 
   // --- Workflow Execution (Scheduled) ---
   useEffect(() => {
@@ -2301,8 +2288,6 @@ export default function App() {
         config={config}
         setConfig={setConfig}
         onLogout={logout}
-        isTeamLeadView={isTeamLeadView}
-        onToggleTeamLeadView={() => setIsTeamLeadView(!isTeamLeadView)}
         weeklyEffortFlags={weeklyEffortFlags}
       />
 
