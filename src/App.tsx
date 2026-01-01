@@ -653,6 +653,21 @@ export default function App() {
     }
   }, [location.pathname, isModalOpen, editingItem]);
 
+  // Keep editingItem in sync with initiatives state when modal is open
+  useEffect(() => {
+    if (isModalOpen && editingItem) {
+      const updatedInitiative = initiatives.find(i => i.id === editingItem.id);
+      if (updatedInitiative) {
+        // Only update if history changed (to avoid unnecessary re-renders)
+        const historyChanged = (updatedInitiative.history?.length || 0) !== (editingItem.history?.length || 0);
+        const lastUpdatedChanged = updatedInitiative.lastUpdated !== editingItem.lastUpdated;
+        if (historyChanged || lastUpdatedChanged) {
+          setEditingItem(updatedInitiative);
+        }
+      }
+    }
+  }, [initiatives, isModalOpen]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1237,6 +1252,7 @@ export default function App() {
       ? `Task ${field} changed from ${oldValue ?? 'N/A'} to ${newValue ?? 'N/A'}`
       : `Initiative ${field} changed from ${oldValue ?? 'N/A'} to ${newValue ?? 'N/A'}`;
     
+    console.log('[ACTIVITY] Logging change:', { activityType, description, initiativeId: initiative.id, field });
     logService.logActivity(activityType, description, {
       initiativeId: initiative.id,
       taskId: taskId,
@@ -1770,15 +1786,16 @@ export default function App() {
         const oldValue = i[field];
         const fieldName = field === 'estimatedEffort' ? 'Effort' : field === 'eta' ? 'ETA' : field === 'status' ? 'Status' : field;
         
+        let updatedHistory = i.history || [];
         if (oldValue !== value && (field === 'estimatedEffort' || field === 'eta' || field === 'status' || field === 'priority')) {
            const change = recordChange(i, fieldName, oldValue, value);
            setChangeLog(prevLog => [change, ...prevLog]);
-           i.history = [...(i.history || []), change];
+           updatedHistory = [...updatedHistory, change];
            // Sync change record to Google Sheets
            sheetsSync.queueChangeLog(change);
         }
         
-        const updated = { ...i, [field]: value, lastUpdated: today };
+        const updated = { ...i, [field]: value, lastUpdated: today, history: updatedHistory };
         
         // Log task updates for debugging
         if (field === 'tasks') {
