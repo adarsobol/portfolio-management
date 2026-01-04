@@ -667,3 +667,115 @@ export interface UserEngagement {
   initiativesUpdated: number;
   commentsPosted: number;
 }
+
+// ============================================
+// JIRA INTEGRATION TYPES
+// ============================================
+
+export interface JiraItem {
+  id: string;
+  key: string; // e.g., "POL-123"
+  summary: string;
+  issueType: string;
+  assetClass?: string; // From custom field "asset class(pol)"
+  dueDate?: string; // ISO date string
+  startDate?: string; // ISO date string
+  estimatedDays?: number;
+  status: string;
+  assignee?: string;
+  assigneeEmail?: string;
+  mappedTeam?: string; // Computed from mapping rules or overridden
+  teamOverride?: string; // Manual override
+  lastSynced: string; // ISO timestamp
+  jiraUrl: string; // Direct link to the Jira issue
+}
+
+export interface JiraConfig {
+  baseUrl: string;
+  email: string;
+  // apiToken is stored server-side only, not exposed to frontend
+  jqlQuery: string;
+  assetClassFieldId: string; // Jira custom field ID for "asset class(pol)"
+  lastSync?: string; // ISO timestamp
+  syncStatus?: 'idle' | 'syncing' | 'success' | 'error';
+  syncError?: string;
+}
+
+export interface TeamMappingRule {
+  id: string;
+  issueType: string; // Jira issue type (e.g., "Task", "Story")
+  assetClass: string; // Asset class value (e.g., "PL", "Auto")
+  targetTeam: string; // Production team (e.g., "Production - PL")
+}
+
+export interface ProductionTeam {
+  id: string;
+  name: string; // "Production - PL", "Production - Auto", etc.
+  color: string; // Hex color for Gantt chart
+  assetClasses: string[]; // Which asset classes this team handles
+}
+
+// Full configuration for the Capacity Simulator
+export interface CapacitySimulatorConfig {
+  // Jira connection settings
+  jira: {
+    baseUrl: string;
+    email: string;
+    jqlQuery: string; // Default JQL to fetch issues
+    assetClassFieldId: string; // customfield_11333
+    lastSync?: string;
+    syncStatus?: 'idle' | 'syncing' | 'success' | 'error';
+    syncError?: string;
+  };
+  // Production teams
+  productionTeams: ProductionTeam[];
+  // Mapping rules: (Issue Type + Asset Class) → Team
+  teamMappingRules: TeamMappingRule[];
+  // Cached Jira items
+  cachedItems?: JiraItem[];
+}
+
+// Default Production Teams
+export const DEFAULT_PRODUCTION_TEAMS: ProductionTeam[] = [
+  {
+    id: 'team_prod_pl',
+    name: 'Production - PL',
+    color: '#3B82F6', // Blue
+    assetClasses: ['PL', 'Personal Loans']
+  },
+  {
+    id: 'team_prod_auto',
+    name: 'Production - Auto',
+    color: '#10B981', // Green
+    assetClasses: ['Auto', 'Automobile']
+  },
+  {
+    id: 'team_prod_qa',
+    name: 'Production - QA',
+    color: '#8B5CF6', // Purple
+    assetClasses: [] // QA handles all asset classes based on issue type
+  },
+  {
+    id: 'team_prod_bankops',
+    name: 'Production - BankOps',
+    color: '#F59E0B', // Orange/Amber
+    assetClasses: [] // BankOps handles specific issue types
+  }
+];
+
+// Default mapping rules
+export const DEFAULT_TEAM_MAPPING_RULES: TeamMappingRule[] = [
+  // PL asset class mappings
+  { id: 'rule_pl_policies', issueType: 'Policies', assetClass: 'PL', targetTeam: 'Production - PL' },
+  { id: 'rule_pl_prm', issueType: 'Post Release Monitoring', assetClass: 'PL', targetTeam: 'Production - PL' },
+  
+  // Auto asset class mappings
+  { id: 'rule_auto_policies', issueType: 'Policies', assetClass: 'Auto', targetTeam: 'Production - Auto' },
+  { id: 'rule_auto_prm', issueType: 'Post Release Monitoring', assetClass: 'Auto', targetTeam: 'Production - Auto' },
+  
+  // QA handles specific issue types regardless of asset class
+  { id: 'rule_qa_any', issueType: 'QA', assetClass: '*', targetTeam: 'Production - QA' },
+  
+  // BankOps handles bank-related issue types
+  { id: 'rule_bankops_any', issueType: 'Bank Integration', assetClass: '*', targetTeam: 'Production - BankOps' },
+];

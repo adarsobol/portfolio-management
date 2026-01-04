@@ -5093,6 +5093,143 @@ app.post('/api/support/feedback/:id/comments', optionalAuthenticateToken, async 
 });
 
 // ============================================
+// JIRA INTEGRATION ENDPOINTS
+// ============================================
+
+// Jira configuration from environment
+const JIRA_BASE_URL = process.env.JIRA_BASE_URL;
+const JIRA_USER_EMAIL = process.env.JIRA_USER_EMAIL;
+const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+
+const isJiraConfigured = () => !!(JIRA_BASE_URL && JIRA_USER_EMAIL && JIRA_API_TOKEN);
+
+// Helper to make Jira API requests
+async function jiraFetch(endpoint: string, options: RequestInit = {}) {
+  if (!isJiraConfigured()) {
+    throw new Error('Jira is not configured. Please set JIRA_BASE_URL, JIRA_USER_EMAIL, and JIRA_API_TOKEN environment variables.');
+  }
+  
+  const auth = Buffer.from(`${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
+  
+  const response = await fetch(`${JIRA_BASE_URL}/rest/api/3${endpoint}`, {
+    ...options,
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Jira API error (${response.status}): ${errorText}`);
+  }
+  
+  return response.json();
+}
+
+// GET /api/jira/test - Test Jira connection and fetch sample issues
+app.get('/api/jira/test', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    console.log('[JIRA] Testing connection...');
+    
+    if (!isJiraConfigured()) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Jira is not configured',
+        details: {
+          hasBaseUrl: !!JIRA_BASE_URL,
+          hasEmail: !!JIRA_USER_EMAIL,
+          hasToken: !!JIRA_API_TOKEN,
+        }
+      });
+      return;
+    }
+    
+    // Test with a simple search - get 5 issues from POL project
+    // Using the new /search/jql endpoint (the old /search endpoint was deprecated)
+    const jql = 'project = POL ORDER BY created DESC';
+    const ASSET_CLASS_FIELD = 'customfield_11333'; // Asset Class (Pol)
+    
+    const result = await jiraFetch(`/search/jql`, {
+      method: 'POST',
+      body: JSON.stringify({
+        jql: jql,
+        maxResults: 5,
+        fields: ['summary', 'status', 'issuetype', 'assignee', 'duedate', ASSET_CLASS_FIELD]
+      })
+    });
+    
+    console.log(`[JIRA] Successfully fetched ${result.issues?.length || 0} issues`);
+    
+    // Map to simplified format
+    const issues = (result.issues || []).map((issue: any) => ({
+      key: issue.key,
+      summary: issue.fields.summary,
+      status: issue.fields.status?.name,
+      issueType: issue.fields.issuetype?.name,
+      assetClass: issue.fields[ASSET_CLASS_FIELD]?.value || issue.fields[ASSET_CLASS_FIELD] || null,
+      assignee: issue.fields.assignee?.displayName || 'Unassigned',
+      dueDate: issue.fields.duedate,
+      url: `${JIRA_BASE_URL}/browse/${issue.key}`,
+    }));
+    
+    res.json({
+      success: true,
+      message: `Connected to Jira. Found ${result.total} total issues in POL project.`,
+      sampleIssues: issues,
+      config: {
+        baseUrl: JIRA_BASE_URL,
+        email: JIRA_USER_EMAIL,
+        project: 'POL',
+      }
+    });
+  } catch (error) {
+    console.error('[JIRA] Test failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: String(error),
+      hint: 'Check your JIRA_API_TOKEN and ensure the user has access to the POL project.'
+    });
+  }
+});
+
+// GET /api/jira/fields - Get available custom fields (to find asset class field ID)
+app.get('/api/jira/fields', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!isJiraConfigured()) {
+      res.status(400).json({ success: false, error: 'Jira is not configured' });
+      return;
+    }
+    
+    const fields = await jiraFetch('/field');
+    
+    // Filter to show custom fields that might be "asset class"
+    const assetClassFields = fields.filter((f: any) => 
+      f.name.toLowerCase().includes('asset') || 
+      f.name.toLowerCase().includes('class') ||
+      f.id.startsWith('customfield_')
+    );
+    
+    res.json({
+      success: true,
+      totalFields: fields.length,
+      relevantFields: assetClassFields.map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        custom: f.custom,
+        type: f.schema?.type,
+      })),
+      hint: 'Look for a field named "asset class(pol)" or similar. Use its ID (e.g., customfield_12345) in the configuration.'
+    });
+  } catch (error) {
+    console.error('[JIRA] Failed to fetch fields:', error);
+    res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
+// ============================================
 // SPA FALLBACK (serve index.html for all non-API routes)
 // ============================================
 // This must be after all API routes
@@ -5191,6 +5328,10 @@ setTimeout(() => {
   console.log(`  PATCH /api/support/tickets/:id  - Update support ticket (admin)`);
   console.log(`  POST /api/support/feedback       - Submit feedback`);
   console.log(`  GET  /api/support/feedback       - Get feedback (admin)`);
+  console.log(`\nJira Integration Endpoints:`);
+  console.log(`  GET  /api/jira/test           - Test Jira connection`);
+  console.log(`  GET  /api/jira/fields         - List custom fields`);
+  console.log(`  Jira configured: ${isJiraConfigured() ? 'YES' : 'NO'}`);
   console.log(`\nReal-time Collaboration (Socket.IO):`);
   console.log(`  - User presence tracking`);
   console.log(`  - Live initiative updates`);
