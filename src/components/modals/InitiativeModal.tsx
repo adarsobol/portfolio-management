@@ -358,14 +358,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   );
 
   const canEdit = (): boolean => {
-    // #region agent log
-    const canEditAll = canEditAllTasks(config, currentUser.role);
-    const canEditOwn = canEditOwnTasks(config, currentUser.role);
-    const ownerMatch = formData.ownerId === currentUser.id;
-    const editTasksPermValue = config.rolePermissions?.[currentUser.role]?.editTasks;
-    console.log('[DEBUG canEdit Modal]', { isEditMode, currentUserId: currentUser.id, currentUserRole: currentUser.role, formDataOwnerId: formData.ownerId, ownerMatch, canEditAll, canEditOwn, editTasksPermValue });
-    fetch('http://127.0.0.1:7242/ingest/30bff00f-1252-4a6a-a1a1-ff6715802d11',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InitiativeModal.tsx:canEdit',message:'Modal permission check',data:{isEditMode,currentUserId:currentUser.id,currentUserRole:currentUser.role,formDataOwnerId:formData.ownerId,ownerMatch,canEditAll,canEditOwn,editTasksPermValue},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C,E'})}).catch(()=>{});
-    // #endregion
     if (isEditMode) {
       // Check if user can edit all tasks
       if (canEditAllTasks(config, currentUser.role)) return true;
@@ -382,21 +374,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   const canDelete = (): boolean => {
     if (!initiativeToEdit) {
-      console.log('[InitiativeModal.canDelete] No initiative to edit');
       return false;
     }
     // Use permission system to check if user can delete this initiative
-    console.log('[InitiativeModal.canDelete] Checking delete permission:', {
-      initiativeId: initiativeToEdit.id,
-      initiativeTitle: initiativeToEdit.title,
-      initiativeOwnerId: initiativeToEdit.ownerId,
-      currentUserId: currentUser.id,
-      currentUserEmail: currentUser.email,
-      currentUserRole: currentUser.role
-    });
-    const result = canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id, currentUser.email);
-    console.log('[InitiativeModal.canDelete] Result:', result);
-    return result;
+    return canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id, currentUser.email);
   };
 
   const handleDelete = () => {

@@ -232,24 +232,12 @@ const matchesUserId = (ownerId: string | null | undefined, currentUserId: string
   const normalizedOwnerId = normalizeUserId(ownerId);
   const normalizedCurrentUserId = normalizeUserId(currentUserId);
   
-  console.log('[matchesUserId] Checking match:', {
-    ownerId,
-    normalizedOwnerId,
-    currentUserId,
-    normalizedCurrentUserId,
-    currentUserEmail,
-    ownerIdIsEmail: normalizedOwnerId?.includes('@'),
-    currentUserIdIsEmail: normalizedCurrentUserId?.includes('@')
-  });
-  
   if (!normalizedOwnerId || !normalizedCurrentUserId) {
-    console.log('[matchesUserId] No match - missing normalized values');
     return false;
   }
   
   // Direct ID-to-ID match
   if (normalizedOwnerId === normalizedCurrentUserId) {
-    console.log('[matchesUserId] Match found - direct ID match');
     return true;
   }
   
@@ -257,13 +245,7 @@ const matchesUserId = (ownerId: string | null | undefined, currentUserId: string
   if (normalizedOwnerId.includes('@') && currentUserEmail) {
     const normalizedOwnerEmail = normalizedOwnerId.toLowerCase().trim();
     const normalizedCurrentEmail = String(currentUserEmail).toLowerCase().trim();
-    console.log('[matchesUserId] Checking email match:', {
-      normalizedOwnerEmail,
-      normalizedCurrentEmail,
-      match: normalizedOwnerEmail === normalizedCurrentEmail
-    });
     if (normalizedOwnerEmail === normalizedCurrentEmail) {
-      console.log('[matchesUserId] Match found - email match');
       return true;
     }
   }
@@ -272,18 +254,11 @@ const matchesUserId = (ownerId: string | null | undefined, currentUserId: string
   if (normalizedCurrentUserId.includes('@') && normalizedOwnerId) {
     const normalizedCurrentEmail = normalizedCurrentUserId.toLowerCase().trim();
     const normalizedOwnerEmail = normalizedOwnerId.toLowerCase().trim();
-    console.log('[matchesUserId] Checking reverse email match:', {
-      normalizedCurrentEmail,
-      normalizedOwnerEmail,
-      match: normalizedCurrentEmail === normalizedOwnerEmail
-    });
     if (normalizedCurrentEmail === normalizedOwnerEmail) {
-      console.log('[matchesUserId] Match found - reverse email match');
       return true;
     }
   }
   
-  console.log('[matchesUserId] No match found');
   return false;
 };
 

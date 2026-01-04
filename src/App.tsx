@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router-dom';
 import { Search, Plus, ChevronDown } from 'lucide-react';
 
@@ -1045,8 +1045,8 @@ export default function App() {
     };
   }, [filteredInitiatives, config.teamCapacities, config.teamBuffers, filterOwners, filterAssetClass, filterWorkType.join(',')]);
 
-  // Notification Helpers
-  const createNotification = (
+  // Notification Helpers - memoized to prevent infinite useEffect loops
+  const createNotification = useCallback((
     type: NotificationType,
     title: string,
     message: string,
@@ -1067,9 +1067,9 @@ export default function App() {
       userId,
       metadata
     };
-  };
+  }, []);
 
-  const addNotification = (notification: Notification) => {
+  const addNotification = useCallback((notification: Notification) => {
     // Add to local state for immediate UI update
     setNotifications(prev => [notification, ...prev]);
     
@@ -1085,7 +1085,7 @@ export default function App() {
           });
         });
     }
-  };
+  }, []);
 
   // Weekly Effort Validation for Team Leads
   useEffect(() => {
