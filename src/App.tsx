@@ -2399,15 +2399,16 @@ export default function App() {
                 />
              )}
              
-             <FilterBar 
-                filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
-                filterOwners={filterOwners} setFilterOwners={setFilterOwners}
-                filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
-                searchQuery={searchQuery} resetFilters={resetFilters}
-                currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
-                users={users}
-                config={config}
-             />
+<FilterBar 
+               filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+               filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+               filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+               searchQuery={searchQuery} resetFilters={resetFilters}
+               currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+               users={users}
+               initiatives={initiatives}
+               config={config}
+            />
 
              {currentView === 'resources' ? (
                canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (
@@ -2589,15 +2590,16 @@ export default function App() {
                 />
              )}
              
-             <FilterBar 
-                filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
-                filterOwners={filterOwners} setFilterOwners={setFilterOwners}
-                filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
-                searchQuery={searchQuery} resetFilters={resetFilters}
-                currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
-                users={users}
-                config={config}
-             />
+<FilterBar 
+               filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+               filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+               filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+               searchQuery={searchQuery} resetFilters={resetFilters}
+               currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+               users={users}
+               initiatives={initiatives}
+               config={config}
+            />
 
              {currentView === 'resources' ? (
                canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (

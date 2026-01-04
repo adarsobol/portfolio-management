@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { Filter } from 'lucide-react';
-import { User, UnplannedTag, AppConfig } from '../../types';
+import { User, UnplannedTag, AppConfig, Initiative } from '../../types';
 import { getAssetClasses } from '../../utils/valueLists';
-import { getEligibleOwners } from '../../utils';
 
 interface FilterBarProps {
   filterAssetClass: string;
@@ -17,6 +16,7 @@ interface FilterBarProps {
   viewLayout: 'table' | 'tree';
   setViewLayout: (layout: 'table' | 'tree') => void;
   users: User[];
+  initiatives: Initiative[];
   config: AppConfig;
 }
 
@@ -27,15 +27,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   searchQuery, resetFilters,
   currentView: _currentView, viewLayout: _viewLayout, setViewLayout: _setViewLayout,
   users,
+  initiatives,
   config
 }) => {
   // Reserved for future layout toggle functionality
   void _currentView; void _viewLayout; void _setViewLayout;
 
-  // Get owners who can be assigned to initiatives
+  // Get owners from existing initiatives (only show owners who have items)
   const availableOwners = useMemo(() => {
-    return getEligibleOwners(users);
-  }, [users]);
+    const ownerIds = new Set(initiatives.map(i => i.ownerId));
+    return users.filter(u => ownerIds.has(u.id));
+  }, [initiatives, users]);
 
   const toggleOwner = (ownerId: string) => {
     if (filterOwners.includes(ownerId)) {
