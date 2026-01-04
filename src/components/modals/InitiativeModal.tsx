@@ -381,9 +381,22 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const isReadOnly = !canEdit();
 
   const canDelete = (): boolean => {
-    if (!initiativeToEdit) return false;
+    if (!initiativeToEdit) {
+      console.log('[InitiativeModal.canDelete] No initiative to edit');
+      return false;
+    }
     // Use permission system to check if user can delete this initiative
-    return canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id, currentUser.email);
+    console.log('[InitiativeModal.canDelete] Checking delete permission:', {
+      initiativeId: initiativeToEdit.id,
+      initiativeTitle: initiativeToEdit.title,
+      initiativeOwnerId: initiativeToEdit.ownerId,
+      currentUserId: currentUser.id,
+      currentUserEmail: currentUser.email,
+      currentUserRole: currentUser.role
+    });
+    const result = canDeleteInitiative(config, currentUser.role, initiativeToEdit.ownerId, currentUser.id, currentUser.email);
+    console.log('[InitiativeModal.canDelete] Result:', result);
+    return result;
   };
 
   const handleDelete = () => {
@@ -1080,7 +1093,17 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </button>
                     
                     {/* Delete Section - Only show if user can delete and in edit mode */}
-                    {isEditMode && canDelete() && onDelete && (
+                    {(() => {
+                      const canDeleteResult = canDelete();
+                      const showDelete = isEditMode && canDeleteResult && onDelete;
+                      console.log('[InitiativeModal] Delete button visibility check:', {
+                        isEditMode,
+                        canDeleteResult,
+                        hasOnDelete: !!onDelete,
+                        showDelete
+                      });
+                      return showDelete;
+                    })() && (
                       <>
                         <div className="border-t border-slate-200 my-1"></div>
                         <button

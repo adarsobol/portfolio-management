@@ -19,5 +19,5 @@ export const isGoogleOAuthConfigured =
 
 // API Endpoint - relative in production, configurable in dev
 export const API_ENDPOINT = 
-  import.meta.env.PROD ? '' : (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3001');
+  import.meta.env.PROD ? '' : (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:8080');
 

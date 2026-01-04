@@ -410,6 +410,13 @@ export default function App() {
       }
     }
     
+    // Fix Team Lead's deleteTasks permission - should be 'own' to allow deleting own initiatives/tasks
+    if (updatedConfig.rolePermissions[Role.TeamLead]?.deleteTasks === 'no') {
+      updatedConfig.rolePermissions[Role.TeamLead].deleteTasks = 'own';
+      needsUpdate = true;
+      logger.info('Fixed Team Lead deleteTasks permission: no -> own', { context: 'App.configMigration' });
+    }
+    
     // Migrate Slack config if it's missing or outdated
     if (INITIAL_CONFIG.slack) {
       const needsSlackUpdate = !updatedConfig.slack || 

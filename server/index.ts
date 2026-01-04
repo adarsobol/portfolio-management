@@ -516,7 +516,7 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
       name: 'Adar Sobol',
-      role: 'Admin'
+      role: 'Team Lead' // TEMPORARY: Changed to TeamLead for testing delete button fix
     };
     next();
     return;
@@ -547,7 +547,7 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
       name: 'Adar Sobol',
-      role: 'Admin'
+      role: 'Team Lead' // TEMPORARY: Changed to TeamLead for testing delete button fix
     };
     next();
     return;
@@ -686,6 +686,48 @@ function normalizeUserId(userId: string | undefined | null): string | null {
 }
 
 /**
+ * Check if two user identifiers match, handling both userId and email formats
+ * Mirrors the frontend matchesUserId logic from src/utils/index.ts
+ */
+function matchesUserId(
+  ownerId: string | null | undefined,
+  currentUserId: string,
+  currentUserEmail?: string
+): boolean {
+  const normalizedOwnerId = normalizeUserId(ownerId);
+  const normalizedCurrentUserId = normalizeUserId(currentUserId);
+  
+  if (!normalizedOwnerId || !normalizedCurrentUserId) {
+    return false;
+  }
+  
+  // Direct ID-to-ID match
+  if (normalizedOwnerId === normalizedCurrentUserId) {
+    return true;
+  }
+  
+  // Email match: If ownerId looks like an email, compare with currentUserEmail (case-insensitive)
+  if (normalizedOwnerId.includes('@') && currentUserEmail) {
+    const normalizedOwnerEmail = normalizedOwnerId.toLowerCase().trim();
+    const normalizedCurrentEmail = String(currentUserEmail).toLowerCase().trim();
+    if (normalizedOwnerEmail === normalizedCurrentEmail) {
+      return true;
+    }
+  }
+  
+  // Reverse email match: If currentUserId looks like an email, compare with ownerId
+  if (normalizedCurrentUserId.includes('@') && normalizedOwnerId) {
+    const normalizedCurrentEmail = normalizedCurrentUserId.toLowerCase().trim();
+    const normalizedOwnerEmail = normalizedOwnerId.toLowerCase().trim();
+    if (normalizedCurrentEmail === normalizedOwnerEmail) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Check if user can delete a task (server-side authorization)
  */
 function canUserDeleteTask(
@@ -693,7 +735,8 @@ function canUserDeleteTask(
   userRole: string,
   taskOwnerId: string | undefined | null,
   initiativeOwnerId: string | undefined | null,
-  currentUserId: string
+  currentUserId: string,
+  currentUserEmail?: string
 ): boolean {
   if (!config || !config.rolePermissions) {
     console.warn('[canUserDeleteTask] Config or rolePermissions missing');
@@ -710,19 +753,13 @@ function canUserDeleteTask(
   if (deleteScope === 'yes') {
     return true;
   } else if (deleteScope === 'own') {
-    const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
-    const normalizedCurrentUserId = normalizeUserId(currentUserId);
-    const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
-    
-    if (!normalizedCurrentUserId) {
-      return false;
+    // Check task ownership first (if task has an owner)
+    if (taskOwnerId) {
+      return matchesUserId(taskOwnerId, currentUserId, currentUserEmail);
     }
     
-    if (normalizedTaskOwnerId) {
-      return normalizedTaskOwnerId === normalizedCurrentUserId;
-    }
-    
-    return normalizedInitiativeOwnerId === normalizedCurrentUserId;
+    // Fall back to initiative ownership
+    return matchesUserId(initiativeOwnerId, currentUserId, currentUserEmail);
   }
   
   return false;
@@ -2171,7 +2208,8 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
         currentUser.role,
         taskOwnerId,
         initiativeOwnerId,
-        currentUser.id
+        currentUser.id,
+        currentUser.email
       );
       
       if (!hasPermission) {
@@ -2179,6 +2217,7 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
           taskOwnerId,
           initiativeOwnerId,
           currentUserId: currentUser.id,
+          currentUserEmail: currentUser.email,
           deleteScope: config.rolePermissions?.[currentUser.role]?.deleteTasks
         });
         res.status(403).json({ 
@@ -2189,22 +2228,17 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
       }
     } else {
       // If config is not available, fall back to basic check: user must own the task or initiative
-      const normalizedTaskOwnerId = normalizeUserId(taskOwnerId);
-      const normalizedCurrentUserId = normalizeUserId(currentUser.id);
-      const normalizedInitiativeOwnerId = normalizeUserId(initiativeOwnerId);
+      // Using matchesUserId for email matching support
+      const ownsTask = matchesUserId(taskOwnerId, currentUser.id, currentUser.email);
+      const ownsInitiative = matchesUserId(initiativeOwnerId, currentUser.id, currentUser.email);
       
-      if (normalizedCurrentUserId) {
-        const ownsTask = normalizedTaskOwnerId === normalizedCurrentUserId;
-        const ownsInitiative = normalizedInitiativeOwnerId === normalizedCurrentUserId;
-        
-        if (!ownsTask && !ownsInitiative && currentUser.role !== 'Admin') {
-          console.log(`[DELETE /api/sheets/tasks/:id] Fallback authorization denied for user ${currentUser.id} (role: ${currentUser.role}) to delete task ${id}`);
-          res.status(403).json({ 
-            error: 'You do not have permission to delete this task',
-            details: 'You can only delete tasks that you own or tasks in initiatives you own'
-          });
-          return;
-        }
+      if (!ownsTask && !ownsInitiative && currentUser.role !== 'Admin') {
+        console.log(`[DELETE /api/sheets/tasks/:id] Fallback authorization denied for user ${currentUser.id} (role: ${currentUser.role}) to delete task ${id}`);
+        res.status(403).json({ 
+          error: 'You do not have permission to delete this task',
+          details: 'You can only delete tasks that you own or tasks in initiatives you own'
+        });
+        return;
       }
     }
 

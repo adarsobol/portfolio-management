@@ -127,7 +127,7 @@ class AuthService {
         id: 'u_as',
         email: 'adar.sobol@pagaya.com',
         name: 'Adar Sobol',
-        role: 'Admin',
+        role: 'Team Lead', // TEMPORARY: Changed to TeamLead for testing delete button fix
         avatar: 'https://ui-avatars.com/api/?name=Adar+Sobol&background=10B981&color=fff'
       };
     }

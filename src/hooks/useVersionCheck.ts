@@ -19,6 +19,11 @@ const BUILD_HASH_KEY = 'portfolio-app-build-hash';
  */
 export function useVersionCheck() {
   useEffect(() => {
+    // Skip version check in development mode to prevent HMR-induced reload loops
+    if (import.meta.env.DEV) {
+      return;
+    }
+    
     // Get current build hash from meta tag
     const getCurrentBuildHash = (): string | null => {
       const metaTag = document.querySelector('meta[name="app-build-hash"]');
