@@ -92,6 +92,8 @@ interface BulkEntryRow {
   definitionOfDone?: string;
   unplannedTags?: UnplannedTag[];
   dependencies?: Dependency[];
+  // Initiative type (WP or BAU)
+  initiativeType: InitiativeType;
   // Trade-off fields
   hasTradeOff: boolean;
   tradeOffTargetId: string;
@@ -234,6 +236,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       definitionOfDone: '',
       unplannedTags: [],
       dependencies: [],
+      initiativeType: InitiativeType.WP,
       // Trade-off defaults
       hasTradeOff: false,
       tradeOffTargetId: '',
@@ -690,7 +693,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         originalEta: row.eta,
         estimatedEffort: row.estimatedEffort,
         originalEstimatedEffort: row.estimatedEffort,
-        initiativeType: InitiativeType.WP, // Bulk mode defaults to WP
+        initiativeType: row.initiativeType || InitiativeType.WP,
         quarter: bulkSharedSettings.quarter,
         l1_assetClass: bulkSharedSettings.l1_assetClass,
         l2_pillar: row.l2_pillar,

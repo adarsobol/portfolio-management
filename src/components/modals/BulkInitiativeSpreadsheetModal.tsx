@@ -1,9 +1,9 @@
 import React, { useRef } from 'react';
 import {
-  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, AppConfig
+  Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, AppConfig, InitiativeType
 } from '../../types';
 import { getEligibleOwners, generateId } from '../../utils';
-import { getPriorities, getQuarters, getAssetClasses, getDependencyTeams, getHierarchy } from '../../utils/valueLists';
+import { getPriorities, getQuarters, getAssetClasses, getDependencyTeams, getHierarchy, getInitiativeTypes } from '../../utils/valueLists';
 import { Plus, Trash2, Users, ArrowDown, ArrowUp, Copy, Upload, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -26,6 +26,7 @@ interface BulkEntryRow {
   tradeOffTargetId: string;
   tradeOffField: 'eta' | 'status' | 'priority';
   tradeOffValue: string;
+  initiativeType: InitiativeType;
 }
 
 interface BulkInitiativeSpreadsheetModalProps {
@@ -107,6 +108,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
 
   // Column definitions for the spreadsheet (aligned with expected format)
   const columns = [
+    { key: 'initiativeType', label: 'Type', width: 'w-20' },
     { key: 'l2_pillar', label: 'Pillar', width: 'w-32' },
     { key: 'l3_responsibility', label: 'Responsibilities', width: 'w-40' },
     { key: 'l4_target', label: 'Target', width: 'w-48' },
@@ -125,7 +127,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
 
   // Template headers for download (matches column labels)
   const TEMPLATE_HEADERS = [
-    'Pillar', 'Responsibilities', 'Target', 'Initiatives', 'Priority',
+    'Type', 'Pillar', 'Responsibilities', 'Target', 'Initiatives', 'Priority',
     'Definition of Done', 'Q1 Effort (weeks)', 'Owner', 'ETA',
     'PM Item', 'Risk Item', 'Dependencies Department', 'Dependencies Deliverable', 'Dependencies ETA'
   ];
@@ -158,6 +160,8 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
 
         const parsedRows: BulkEntryRow[] = jsonData.map((row) => {
           // Map columns to BulkEntryRow fields
+          const typeVal = String(row['Type'] || row['type'] || row['Initiative Type'] || row['initiativeType'] || 'WP').trim().toUpperCase();
+          const initiativeType = (typeVal === 'BAU' ? InitiativeType.BAU : InitiativeType.WP);
           const pillar = String(row['Pillar'] || row['pillar'] || defaultPillar).trim();
           const responsibility = String(row['Responsibilities'] || row['responsibilities'] || row['Responsibility'] || defaultResp).trim();
           const target = String(row['Target'] || row['target'] || '').trim();
@@ -238,7 +242,8 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
             hasTradeOff: false,
             tradeOffTargetId: '',
             tradeOffField: 'eta',
-            tradeOffValue: ''
+            tradeOffValue: '',
+            initiativeType
           };
         });
 
@@ -345,6 +350,19 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
 
                 return (
                   <tr key={row.id} className="hover:bg-slate-50 border-b border-slate-200">
+                    {/* Type (WP/BAU) */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <select
+                        value={row.initiativeType || InitiativeType.WP}
+                        onChange={(e) => onRowChange(row.id, 'initiativeType', e.target.value as InitiativeType)}
+                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {getInitiativeTypes(config).map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+
                     {/* Pillar */}
                     <td className="px-3 py-2 border-r border-slate-200">
                       <select
