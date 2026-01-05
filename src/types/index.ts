@@ -89,12 +89,14 @@ export interface Task {
   estimatedEffort?: number; // Planned effort in weeks (defaults to 0)
   actualEffort?: number; // Actual effort consumed in weeks (defaults to 0)
   eta: string; // ISO date string
-  ownerId: string; // Team Lead ID
+  ownerId?: string; // Team Lead ID (optional, uses initiative owner for permissions)
+  owner?: string; // Open text field for assignee name (UI display)
   status: Status; // NotStarted/InProgress/Done
   tags?: UnplannedTag[]; // PM Item, Risk Item, Both
   comments?: Comment[];
   deletedAt?: string; // ISO date string when soft-deleted
   createdAt?: string; // ISO date string when created
+  createdBy?: string; // User ID of who created the task
 }
 
 export interface Dependency {
@@ -154,6 +156,7 @@ export interface Initiative {
   originalEta?: string; // Baseline ETA (ISO Date String), only tracked when changed
   lastUpdated: string; // ISO Date String
   createdAt?: string; // ISO date string when created
+  createdBy?: string; // User ID of who created the initiative
   lastWeeklyUpdate?: string; // Last Thursday EoD update (ISO Date String) for weekly routine tracking
   
   // External Team Dependencies

@@ -524,18 +524,17 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (tasks && tasks.length > 0) {
       // Validate each task
       tasks.forEach((task, index) => {
-        if (task.estimatedEffort === undefined || task.estimatedEffort < 0) {
-          newErrors[`task_${task.id}_estimatedEffort`] = `Task ${index + 1}: Planned effort is required`;
+        // Planned effort is optional, but must be non-negative if provided
+        if (task.estimatedEffort !== undefined && task.estimatedEffort < 0) {
+          newErrors[`task_${task.id}_estimatedEffort`] = `Task ${index + 1}: Planned effort must be non-negative`;
         }
-        if (task.actualEffort === undefined || task.actualEffort < 0) {
+        if (task.actualEffort !== undefined && task.actualEffort < 0) {
           newErrors[`task_${task.id}_actualEffort`] = `Task ${index + 1}: Actual effort must be non-negative`;
         }
         if (!task.eta) {
           newErrors[`task_${task.id}_eta`] = `Task ${index + 1}: ETA is required`;
         }
-        if (!task.ownerId) {
-          newErrors[`task_${task.id}_owner`] = `Task ${index + 1}: Owner is required`;
-        }
+        // Owner is now open text field, no validation required
       });
     }
 
@@ -579,8 +578,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         // Set originalEstimatedEffort only when creating new or when it changes
         originalEstimatedEffort: isNew ? (formData.estimatedEffort || 0) : formData.originalEstimatedEffort,
         originalEta: isNew ? (formData.eta || '') : formData.originalEta,
-        // Set createdAt for new initiatives
+        // Set createdAt and createdBy for new initiatives
         createdAt: isNew ? new Date().toISOString() : formData.createdAt,
+        createdBy: isNew ? currentUser.id : formData.createdBy,
         // Include tasks for all initiative types
         tasks: tasks && tasks.length > 0 ? tasks : undefined,
         // Ensure initiativeType is set (required field)
@@ -751,13 +751,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       estimatedEffort: 0,
       actualEffort: 0,
       eta: '',
-      ownerId: formData.ownerId || '',
       status: Status.NotStarted,
       tags: [],
       comments: [],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id
     };
-  }, [formData.ownerId]);
+  }, [currentUser.id]);
 
   const addTask = () => {
     setTasks(prev => [...prev, createEmptyTask()]);
@@ -822,7 +822,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         ...taskToDuplicate,
         id: generateId(),
         title: taskToDuplicate.title ? `${taskToDuplicate.title} (copy)` : undefined,
-        createdAt: new Date().toISOString() // New task gets new createdAt
+        createdAt: new Date().toISOString(), // New task gets new createdAt
+        createdBy: currentUser.id // New task gets current user as creator
       };
       setTasks(prev => [...prev, newTask]);
     }
@@ -2032,9 +2033,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 {task.title || `Task ${index + 1}`}
                               </span>
                               <span className="text-xs font-mono flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded">
-                                <span className="text-blue-600 font-semibold">{task.estimatedEffort || 0}</span>
-                                <span className="text-slate-400">/</span>
                                 <span className="text-slate-600">{task.actualEffort || 0}</span>
+                                <span className="text-slate-400">/</span>
+                                <span className="text-blue-600 font-semibold">{task.estimatedEffort || 0}</span>
                                 <span className="text-slate-400">w</span>
                               </span>
                               {task.tags && task.tags.length > 0 && (
@@ -2098,48 +2099,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 />
                               </div>
                               
-                              {/* Effort (Planned/Actual) | ETA | Owner | Status */}
+                              {/* Effort (Actual/Planned) | ETA | Owner | Status */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {/* Planned Effort */}
-                                <div>
-                                  <label className="block text-xs font-medium text-blue-600 mb-1">
-                                    Planned <span className="text-red-500">*</span>
-                                  </label>
-                                  <div className="flex items-center gap-0.5 bg-blue-50 rounded-lg px-1.5 py-1 border border-blue-200">
-                                    <button
-                                      type="button"
-                                      onClick={() => updateTask(task.id, 'estimatedEffort', Math.max(0, Number(task.estimatedEffort || 0) - 0.25))}
-                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
-                                      title="Decrease planned by 0.25"
-                                    >
-                                      <ArrowDown size={14} />
-                                    </button>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.25"
-                                      value={task.estimatedEffort || 0}
-                                      onChange={(e) => updateTask(task.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
-                                      className={`w-14 px-1.5 py-1 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-blue-300 text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                                        errors[`task_${task.id}_estimatedEffort`] ? 'border-red-500 bg-red-50' : 'border-blue-300'
-                                      }`}
-                                      placeholder="0"
-                                      title="Planned effort"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => updateTask(task.id, 'estimatedEffort', Number(task.estimatedEffort || 0) + 0.25)}
-                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
-                                      title="Increase planned by 0.25"
-                                    >
-                                      <ArrowUp size={14} />
-                                    </button>
-                                    <span className="text-xs text-blue-500 ml-0.5">w</span>
-                                  </div>
-                                  {errors[`task_${task.id}_estimatedEffort`] && (
-                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_estimatedEffort`]}</p>
-                                  )}
-                                </div>
                                 {/* Actual Effort */}
                                 <div>
                                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -2180,6 +2141,46 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_actualEffort`]}</p>
                                   )}
                                 </div>
+                                {/* Planned Effort */}
+                                <div>
+                                  <label className="block text-xs font-medium text-blue-600 mb-1">
+                                    Planned
+                                  </label>
+                                  <div className="flex items-center gap-0.5 bg-blue-50 rounded-lg px-1.5 py-1 border border-blue-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateTask(task.id, 'estimatedEffort', Math.max(0, Number(task.estimatedEffort || 0) - 0.25))}
+                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
+                                      title="Decrease planned by 0.25"
+                                    >
+                                      <ArrowDown size={14} />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.25"
+                                      value={task.estimatedEffort || 0}
+                                      onChange={(e) => updateTask(task.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                                      className={`w-14 px-1.5 py-1 text-sm font-mono border rounded focus:outline-none focus:ring-2 focus:ring-blue-300 text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                                        errors[`task_${task.id}_estimatedEffort`] ? 'border-red-500 bg-red-50' : 'border-blue-300'
+                                      }`}
+                                      placeholder="0"
+                                      title="Planned effort"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateTask(task.id, 'estimatedEffort', Number(task.estimatedEffort || 0) + 0.25)}
+                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
+                                      title="Increase planned by 0.25"
+                                    >
+                                      <ArrowUp size={14} />
+                                    </button>
+                                    <span className="text-xs text-blue-500 ml-0.5">w</span>
+                                  </div>
+                                  {errors[`task_${task.id}_estimatedEffort`] && (
+                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_estimatedEffort`]}</p>
+                                  )}
+                                </div>
                               </div>
                               
                               {/* ETA | Owner | Status - Second Row */}
@@ -2202,23 +2203,15 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                                    Owner <span className="text-red-500">*</span>
+                                    Assignee
                                   </label>
-                                  <select
-                                    value={task.ownerId}
-                                    onChange={(e) => updateTask(task.id, 'ownerId', e.target.value)}
-                                    className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-300 ${
-                                      errors[`task_${task.id}_owner`] ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                                    }`}
-                                  >
-                                    <option value="">Select...</option>
-                                    {getEligibleOwners(users).map(u => (
-                                      <option key={u.id} value={u.id}>{u.name}</option>
-                                    ))}
-                                  </select>
-                                  {errors[`task_${task.id}_owner`] && (
-                                    <p className="text-red-500 text-xs mt-0.5">{errors[`task_${task.id}_owner`]}</p>
-                                  )}
+                                  <input
+                                    type="text"
+                                    value={task.owner || ''}
+                                    onChange={(e) => updateTask(task.id, 'owner', e.target.value || undefined)}
+                                    placeholder="Enter assignee name..."
+                                    className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                  />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-slate-600 mb-1">

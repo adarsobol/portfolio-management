@@ -625,7 +625,7 @@ const INITIATIVE_HEADERS = [
   'id', 'initiativeType', 'l1_assetClass', 'l2_pillar', 'l3_responsibility', 'l4_target',
   'title', 'ownerId', 'secondaryOwner', 'quarter', 'status', 'priority',
   'estimatedEffort', 'originalEstimatedEffort', 'actualEffort',
-  'eta', 'originalEta', 'lastUpdated', 'createdAt', 'lastWeeklyUpdate', 'dependencies', 'workType',
+  'eta', 'originalEta', 'lastUpdated', 'createdAt', 'createdBy', 'lastWeeklyUpdate', 'dependencies', 'workType',
   'unplannedTags', 'riskActionLog', 'isAtRisk', 'definitionOfDone',
   'tasks', 'overlookedCount', 'lastDelayDate', 'completionRate',
   'comments', 'history', 'version', 'deletedAt'
@@ -638,7 +638,7 @@ const CHANGELOG_HEADERS = [
 
 const TASK_HEADERS = [
   'id', 'parentId', 'initiativeTitle', 'title', 'estimatedEffort', 'actualEffort',
-  'eta', 'ownerId', 'status', 'tags', 'comments', 'createdAt', 'lastUpdated', 'deletedAt'
+  'eta', 'ownerId', 'owner', 'status', 'tags', 'comments', 'createdAt', 'createdBy', 'lastUpdated', 'deletedAt'
 ];
 
 const USER_HEADERS = ['id', 'email', 'passwordHash', 'name', 'role', 'avatar', 'lastLogin', 'team'];
@@ -1814,6 +1814,7 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
         originalEta: eta,
         lastUpdated: today,
         createdAt: today,
+        createdBy: req.user?.id || '',
         dependencies: init.dependencies || init.Dependencies || '',
         workType: workType,
         unplannedTags: '[]',
@@ -2035,15 +2036,19 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         console.log(`[SERVER] Updating ${initiative.id}: client ${clientLastUpdated} >= server ${serverLastUpdated}`);
         const serverVersion = parseInt(existing.get('version') || '0', 10);
         const newVersion = serverVersion + 1;
-        // Preserve createdAt from server if not provided by client
+        // Preserve createdAt and createdBy from server if not provided by client
         const serverCreatedAt = existing.get('createdAt');
+        const serverCreatedBy = existing.get('createdBy');
         Object.keys(initiative).forEach(key => {
           const value = initiative[key];
           existing.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
         });
-        // Preserve createdAt if it exists on server but not in client update
+        // Preserve createdAt and createdBy if they exist on server but not in client update
         if (serverCreatedAt && !initiative.createdAt) {
           existing.set('createdAt', serverCreatedAt);
+        }
+        if (serverCreatedBy && !initiative.createdBy) {
+          existing.set('createdBy', serverCreatedBy);
         }
         existing.set('version', String(newVersion));
         await existing.save();
@@ -2422,15 +2427,19 @@ app.post('/api/sheets/tasks', authenticateToken, async (req: AuthenticatedReques
 
       if (existing) {
         // Update existing task
-        // Preserve createdAt from server if not provided by client
+        // Preserve createdAt and createdBy from server if not provided by client
         const serverCreatedAt = existing.get('createdAt');
+        const serverCreatedBy = existing.get('createdBy');
         Object.keys(task).forEach(key => {
           const value = task[key];
           existing.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
         });
-        // Preserve createdAt if it exists on server but not in client update
+        // Preserve createdAt and createdBy if they exist on server but not in client update
         if (serverCreatedAt && !task.createdAt) {
           existing.set('createdAt', serverCreatedAt);
+        }
+        if (serverCreatedBy && !task.createdBy) {
+          existing.set('createdBy', serverCreatedBy);
         }
         await existing.save();
         syncedCount++;

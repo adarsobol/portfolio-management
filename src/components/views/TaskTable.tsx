@@ -105,10 +105,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     tradeOffEta?: string;
   }>({
     title: '',
-    estimatedEffort: 1,
+    estimatedEffort: 0,
     actualEffort: 0,
     eta: '',
-    ownerId: '',
+    owner: '',
     status: Status.NotStarted,
     tags: [],
     initiativeId: undefined,
@@ -157,22 +157,23 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       return;
     }
     
-    if (!newTaskForm.eta || !newTaskForm.ownerId) {
-      alert('Please fill in all required fields (ETA and Owner)');
+    if (!newTaskForm.eta) {
+      alert('Please fill in the required ETA field');
       return;
     }
     
     const newTask: Task = {
       id: generateId(),
       title: newTaskForm.title || undefined,
-      estimatedEffort: newTaskForm.estimatedEffort || 1,
+      estimatedEffort: newTaskForm.estimatedEffort || 0,
       actualEffort: newTaskForm.actualEffort || 0,
       eta: newTaskForm.eta,
-      ownerId: newTaskForm.ownerId,
+      owner: newTaskForm.owner || undefined,
       status: newTaskForm.status || Status.NotStarted,
       tags: newTaskForm.tags || [],
       comments: [],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id
     };
     
     const updatedTasks = [...(initiative.tasks || []), newTask];
@@ -215,10 +216,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     // Reset form and close add mode
     setNewTaskForm({
       title: '',
-      estimatedEffort: 1,
+      estimatedEffort: 0,
       actualEffort: 0,
       eta: '',
-      ownerId: '',
+      owner: '',
       status: Status.NotStarted,
       tags: [],
       initiativeId: undefined,
@@ -593,10 +594,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       const defaultEta = new Date().toISOString().split('T')[0];
                       setNewTaskForm({
                         title: '',
-                        estimatedEffort: 1,
+                        estimatedEffort: 0,
                         actualEffort: 0,
                         eta: defaultEta,
-                        ownerId: item.ownerId,
+                        owner: '',
                         status: Status.NotStarted,
                         tags: [],
                         initiativeId: item.id,
@@ -1086,28 +1087,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           </div>
                         </div>
                         
-                        {/* Column 3: Owner (aligned with Owner column) */}
+                        {/* Column 3: Assignee (aligned with Owner column) */}
                         <div className="px-2.5 py-2 border-r border-purple-200 whitespace-nowrap">
                           {editable ? (
-                            <div className="flex items-center gap-1.5">
-                              <select
-                                value={task.ownerId}
-                                onChange={(e) => handleUpdateTask(item.id, task.id, 'ownerId', e.target.value)}
-                                className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
-                              >
-                                {getEligibleOwners(users).map(u => (
-                                  <option key={u.id} value={u.id}>{u.name}</option>
-                                ))}
-                              </select>
-                            </div>
+                            <input
+                              type="text"
+                              value={task.owner || ''}
+                              onChange={(e) => handleUpdateTask(item.id, task.id, 'owner', e.target.value || undefined)}
+                              placeholder="Assignee..."
+                              className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white w-24"
+                            />
                           ) : (
-                            <div className="flex items-center gap-2.5" title="Owner">
-                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-[10px] font-bold text-purple-600 border border-purple-300 shadow-sm">
-                                {getOwnerNameById(task.ownerId)?.charAt(0)}
-                              </div>
-                              <div className="flex flex-col justify-center gap-0.5">
-                                <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{getOwnerNameById(task.ownerId)}</span>
-                              </div>
+                            <div className="flex items-center gap-2.5" title="Assignee">
+                              {task.owner ? (
+                                <>
+                                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-[10px] font-bold text-purple-600 border border-purple-300 shadow-sm">
+                                    {task.owner.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className="flex flex-col justify-center gap-0.5">
+                                    <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{task.owner}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="text-slate-400 text-xs italic">Not assigned</span>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1334,10 +1337,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         const defaultEta = new Date().toISOString().split('T')[0];
                         setNewTaskForm({
                           title: '',
-                          estimatedEffort: 1,
+                          estimatedEffort: 0,
                           actualEffort: 0,
                           eta: defaultEta,
-                          ownerId: item.ownerId,
+                          owner: '',
                           status: Status.NotStarted,
                           tags: [],
                           initiativeId: item.id,
@@ -1361,10 +1364,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             setAddingTaskFor(null);
                             setNewTaskForm({
                               title: '',
-                              estimatedEffort: 1,
+                              estimatedEffort: 0,
                               actualEffort: 0,
                               eta: '',
-                              ownerId: '',
+                              owner: '',
                               status: Status.NotStarted,
                               tags: [],
                               initiativeId: item.id,
@@ -1409,48 +1412,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           {/* Effort */}
                           <div>
                             <label className="block text-[10px] font-medium text-slate-700 mb-1">
-                              Effort <span className="text-red-500">*</span>
-                              <span className="text-[9px] text-slate-400 font-normal ml-0.5">(Planned / Actual)</span>
+                              Effort
+                              <span className="text-[9px] text-slate-400 font-normal ml-0.5">(Actual / Planned)</span>
                             </label>
                             <div className="flex items-center gap-1">
-                              {/* Planned Effort - Blue theme */}
-                              <div className="flex items-center gap-0.5 bg-blue-50 border border-blue-200 rounded-md px-0.5 py-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Math.max(0, Number(prev.estimatedEffort || 1) - 0.25) }));
-                                  }}
-                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
-                                  title="Decrease planned"
-                                >
-                                  <ArrowDown size={9} />
-                                </button>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.25"
-                                  value={newTaskForm.estimatedEffort || 1}
-                                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, estimatedEffort: parseFloat(e.target.value) || 1 }))}
-                                  className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right text-blue-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  placeholder="1"
-                                  title="Planned effort"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Number(prev.estimatedEffort || 1) + 0.25 }));
-                                  }}
-                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
-                                  title="Increase planned"
-                                >
-                                  <ArrowUp size={9} />
-                                </button>
-                              </div>
-                              <span className="text-slate-400 text-[10px]">/</span>
                               {/* Actual Effort - Slate theme */}
                               <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-300 rounded-md px-0.5 py-0.5">
                                 <button
@@ -1488,6 +1453,44 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   <ArrowUp size={9} />
                                 </button>
                               </div>
+                              <span className="text-slate-400 text-[10px]">/</span>
+                              {/* Planned Effort - Blue theme */}
+                              <div className="flex items-center gap-0.5 bg-blue-50 border border-blue-200 rounded-md px-0.5 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Math.max(0, Number(prev.estimatedEffort || 0) - 0.25) }));
+                                  }}
+                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
+                                  title="Decrease planned"
+                                >
+                                  <ArrowDown size={9} />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.25"
+                                  value={newTaskForm.estimatedEffort || 0}
+                                  onChange={(e) => setNewTaskForm(prev => ({ ...prev, estimatedEffort: parseFloat(e.target.value) || 0 }))}
+                                  className="w-10 px-0.5 py-0.5 text-xs font-mono border-0 bg-transparent focus:outline-none text-right text-blue-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder="0"
+                                  title="Planned effort"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNewTaskForm(prev => ({ ...prev, estimatedEffort: Number(prev.estimatedEffort || 0) + 0.25 }));
+                                  }}
+                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
+                                  title="Increase planned"
+                                >
+                                  <ArrowUp size={9} />
+                                </button>
+                              </div>
                               <span className="text-[9px] text-slate-500 font-medium">w</span>
                             </div>
                           </div>
@@ -1505,21 +1508,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             />
                           </div>
 
-                          {/* Owner */}
+                          {/* Assignee */}
                           <div>
                             <label className="block text-[10px] font-medium text-slate-700 mb-1">
-                              Owner <span className="text-red-500">*</span>
+                              Assignee
                             </label>
-                            <select
-                              value={newTaskForm.ownerId || item.ownerId}
-                              onChange={(e) => setNewTaskForm(prev => ({ ...prev, ownerId: e.target.value }))}
+                            <input
+                              type="text"
+                              value={newTaskForm.owner || ''}
+                              onChange={(e) => setNewTaskForm(prev => ({ ...prev, owner: e.target.value || undefined }))}
+                              placeholder="Enter name..."
                               className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                              <option value="">Select...</option>
-                              {users.filter(u => u.role === Role.TeamLead).map(u => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
-                              ))}
-                            </select>
+                            />
                           </div>
 
                           {/* Status */}
@@ -1710,10 +1710,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             setAddingTaskFor(null);
                             setNewTaskForm({
                               title: '',
-                              estimatedEffort: 1,
+                              estimatedEffort: 0,
                               actualEffort: 0,
                               eta: '',
-                              ownerId: '',
+                              owner: '',
                               status: Status.NotStarted,
                               tags: [],
                               initiativeId: item.id,
@@ -1736,7 +1736,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </button>
                         <button
                           onClick={() => handleAddTask(item.id)}
-                          disabled={!newTaskForm.eta || !newTaskForm.ownerId}
+                          disabled={!newTaskForm.eta}
                           className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                         >
                           Add Task
