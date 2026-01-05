@@ -516,7 +516,7 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
       name: 'Adar Sobol',
-      role: 'Team Lead' // TEMPORARY: Changed to TeamLead for testing delete button fix
+      role: 'Admin'
     };
     next();
     return;
@@ -547,7 +547,7 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
       name: 'Adar Sobol',
-      role: 'Team Lead' // TEMPORARY: Changed to TeamLead for testing delete button fix
+      role: 'Admin'
     };
     next();
     return;
@@ -738,6 +738,11 @@ function canUserDeleteTask(
   currentUserId: string,
   currentUserEmail?: string
 ): boolean {
+  // Admin users can always delete tasks
+  if (userRole === 'Admin') {
+    return true;
+  }
+  
   if (!config || !config.rolePermissions) {
     console.warn('[canUserDeleteTask] Config or rolePermissions missing');
     return false;
