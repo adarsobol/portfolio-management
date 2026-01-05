@@ -1762,13 +1762,6 @@ export default function App() {
       timestamp: Date.now()
     }));
 
-    // Show success toast immediately for better UX (only if not suppressed)
-    if (!suppressNotification) {
-      const isTaskUpdate = field === 'tasks';
-      const toastMessage = isTaskUpdate ? 'Task was updated' : 'Initiative was updated';
-      showSuccess(toastMessage);
-    }
-
     // Set timeout to clear optimistic marker if sync takes too long (10s)
     const timeoutId = setTimeout(() => {
       setOptimisticUpdates(prev => {
