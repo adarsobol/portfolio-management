@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import {
   Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, AppConfig
 } from '../../types';
-import { getEligibleOwners } from '../../utils';
+import { getEligibleOwners, generateId } from '../../utils';
 import { getPriorities, getQuarters, getAssetClasses, getDependencyTeams, getHierarchy } from '../../utils/valueLists';
-import { Plus, X, Trash2, Users, ArrowDown, ArrowUp, Copy } from 'lucide-react';
+import { Plus, Trash2, Users, ArrowDown, ArrowUp, Copy, Upload, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface BulkEntryRow {
   id: string;
@@ -49,7 +50,7 @@ interface BulkInitiativeSpreadsheetModalProps {
 export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetModalProps> = ({
   rows,
   config,
-  onRowsChange: _onRowsChange,
+  onRowsChange,
   errors,
   onErrorsChange: _onErrorsChange,
   sharedSettings,
@@ -61,47 +62,33 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
   onRemoveRow,
   onDuplicateRow
 }) => {
-  const [expandedDependencies, setExpandedDependencies] = useState<Set<string>>(new Set());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const toggleDependencies = (rowId: string) => {
-    setExpandedDependencies(prev => {
-      const next = new Set(prev);
-      if (next.has(rowId)) {
-        next.delete(rowId);
+  // Update the first dependency field for a row (inline editing)
+  const updateFirstDependency = (rowId: string, field: keyof Dependency, value: string) => {
+    const row = rows.find(r => r.id === rowId);
+    if (row) {
+      const deps = row.dependencies || [];
+      if (deps.length === 0) {
+        // Create first dependency
+        const newDep: Dependency = {
+          team: field === 'team' ? value as DependencyTeam : DependencyTeam.Product,
+          deliverable: field === 'deliverable' ? value : '',
+          eta: field === 'eta' ? value : ''
+        };
+        onRowChange(rowId, 'dependencies', [newDep]);
       } else {
-        next.add(rowId);
+        // Update first dependency
+        const updatedDeps = [...deps];
+        updatedDeps[0] = { ...updatedDeps[0], [field]: value };
+        onRowChange(rowId, 'dependencies', updatedDeps);
       }
-      return next;
-    });
-  };
-
-  const addDependency = (rowId: string) => {
-    const row = rows.find(r => r.id === rowId);
-    if (row) {
-      const newDependency: Dependency = {
-        team: DependencyTeam.Product,
-        deliverable: '',
-        eta: ''
-      };
-      onRowChange(rowId, 'dependencies', [...(row.dependencies || []), newDependency]);
     }
   };
 
-  const updateDependency = (rowId: string, depIndex: number, field: keyof Dependency, value: any) => {
-    const row = rows.find(r => r.id === rowId);
-    if (row) {
-      const updatedDeps = [...(row.dependencies || [])];
-      updatedDeps[depIndex] = { ...updatedDeps[depIndex], [field]: value };
-      onRowChange(rowId, 'dependencies', updatedDeps);
-    }
-  };
-
-  const removeDependency = (rowId: string, depIndex: number) => {
-    const row = rows.find(r => r.id === rowId);
-    if (row && row.dependencies) {
-      const updatedDeps = row.dependencies.filter((_, i) => i !== depIndex);
-      onRowChange(rowId, 'dependencies', updatedDeps);
-    }
+  // Get first dependency or empty values
+  const getFirstDependency = (row: BulkEntryRow): Dependency => {
+    return row.dependencies?.[0] || { team: '' as DependencyTeam, deliverable: '', eta: '' };
   };
 
   const toggleUnplannedTag = (rowId: string, tag: UnplannedTag) => {
@@ -118,30 +105,194 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
 
   const teamLeads = getEligibleOwners(users);
 
-  // Column definitions for the spreadsheet
+  // Column definitions for the spreadsheet (aligned with expected format)
   const columns = [
-    { key: 'l2_pillar', label: 'Pillar', width: 'w-32', type: 'select' },
-    { key: 'l3_responsibility', label: 'Responsibilities', width: 'w-40', type: 'select' },
-    { key: 'l4_target', label: 'Target', width: 'w-48', type: 'text' },
-    { key: 'title', label: 'Initiatives', width: 'w-64', type: 'text' },
-    { key: 'priority', label: 'Priority', width: 'w-24', type: 'select' },
-    { key: 'definitionOfDone', label: 'Definition of Done', width: 'w-48', type: 'text' },
-    { key: 'estimatedEffort', label: 'Q1 Effort (weeks)', width: 'w-32', type: 'number' },
-    { key: 'ownerId', label: 'Owner Within Team', width: 'w-40', type: 'select' },
-    { key: 'status', label: 'Status', width: 'w-32', type: 'select' },
-    { key: 'eta', label: 'ETA', width: 'w-32', type: 'date' },
-    { key: 'pmItem', label: 'PM Item', width: 'w-20', type: 'checkbox' },
-    { key: 'riskItem', label: 'Risk Item', width: 'w-20', type: 'checkbox' },
-    { key: 'dependencies', label: 'Dependencies', width: 'w-auto', type: 'dependencies' },
+    { key: 'l2_pillar', label: 'Pillar', width: 'w-32' },
+    { key: 'l3_responsibility', label: 'Responsibilities', width: 'w-40' },
+    { key: 'l4_target', label: 'Target', width: 'w-48' },
+    { key: 'title', label: 'Initiatives', width: 'w-64' },
+    { key: 'priority', label: 'Priority', width: 'w-24' },
+    { key: 'definitionOfDone', label: 'Definition of Done', width: 'w-48' },
+    { key: 'estimatedEffort', label: 'Q1 Effort (weeks)', width: 'w-32' },
+    { key: 'ownerId', label: 'Owner', width: 'w-40' },
+    { key: 'eta', label: 'ETA', width: 'w-32' },
+    { key: 'pmItem', label: 'PM Item', width: 'w-20' },
+    { key: 'riskItem', label: 'Risk Item', width: 'w-20' },
+    { key: 'depDepartment', label: 'Dependencies Department', width: 'w-36' },
+    { key: 'depDeliverable', label: 'Dependencies Deliverable', width: 'w-48' },
+    { key: 'depEta', label: 'Dependencies ETA', width: 'w-32' },
   ];
+
+  // Template headers for download (matches column labels)
+  const TEMPLATE_HEADERS = [
+    'Pillar', 'Responsibilities', 'Target', 'Initiatives', 'Priority',
+    'Definition of Done', 'Q1 Effort (weeks)', 'Owner', 'ETA',
+    'PM Item', 'Risk Item', 'Dependencies Department', 'Dependencies Deliverable', 'Dependencies ETA'
+  ];
+
+  // Download template Excel file
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Plan Mode Template');
+    XLSX.writeFile(wb, 'plan-mode-template.xlsx');
+  };
+
+  // Parse uploaded Excel/CSV file
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
+
+        const hierarchy = getHierarchy(config);
+        const defaultPillar = hierarchy[sharedSettings.l1_assetClass][0]?.name || '';
+        const defaultResp = hierarchy[sharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
+
+        const parsedRows: BulkEntryRow[] = jsonData.map((row) => {
+          // Map columns to BulkEntryRow fields
+          const pillar = String(row['Pillar'] || row['pillar'] || defaultPillar).trim();
+          const responsibility = String(row['Responsibilities'] || row['responsibilities'] || row['Responsibility'] || defaultResp).trim();
+          const target = String(row['Target'] || row['target'] || '').trim();
+          const title = String(row['Initiatives'] || row['Initiative'] || row['Title'] || row['title'] || '').trim();
+          const priority = String(row['Priority'] || row['priority'] || 'P1').trim() as Priority;
+          const definitionOfDone = String(row['Definition of Done'] || row['definitionOfDone'] || '').trim();
+          const effort = parseFloat(String(row['Q1 Effort (weeks)'] || row['Effort'] || row['estimatedEffort'] || '0')) || 0;
+          
+          // Owner lookup by name
+          const ownerName = String(row['Owner'] || row['owner'] || '').trim().toLowerCase();
+          const owner = teamLeads.find(u => u.name.toLowerCase() === ownerName);
+          const ownerId = owner?.id || '';
+
+          // Parse ETA (handle Excel date serial numbers)
+          let eta = '';
+          const rawEta = row['ETA'] || row['eta'];
+          if (rawEta) {
+            if (typeof rawEta === 'number') {
+              // Excel date serial number conversion
+              const excelEpoch = new Date(1899, 11, 30);
+              const date = new Date(excelEpoch.getTime() + rawEta * 86400000);
+              eta = date.toISOString().split('T')[0];
+            } else {
+              eta = String(rawEta).trim();
+            }
+          }
+
+          // PM Item and Risk Item (checkboxes)
+          const pmItemVal = row['PM Item'] || row['pmItem'];
+          const riskItemVal = row['Risk Item'] || row['riskItem'];
+          const unplannedTags: UnplannedTag[] = [];
+          if (pmItemVal === true || pmItemVal === 'true' || pmItemVal === 'TRUE' || pmItemVal === 'Yes' || pmItemVal === 'yes' || pmItemVal === 'X' || pmItemVal === 'x') {
+            unplannedTags.push(UnplannedTag.PMItem);
+          }
+          if (riskItemVal === true || riskItemVal === 'true' || riskItemVal === 'TRUE' || riskItemVal === 'Yes' || riskItemVal === 'yes' || riskItemVal === 'X' || riskItemVal === 'x') {
+            unplannedTags.push(UnplannedTag.RiskItem);
+          }
+
+          // Dependencies
+          const depDepartment = String(row['Dependencies Department'] || row['depDepartment'] || '').trim();
+          const depDeliverable = String(row['Dependencies Deliverable'] || row['depDeliverable'] || '').trim();
+          let depEta = '';
+          const rawDepEta = row['Dependencies ETA'] || row['depEta'];
+          if (rawDepEta) {
+            if (typeof rawDepEta === 'number') {
+              const excelEpoch = new Date(1899, 11, 30);
+              const date = new Date(excelEpoch.getTime() + rawDepEta * 86400000);
+              depEta = date.toISOString().split('T')[0];
+            } else {
+              depEta = String(rawDepEta).trim();
+            }
+          }
+
+          const dependencies: Dependency[] = [];
+          if (depDepartment || depDeliverable || depEta) {
+            dependencies.push({
+              team: (depDepartment || DependencyTeam.Product) as DependencyTeam,
+              deliverable: depDeliverable,
+              eta: depEta
+            });
+          }
+
+          return {
+            id: generateId(),
+            title,
+            ownerId,
+            priority: (['P0', 'P1', 'P2'].includes(priority) ? priority : Priority.P1) as Priority,
+            status: Status.NotStarted, // Default status (not shown in table)
+            eta,
+            estimatedEffort: effort,
+            l2_pillar: pillar,
+            l3_responsibility: responsibility,
+            l4_target: target,
+            secondaryOwner: '',
+            definitionOfDone,
+            unplannedTags,
+            dependencies,
+            hasTradeOff: false,
+            tradeOffTargetId: '',
+            tradeOffField: 'eta',
+            tradeOffValue: ''
+          };
+        });
+
+        // Replace existing rows with parsed data
+        if (parsedRows.length > 0) {
+          onRowsChange(parsedRows);
+        }
+      } catch (err) {
+        console.error('Error parsing file:', err);
+        alert('Failed to parse file. Please ensure it is a valid Excel or CSV file.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
-      {/* Shared Settings */}
+      {/* Shared Settings + Upload/Download */}
       <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
-        <div className="flex items-center gap-2 mb-3">
-          <Users size={16} className="text-slate-500" />
-          <span className="text-sm font-semibold text-slate-700">Shared Settings (applies to all)</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-slate-500" />
+            <span className="text-sm font-semibold text-slate-700">Shared Settings (applies to all)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+            >
+              <Upload size={14} />
+              Upload Sheet
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              <Download size={14} />
+              Download Template
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -170,7 +321,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
       {/* Spreadsheet Table */}
       <div className="flex-1 overflow-auto">
         <div className="inline-block min-w-full">
-          <table className="border-collapse" style={{ minWidth: '1400px' }}>
+          <table className="border-collapse" style={{ minWidth: '1600px' }}>
             {/* Header Row */}
             <thead>
               <tr className="bg-blue-100 border-b-2 border-slate-300">
@@ -186,292 +337,241 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                   Actions
                 </th>
               </tr>
-              {/* Dependencies Sub-header */}
-              <tr className="bg-blue-50 border-b border-slate-300">
-                <th colSpan={12} className="px-3 py-1 text-xs font-medium text-slate-600 border-r border-slate-300 sticky top-[41px] bg-blue-50 z-10">
-                  Dependencies
-                </th>
-                <th className="px-3 py-1 text-xs font-medium text-slate-600 border-r border-slate-300 sticky top-[41px] bg-blue-50 z-10">
-                  Department
-                </th>
-                <th className="px-3 py-1 text-xs font-medium text-slate-600 border-r border-slate-300 sticky top-[41px] bg-blue-50 z-10">
-                  Requirement
-                </th>
-                <th className="px-3 py-1 text-xs font-medium text-slate-600 border-r border-slate-300 sticky top-[41px] bg-blue-50 z-10">
-                  Deadline
-                </th>
-                <th className="w-16 px-3 py-1 sticky top-[41px] bg-blue-50 z-10"></th>
-              </tr>
             </thead>
             <tbody>
               {rows.map((row, rowIndex) => {
                 const rowErrors = errors[row.id] || {};
-                const hasDependencies = row.dependencies && row.dependencies.length > 0;
-                const isDependenciesExpanded = expandedDependencies.has(row.id);
+                const firstDep = getFirstDependency(row);
 
                 return (
-                  <React.Fragment key={row.id}>
-                    {/* Main Data Row */}
-                    <tr className="hover:bg-slate-50 border-b border-slate-200">
-                      {/* Pillar */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <select
-                          value={row.l2_pillar}
-                          onChange={(e) => {
-                            const newPillar = e.target.value;
-                            const hierarchy = getHierarchy(config);
-                            const pillarNode = hierarchy[sharedSettings.l1_assetClass].find(p => p.name === newPillar);
-                            onRowChange(row.id, 'l2_pillar', newPillar);
-                            if (pillarNode) {
-                              onRowChange(row.id, 'l3_responsibility', pillarNode.responsibilities[0] || '');
-                            }
-                          }}
-                          className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            rowErrors.l2_pillar ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                          }`}
-                        >
-                          {getHierarchy(config)[sharedSettings.l1_assetClass].map(p => (
-                            <option key={p.name} value={p.name}>{p.name}</option>
-                          ))}
-                        </select>
-                      </td>
+                  <tr key={row.id} className="hover:bg-slate-50 border-b border-slate-200">
+                    {/* Pillar */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <select
+                        value={row.l2_pillar}
+                        onChange={(e) => {
+                          const newPillar = e.target.value;
+                          const hierarchy = getHierarchy(config);
+                          const pillarNode = hierarchy[sharedSettings.l1_assetClass].find(p => p.name === newPillar);
+                          onRowChange(row.id, 'l2_pillar', newPillar);
+                          if (pillarNode) {
+                            onRowChange(row.id, 'l3_responsibility', pillarNode.responsibilities[0] || '');
+                          }
+                        }}
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.l2_pillar ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      >
+                        {getHierarchy(config)[sharedSettings.l1_assetClass].map(p => (
+                          <option key={p.name} value={p.name}>{p.name}</option>
+                        ))}
+                      </select>
+                    </td>
 
-                      {/* Responsibilities */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <select
-                          value={row.l3_responsibility}
-                          onChange={(e) => onRowChange(row.id, 'l3_responsibility', e.target.value)}
-                          className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            rowErrors.l3_responsibility ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                          }`}
-                        >
-                          {(getHierarchy(config)[sharedSettings.l1_assetClass].find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                      </td>
+                    {/* Responsibilities */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <select
+                        value={row.l3_responsibility}
+                        onChange={(e) => onRowChange(row.id, 'l3_responsibility', e.target.value)}
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.l3_responsibility ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      >
+                        {(getHierarchy(config)[sharedSettings.l1_assetClass].find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </td>
 
-                      {/* Target */}
-                      <td className="px-3 py-2 border-r border-slate-200">
+                    {/* Target */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={row.l4_target}
+                        onChange={(e) => onRowChange(row.id, 'l4_target', e.target.value)}
+                        placeholder="e.g. Identify constraints"
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.l4_target ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      />
+                    </td>
+
+                    {/* Initiatives (Title) */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={row.title}
+                        onChange={(e) => onRowChange(row.id, 'title', e.target.value)}
+                        placeholder={`Initiative ${rowIndex + 1}...`}
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.title ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      />
+                    </td>
+
+                    {/* Priority */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <select
+                        value={row.priority}
+                        onChange={(e) => onRowChange(row.id, 'priority', e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {getPriorities(config).map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </td>
+
+                    {/* Definition of Done */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={row.definitionOfDone || ''}
+                        onChange={(e) => onRowChange(row.id, 'definitionOfDone', e.target.value)}
+                        placeholder="Definition of done..."
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.definitionOfDone ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      />
+                    </td>
+
+                    {/* Q1 Effort (weeks) */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onRowChange(row.id, 'estimatedEffort', Math.max(0, row.estimatedEffort - 0.25))}
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
+                          title="Decrease by 0.25"
+                        >
+                          <ArrowDown size={12} />
+                        </button>
                         <input
-                          type="text"
-                          value={row.l4_target}
-                          onChange={(e) => onRowChange(row.id, 'l4_target', e.target.value)}
-                          placeholder="e.g. Identify constraints"
-                          className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            rowErrors.l4_target ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                          type="number"
+                          min="0"
+                          step="0.25"
+                          value={row.estimatedEffort}
+                          onChange={(e) => onRowChange(row.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
+                          className={`w-16 px-2 py-1 text-sm border rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            rowErrors.estimatedEffort ? 'border-red-500 bg-red-50' : 'border-slate-200'
                           }`}
                         />
-                      </td>
-
-                      {/* Initiatives (Title) */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <input
-                          type="text"
-                          value={row.title}
-                          onChange={(e) => onRowChange(row.id, 'title', e.target.value)}
-                          placeholder={`Initiative ${rowIndex + 1}...`}
-                          className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            rowErrors.title ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                          }`}
-                        />
-                      </td>
-
-                      {/* Priority */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <select
-                          value={row.priority}
-                          onChange={(e) => onRowChange(row.id, 'priority', e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        <button
+                          type="button"
+                          onClick={() => onRowChange(row.id, 'estimatedEffort', row.estimatedEffort + 0.25)}
+                          className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
+                          title="Increase by 0.25"
                         >
-                          {getPriorities(config).map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      </td>
+                          <ArrowUp size={12} />
+                        </button>
+                      </div>
+                    </td>
 
-                      {/* Definition of Done */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <input
-                          type="text"
-                          value={row.definitionOfDone || ''}
-                          onChange={(e) => onRowChange(row.id, 'definitionOfDone', e.target.value)}
-                          placeholder="Definition of done..."
-                          className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            rowErrors.definitionOfDone ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                          }`}
-                        />
-                      </td>
+                    {/* Owner */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <select
+                        value={row.ownerId}
+                        onChange={(e) => onRowChange(row.id, 'ownerId', e.target.value)}
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.ownerId ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      >
+                        <option value="">Select...</option>
+                        {teamLeads.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </td>
 
-                      {/* Q1 Effort (weeks) */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <div className="flex items-center gap-1">
+                    {/* ETA */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <input
+                        type="date"
+                        value={row.eta || ''}
+                        onChange={(e) => onRowChange(row.id, 'eta', e.target.value)}
+                        className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                          rowErrors.eta ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                        }`}
+                      />
+                    </td>
+
+                    {/* PM Item */}
+                    <td className="px-3 py-2 border-r border-slate-200 text-center">
+                      <input
+                        type="checkbox"
+                        checked={(row.unplannedTags || []).includes(UnplannedTag.PMItem)}
+                        onChange={() => toggleUnplannedTag(row.id, UnplannedTag.PMItem)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                    </td>
+
+                    {/* Risk Item */}
+                    <td className="px-3 py-2 border-r border-slate-200 text-center">
+                      <input
+                        type="checkbox"
+                        checked={(row.unplannedTags || []).includes(UnplannedTag.RiskItem)}
+                        onChange={() => toggleUnplannedTag(row.id, UnplannedTag.RiskItem)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                    </td>
+
+                    {/* Dependencies Department */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <select
+                        value={firstDep.team || ''}
+                        onChange={(e) => updateFirstDependency(row.id, 'team', e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Select...</option>
+                        {getDependencyTeams(config).map(team => (
+                          <option key={team} value={team}>{team}</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Dependencies Deliverable */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={firstDep.deliverable || ''}
+                        onChange={(e) => updateFirstDependency(row.id, 'deliverable', e.target.value)}
+                        placeholder="Deliverable..."
+                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+
+                    {/* Dependencies ETA */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <input
+                        type="date"
+                        value={firstDep.eta || ''}
+                        onChange={(e) => updateFirstDependency(row.id, 'eta', e.target.value)}
+                        className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-3 py-2 border-r border-slate-200">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onDuplicateRow(row.id)}
+                          className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600"
+                          title="Duplicate row"
+                        >
+                          <Copy size={14} />
+                        </button>
+                        {rows.length > 1 && (
                           <button
-                            onClick={() => onRowChange(row.id, 'estimatedEffort', Math.max(0, row.estimatedEffort - 0.25))}
-                            className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
-                            title="Decrease by 0.25"
+                            type="button"
+                            onClick={() => onRemoveRow(row.id)}
+                            className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600"
+                            title="Remove row"
                           >
-                            <ArrowDown size={12} />
-                          </button>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.25"
-                            value={row.estimatedEffort}
-                            onChange={(e) => onRowChange(row.id, 'estimatedEffort', parseFloat(e.target.value) || 0)}
-                            className={`w-16 px-2 py-1 text-sm border rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                              rowErrors.estimatedEffort ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                            }`}
-                          />
-                          <button
-                            onClick={() => onRowChange(row.id, 'estimatedEffort', row.estimatedEffort + 0.25)}
-                            className="p-1 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors"
-                            title="Increase by 0.25"
-                          >
-                            <ArrowUp size={12} />
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Owner Within Team */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <select
-                          value={row.ownerId}
-                          onChange={(e) => onRowChange(row.id, 'ownerId', e.target.value)}
-                          className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                            rowErrors.ownerId ? 'border-red-500 bg-red-50' : 'border-slate-200'
-                          }`}
-                        >
-                          <option value="">Select...</option>
-                          {teamLeads.map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* PM Item */}
-                      <td className="px-3 py-2 border-r border-slate-200 text-center">
-                        <input
-                          type="checkbox"
-                          checked={(row.unplannedTags || []).includes(UnplannedTag.PMItem)}
-                          onChange={() => toggleUnplannedTag(row.id, UnplannedTag.PMItem)}
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                        />
-                      </td>
-
-                      {/* Risk Item */}
-                      <td className="px-3 py-2 border-r border-slate-200 text-center">
-                        <input
-                          type="checkbox"
-                          checked={(row.unplannedTags || []).includes(UnplannedTag.RiskItem)}
-                          onChange={() => toggleUnplannedTag(row.id, UnplannedTag.RiskItem)}
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                        />
-                      </td>
-
-                      {/* Dependencies - Department, Requirement, Deadline */}
-                      <td colSpan={3} className="px-3 py-2 border-r border-slate-200">
-                        {hasDependencies && (
-                          <button
-                            onClick={() => toggleDependencies(row.id)}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            {isDependenciesExpanded ? 'Hide' : 'Show'} ({row.dependencies?.length || 0})
+                            <Trash2 size={14} />
                           </button>
                         )}
-                        {!hasDependencies && (
-                          <button
-                            onClick={() => addDependency(row.id)}
-                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          >
-                            <Plus size={12} /> Add
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-3 py-2 border-r border-slate-200">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => onDuplicateRow(row.id)}
-                            className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600"
-                            title="Duplicate row"
-                          >
-                            <Copy size={14} />
-                          </button>
-                          {rows.length > 1 && (
-                            <button
-                              onClick={() => onRemoveRow(row.id)}
-                              className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600"
-                              title="Remove row"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Dependencies Rows */}
-                    {isDependenciesExpanded && row.dependencies && row.dependencies.map((dep, depIndex) => (
-                      <tr key={`${row.id}-dep-${depIndex}`} className="bg-slate-50 border-b border-slate-200">
-                        <td colSpan={12} className="px-3 py-2 border-r border-slate-200"></td>
-                        {/* Department */}
-                        <td className="px-3 py-2 border-r border-slate-200">
-                          <select
-                            value={dep.team}
-                            onChange={(e) => updateDependency(row.id, depIndex, 'team', e.target.value)}
-                            className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          >
-                            {getDependencyTeams(config).map(team => (
-                              <option key={team} value={team}>{team}</option>
-                            ))}
-                          </select>
-                        </td>
-                        {/* Requirement */}
-                        <td className="px-3 py-2 border-r border-slate-200">
-                          <input
-                            type="text"
-                            value={dep.deliverable}
-                            onChange={(e) => updateDependency(row.id, depIndex, 'deliverable', e.target.value)}
-                            placeholder="Requirement..."
-                            className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </td>
-                        {/* Deadline */}
-                        <td className="px-3 py-2 border-r border-slate-200">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="date"
-                              value={dep.eta || ''}
-                              onChange={(e) => updateDependency(row.id, depIndex, 'eta', e.target.value)}
-                              className="flex-1 px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            <button
-                              onClick={() => removeDependency(row.id, depIndex)}
-                              className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600"
-                              title="Remove dependency"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2"></td>
-                      </tr>
-                    ))}
-                    {isDependenciesExpanded && (!row.dependencies || row.dependencies.length === 0) && (
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <td colSpan={12} className="px-3 py-2 border-r border-slate-200"></td>
-                        <td colSpan={3} className="px-3 py-2 border-r border-slate-200">
-                          <button
-                            onClick={() => addDependency(row.id)}
-                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          >
-                            <Plus size={12} /> Add Dependency
-                          </button>
-                        </td>
-                        <td className="px-3 py-2"></td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
