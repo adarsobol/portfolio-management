@@ -5159,7 +5159,7 @@ app.get('/api/jira/test', authenticateToken, async (req: AuthenticatedRequest, r
         maxResults: 5,
         fields: ['summary', 'status', 'issuetype', 'assignee', 'duedate', ASSET_CLASS_FIELD]
       })
-    });
+    }) as { issues?: any[]; total?: number };
     
     console.log(`[JIRA] Successfully fetched ${result.issues?.length || 0} issues`);
     
@@ -5203,7 +5203,7 @@ app.get('/api/jira/fields', authenticateToken, async (req: AuthenticatedRequest,
       return;
     }
     
-    const fields = await jiraFetch('/field');
+    const fields = await jiraFetch('/field') as any[];
     
     // Filter to show custom fields that might be "asset class"
     const assetClassFields = fields.filter((f: any) => 
