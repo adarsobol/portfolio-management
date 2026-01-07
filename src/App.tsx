@@ -776,6 +776,11 @@ export default function App() {
 
   const getOwnerNameById = (id?: string) => getOwnerName(users, id);
 
+  // Memoized set of valid initiative IDs for filtering notifications of deleted initiatives
+  const validInitiativeIds = useMemo(() => {
+    return new Set(initiatives.filter(i => i.status !== Status.Deleted).map(i => i.id));
+  }, [initiatives]);
+
   const filteredInitiatives = useMemo(() => {
     // Deduplicate initiatives first to prevent React key warnings and display issues
     const deduplicatedInitiatives = deduplicateInitiatives(initiatives);
@@ -2322,6 +2327,7 @@ export default function App() {
               onNotificationClick={handleNotificationClick}
               currentUserId={currentUser.id}
               currentUserEmail={currentUser.email}
+              validInitiativeIds={validInitiativeIds}
             />
             {canCreate && (
               <div className="relative" ref={newButtonRef}>
@@ -2513,6 +2519,7 @@ export default function App() {
               onNotificationClick={handleNotificationClick}
               currentUserId={currentUser.id}
               currentUserEmail={currentUser.email}
+              validInitiativeIds={validInitiativeIds}
             />
             {canCreate && (
               <div className="relative" ref={newButtonRef}>

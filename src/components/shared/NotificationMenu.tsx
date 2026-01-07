@@ -10,6 +10,7 @@ interface NotificationMenuProps {
   onNotificationClick: (notification: Notification) => void;
   currentUserId: string;
   currentUserEmail?: string; // Add email for matching notifications
+  validInitiativeIds?: Set<string>; // Filter out notifications for deleted initiatives
 }
 
 export const NotificationMenu: React.FC<NotificationMenuProps> = ({
@@ -19,7 +20,8 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   onClearAll,
   onNotificationClick,
   currentUserId,
-  currentUserEmail
+  currentUserEmail,
+  validInitiativeIds
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
@@ -37,14 +39,20 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
   }, [isOpen]);
 
   // Filter notifications to show relevant notifications for current user:
-  // 1. Direct notifications (mentions, etc.) where userId matches currentUserId or email
-  // 2. Owner notifications - user owns the initiative that was changed/commented on
-  const userNotifications = notifications.filter(n => 
-    n.userId === currentUserId ||
-    (currentUserEmail && n.userId === currentUserEmail) ||
-    n.metadata?.ownerId === currentUserId ||
-    (currentUserEmail && n.metadata?.ownerId === currentUserEmail)
-  );
+  // 1. Only show notifications for initiatives that still exist (not deleted)
+  // 2. Direct notifications (mentions, etc.) where userId matches currentUserId or email
+  // 3. Owner notifications - user owns the initiative that was changed/commented on
+  const userNotifications = notifications.filter(n => {
+    // Skip notifications for deleted initiatives
+    if (validInitiativeIds && !validInitiativeIds.has(n.initiativeId)) {
+      return false;
+    }
+    
+    return n.userId === currentUserId ||
+      (currentUserEmail && n.userId === currentUserEmail) ||
+      n.metadata?.ownerId === currentUserId ||
+      (currentUserEmail && n.metadata?.ownerId === currentUserEmail);
+  });
   
   const unreadCount = userNotifications.filter(n => !n.read).length;
   const sortedNotifications = [...userNotifications].sort((a, b) => 
@@ -81,12 +89,16 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
+    
+    // Format time as HH:MM
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffMins < 1) return `Just now · ${timeStr}`;
+    if (diffMins < 60) return `${diffMins}m ago · ${timeStr}`;
+    if (diffHours < 24) return `${diffHours}h ago · ${timeStr}`;
+    if (diffDays === 1) return `Yesterday · ${timeStr}`;
+    if (diffDays < 7) return `${diffDays}d ago · ${date.toLocaleDateString([], { weekday: 'short' })}`;
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
@@ -200,10 +212,10 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({
                             {notification.message}
                           </p>
                           <div className="flex items-center justify-between mt-2">
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-slate-500 font-medium">
                               {formatTime(notification.timestamp)}
                             </span>
-                            <span className="text-xs text-slate-500 truncate max-w-[150px]">
+                            <span className="text-xs text-slate-400 truncate max-w-[120px]">
                               {notification.initiativeTitle}
                             </span>
                           </div>
