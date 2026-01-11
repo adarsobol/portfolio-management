@@ -583,55 +583,58 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     </div>
                   </>
                 )}
-                {/* Add task button - visible when editable and no tasks exist */}
-                {editable && activeTasks.length === 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      // Expand tasks if not already expanded
-                      if (!tasksExpanded) {
-                        setExpandedTasks(prev => {
-                          const newSet = new Set(prev);
-                          newSet.add(item.id);
-                          return newSet;
+                {/* Add task button and comment popover - stacked vertically to save space */}
+                <div className="flex flex-col items-center gap-0.5">
+                  {/* Add task button - visible when editable and no tasks exist */}
+                  {editable && activeTasks.length === 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Expand tasks if not already expanded
+                        if (!tasksExpanded) {
+                          setExpandedTasks(prev => {
+                            const newSet = new Set(prev);
+                            newSet.add(item.id);
+                            return newSet;
+                          });
+                        }
+                        // Show add task form
+                        setAddingTaskFor(item.id);
+                        const defaultEta = new Date().toISOString().split('T')[0];
+                        setNewTaskForm({
+                          title: '',
+                          estimatedEffort: 0,
+                          actualEffort: 0,
+                          eta: defaultEta,
+                          owner: '',
+                          status: Status.NotStarted,
+                          priority: Priority.P2,
+                          tags: [],
+                          initiativeId: item.id,
+                          tradeOffInitiativeId: undefined,
+                          tradeOffTaskId: undefined,
+                          tradeOffEta: undefined
                         });
-                      }
-                      // Show add task form
-                      setAddingTaskFor(item.id);
-                      const defaultEta = new Date().toISOString().split('T')[0];
-                      setNewTaskForm({
-                        title: '',
-                        estimatedEffort: 0,
-                        actualEffort: 0,
-                        eta: defaultEta,
-                        owner: '',
-                        status: Status.NotStarted,
-                        priority: Priority.P2,
-                        tags: [],
-                        initiativeId: item.id,
-                        tradeOffInitiativeId: undefined,
-                        tradeOffTaskId: undefined,
-                        tradeOffEta: undefined
-                      });
-                    }}
-                    className={`p-1 hover:bg-blue-100 rounded transition-colors flex-shrink-0 ${isBAU ? 'hover:bg-purple-100' : ''}`}
-                    title="Add new task"
-                  >
-                    <Plus size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
-                  </button>
-                )}
-                {/* Comment popover - moved to right-side action area */}
-                {onAddComment && onMarkCommentRead && (
-                  <CommentPopover
-                    initiative={item}
-                    currentUser={currentUser}
-                    users={users}
-                    onAddComment={onAddComment}
-                    lastReadTimestamp={commentReadState[item.id]}
-                    onMarkAsRead={onMarkCommentRead}
-                  />
-                )}
+                      }}
+                      className={`p-1 hover:bg-blue-100 rounded transition-colors flex-shrink-0 ${isBAU ? 'hover:bg-purple-100' : ''}`}
+                      title="Add new task"
+                    >
+                      <Plus size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                    </button>
+                  )}
+                  {/* Comment popover - positioned below the + button */}
+                  {onAddComment && onMarkCommentRead && (
+                    <CommentPopover
+                      initiative={item}
+                      currentUser={currentUser}
+                      users={users}
+                      onAddComment={onAddComment}
+                      lastReadTimestamp={commentReadState[item.id]}
+                      onMarkAsRead={onMarkCommentRead}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           {/* Compact metadata styling */}
