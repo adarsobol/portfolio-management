@@ -493,3 +493,4 @@ export const canManageWorkflows = (config: AppConfig, role: Role): boolean => {
   return getTaskManagementScope(config, role, 'manageWorkflows') === 'yes';
 };
 
+

@@ -181,3 +181,43 @@ export var SupportTicketPriority;
     SupportTicketPriority["HIGH"] = "high";
     SupportTicketPriority["URGENT"] = "urgent";
 })(SupportTicketPriority || (SupportTicketPriority = {}));
+// Default Production Teams
+export const DEFAULT_PRODUCTION_TEAMS = [
+    {
+        id: 'team_prod_pl',
+        name: 'Production - PL',
+        color: '#3B82F6', // Blue
+        assetClasses: ['PL', 'Personal Loans']
+    },
+    {
+        id: 'team_prod_auto',
+        name: 'Production - Auto',
+        color: '#10B981', // Green
+        assetClasses: ['Auto', 'Automobile']
+    },
+    {
+        id: 'team_prod_qa',
+        name: 'Production - QA',
+        color: '#8B5CF6', // Purple
+        assetClasses: [] // QA handles all asset classes based on issue type
+    },
+    {
+        id: 'team_prod_bankops',
+        name: 'Production - BankOps',
+        color: '#F59E0B', // Orange/Amber
+        assetClasses: [] // BankOps handles specific issue types
+    }
+];
+// Default mapping rules
+export const DEFAULT_TEAM_MAPPING_RULES = [
+    // PL asset class mappings
+    { id: 'rule_pl_policies', issueType: 'Policies', assetClass: 'PL', targetTeam: 'Production - PL' },
+    { id: 'rule_pl_prm', issueType: 'Post Release Monitoring', assetClass: 'PL', targetTeam: 'Production - PL' },
+    // Auto asset class mappings
+    { id: 'rule_auto_policies', issueType: 'Policies', assetClass: 'Auto', targetTeam: 'Production - Auto' },
+    { id: 'rule_auto_prm', issueType: 'Post Release Monitoring', assetClass: 'Auto', targetTeam: 'Production - Auto' },
+    // QA handles specific issue types regardless of asset class
+    { id: 'rule_qa_any', issueType: 'QA', assetClass: '*', targetTeam: 'Production - QA' },
+    // BankOps handles bank-related issue types
+    { id: 'rule_bankops_any', issueType: 'Bank Integration', assetClass: '*', targetTeam: 'Production - BankOps' },
+];

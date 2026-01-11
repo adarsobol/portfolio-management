@@ -21,14 +21,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This bypass will be disabled in production builds
   const isDevelopment = import.meta.env.DEV;
   
-  const shouldUseDevBypass = isDevelopment && !isGoogleOAuthConfigured;
+  // Force dev bypass with VITE_DEV_BYPASS=true or when OAuth not configured
+  const forceDevBypass = import.meta.env.VITE_DEV_BYPASS === 'true';
+  const shouldUseDevBypass = isDevelopment && (forceDevBypass || !isGoogleOAuthConfigured);
   
   const [user, setUser] = useState<User | null>(
     shouldUseDevBypass ? {
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
       name: 'Adar Sobol',
-      role: Role.TeamLead, // TeamLead for testing view-only mode
+      role: Role.Admin, // Admin for testing full access including Smart Import Wizard
       avatar: 'https://ui-avatars.com/api/?name=Adar+Sobol&background=10B981&color=fff'
     } : null
   );

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Filter } from 'lucide-react';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { Filter, ChevronDown, X } from 'lucide-react';
 import { User, UnplannedTag, AppConfig, Initiative } from '../../types';
 import { getAssetClasses } from '../../utils/valueLists';
 
@@ -33,11 +33,26 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   // Reserved for future layout toggle functionality
   void _currentView; void _viewLayout; void _setViewLayout;
 
+  // Owner dropdown state
+  const [isOwnerDropdownOpen, setIsOwnerDropdownOpen] = useState(false);
+  const [ownerSearchQuery, setOwnerSearchQuery] = useState('');
+  const ownerDropdownRef = useRef<HTMLDivElement>(null);
+
   // Get owners from existing initiatives (only show owners who have items)
   const availableOwners = useMemo(() => {
     const ownerIds = new Set(initiatives.map(i => i.ownerId));
     return users.filter(u => ownerIds.has(u.id));
   }, [initiatives, users]);
+
+  // Filter owners by search query
+  const filteredOwners = useMemo(() => {
+    if (!ownerSearchQuery.trim()) return availableOwners;
+    const query = ownerSearchQuery.toLowerCase();
+    return availableOwners.filter(owner => 
+      owner.name.toLowerCase().includes(query) || 
+      owner.email.toLowerCase().includes(query)
+    );
+  }, [availableOwners, ownerSearchQuery]);
 
   const toggleOwner = (ownerId: string) => {
     if (filterOwners.includes(ownerId)) {
@@ -47,20 +62,19 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     }
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  // Generate consistent color from name
-  const getAvatarColor = (name: string) => {
-    const colors = [
-      'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 
-      'bg-purple-500', 'bg-cyan-500', 'bg-orange-500', 'bg-indigo-500',
-      'bg-pink-500', 'bg-teal-500'
-    ];
-    const index = name.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ownerDropdownRef.current && !ownerDropdownRef.current.contains(event.target as Node)) {
+        setIsOwnerDropdownOpen(false);
+        setOwnerSearchQuery('');
+      }
+    };
+    if (isOwnerDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOwnerDropdownOpen]);
 
   const hasActiveFilters = filterAssetClass || filterOwners.length > 0 || filterWorkType.length > 0 || searchQuery;
 
@@ -119,40 +133,82 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
         </select>
 
-        {/* Owner Filter - Avatar Circles */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-slate-500 mr-2 font-medium">Owner:</span>
-          <div className="flex -space-x-1">
-            {availableOwners.slice(0, 8).map(owner => {
-              const isSelected = filterOwners.includes(owner.id);
-              return (
-                <button
-                  key={owner.id}
-                  onClick={() => toggleOwner(owner.id)}
-                  className={`relative w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white transition-all ${getAvatarColor(owner.name)} ${
-                    isSelected 
-                      ? 'ring-2 ring-blue-500 ring-offset-2 z-10 scale-110' 
-                      : 'hover:scale-105 hover:z-10 opacity-60 hover:opacity-100'
-                  }`}
-                  title={owner.name}
-                >
-                  {owner.avatar ? (
-                    <img 
-                      src={owner.avatar} 
-                      alt={owner.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    getInitials(owner.name)
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {filterOwners.length > 0 && (
-            <span className="text-xs text-blue-600 font-medium ml-2">
-              {filterOwners.length} selected
-            </span>
+        {/* Owner Filter - Dropdown */}
+        <div className="relative" ref={ownerDropdownRef}>
+          <button
+            onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
+            className="flex items-center gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+          >
+            <Filter size={16} className="text-blue-500" />
+            <span className="text-slate-700">Owners</span>
+            {filterOwners.length > 0 && (
+              <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
+                {filterOwners.length}
+              </span>
+            )}
+            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {isOwnerDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[240px] max-h-[300px] flex flex-col">
+              {/* Search input */}
+              <div className="p-2 border-b border-slate-200">
+                <input
+                  type="text"
+                  placeholder="Search owners..."
+                  value={ownerSearchQuery}
+                  onChange={(e) => setOwnerSearchQuery(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              
+              {/* Owner list */}
+              <div className="overflow-y-auto max-h-[240px]">
+                {filteredOwners.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                    No owners found
+                  </div>
+                ) : (
+                  filteredOwners.map(owner => {
+                    const isSelected = filterOwners.includes(owner.id);
+                    return (
+                      <button
+                        key={owner.id}
+                        onClick={() => toggleOwner(owner.id)}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 ${
+                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="flex-1">{owner.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* Clear selection */}
+              {filterOwners.length > 0 && (
+                <div className="p-2 border-t border-slate-200">
+                  <button
+                    onClick={() => {
+                      setFilterOwners([]);
+                      setOwnerSearchQuery('');
+                    }}
+                    className="w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                  >
+                    <X size={14} />
+                    Clear selection
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
         

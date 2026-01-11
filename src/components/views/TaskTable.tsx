@@ -488,7 +488,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     );
   };
 
-  const renderRow = (item: Initiative, _index: number, editable: boolean) => {
+  const renderRow = (item: Initiative, index: number, editable: boolean) => {
     const isOutdated = checkOutdated(item.lastUpdated);
     const _prevEffort = getPreviousValue(item, 'Effort');
     void _prevEffort; // Reserved for effort history display
@@ -503,39 +503,44 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     const isAtRisk = item.status === Status.AtRisk;
     const showTooltip = hoveredAtRiskDot === item.id && isAtRisk;
 
-    const statusRowColor = getStatusRowColor(item.status);
-    const priorityRowColor = getPriorityRowColor(item.priority);
-    const rowColorClass = `${statusRowColor} ${priorityRowColor}`;
     const isUpdating = optimisticUpdates.has(item.id);
+    // Zebra striping: even rows get subtle background
+    const zebraStripe = index % 2 === 0 ? '' : 'bg-slate-50/50';
 
     return (
       <>
-        <tr key={item.id} className={`group hover:bg-blue-50/60 transition-colors border-b border-slate-100 ${rowColorClass} ${isUpdating ? 'bg-blue-50/30' : ''}`}>
-          <td className="px-2.5 py-2 border-r border-b border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
+        <tr key={item.id} className={`group hover:bg-slate-50 transition-colors border-b border-slate-200 ${zebraStripe} ${isUpdating ? 'bg-blue-50/30' : ''}`}>
+          <td className="px-2 py-1.5 border-r border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
             {item.id}
           </td>
-          <td className="px-3 py-2 border-r border-b border-slate-200 min-w-[320px] relative">
+          <td className="px-3 py-1.5 border-r border-slate-200 min-w-[320px] relative">
             <div className="flex items-start gap-2 justify-between">
-              {/* Left side: Icon, chevron, and title */}
-              <div className="flex items-start gap-2 flex-1 min-w-0">
-                {/* Initiative icon */}
-                <div className="flex-shrink-0 mt-0.5">
-                  {getInitiativeIcon(item)}
+              {/* Left side: Fixed-width icon area + chevron + title for consistent alignment */}
+              <div className="flex items-start flex-1 min-w-0">
+                {/* Fixed-width container for icon + chevron (always same width) */}
+                <div className="flex items-center gap-1 flex-shrink-0 w-14">
+                  {/* Initiative icon */}
+                  <div className="flex-shrink-0">
+                    {getInitiativeIcon(item)}
+                  </div>
+                  {/* Chevron - always takes space, invisible when no tasks */}
+                  <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                    {activeTasks.length > 0 ? (
+                      <button
+                        onClick={() => toggleTasks(item.id)}
+                        className={`p-1 hover:bg-purple-100 rounded transition-colors ${isBAU ? '' : 'hover:bg-blue-100'}`}
+                        title={tasksExpanded ? `Collapse ${activeTasks.length} tasks` : `Expand ${activeTasks.length} tasks`}
+                      >
+                        {tasksExpanded ? (
+                          <ChevronDown size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                        ) : (
+                          <ChevronRight size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                        )}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                {activeTasks.length > 0 && (
-                  <button
-                    onClick={() => toggleTasks(item.id)}
-                    className={`p-1 hover:bg-purple-100 rounded transition-colors flex-shrink-0 mt-0.5 ${isBAU ? '' : 'hover:bg-blue-100'}`}
-                    title={tasksExpanded ? `Collapse ${activeTasks.length} tasks` : `Expand ${activeTasks.length} tasks`}
-                  >
-                    {tasksExpanded ? (
-                      <ChevronDown size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
-                    ) : (
-                      <ChevronRight size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
-                    )}
-                  </button>
-                )}
-                {/* Title button - always starts at same position */}
+                {/* Title button - always starts at same position due to fixed-width container above */}
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -619,7 +624,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               </div>
             </div>
           {/* Compact metadata styling */}
-          <div className="text-[9px] mt-1 flex gap-1 items-center flex-wrap">
+          <div className="text-xs text-slate-500 mt-1 flex gap-1 items-center flex-wrap">
              {viewMode === 'flat' && (
                <>
                  <span className="font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{item.l1_assetClass}</span>
@@ -733,7 +738,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              </div>
           )}
         </td>
-        <td className="px-2.5 py-2 border-r border-b border-slate-200 whitespace-nowrap">
+        <td className="px-2.5 py-1.5 border-r border-slate-200 whitespace-nowrap">
           <div className="flex items-center gap-2.5" title="Primary Owner">
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-300 shadow-sm">
               {getOwnerNameById(item.ownerId)?.charAt(0)}
@@ -746,7 +751,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
           </div>
         </td>
-        <td className={`px-2.5 py-2 border-r border-b border-slate-200 text-center relative ${getStatusCellBg(item.status)}`}>
+        <td className={`px-2.5 py-1.5 border-r border-slate-200 text-center relative ${getStatusCellBg(item.status)}`}>
           {isUpdating && (
             <div className="absolute top-1 right-1 z-10">
               <LoadingIndicator size="sm" />
@@ -764,7 +769,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              <StatusBadge status={item.status} />
           )}
         </td>
-        <td className={`px-2.5 py-2 border-r border-b border-slate-200 text-center relative ${getPriorityCellBg(item.priority)}`}>
+        <td className={`px-2.5 py-1.5 border-r border-slate-200 text-center relative ${getPriorityCellBg(item.priority)}`}>
           {isUpdating && (
             <div className="absolute top-1 right-1 z-10">
               <LoadingIndicator size="sm" />
@@ -782,7 +787,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             <PriorityBadge priority={item.priority} />
           )}
         </td>
-        <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[150px]">
+        <td className="px-2.5 py-1.5 border-r border-slate-200 min-w-[150px]">
           {editable ? (
             <div className="flex items-center gap-1.5">
               {/* Effort exceeded flag */}
@@ -941,7 +946,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              <div className="text-[9px] text-slate-400 italic text-right mt-1">Orig: {item.originalEstimatedEffort}w</div>
           )}
         </td>
-        <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[90px]">
+        <td className="px-2.5 py-1.5 border-r border-slate-200 min-w-[90px]">
           <div className="flex flex-col items-center gap-1.5">
             {editable ? (
               <div className="flex items-center gap-1">
@@ -972,7 +977,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             </div>
           </div>
         </td>
-        <td className="px-2.5 py-2 border-r border-b border-slate-200 min-w-[110px]">
+        <td className="px-2.5 py-1.5 border-r border-slate-200 min-w-[110px]">
           <div className="flex flex-col gap-1">
              {editable ? (
                <input 
@@ -1001,7 +1006,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       {/* Tasks dropdown row for all initiatives with tasks */}
       {tasksExpanded && (
         <tr className="bg-purple-50/30">
-          <td colSpan={8} className="px-3 py-2 border-b border-slate-200">
+          <td colSpan={8} className="px-3 py-1.5 border-b border-slate-200">
             <div className="space-y-1.5">
               {/* Tasks List */}
               {tasks.filter(t => t.status !== Status.Deleted).length > 0 && (

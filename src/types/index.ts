@@ -783,3 +783,56 @@ export const DEFAULT_TEAM_MAPPING_RULES: TeamMappingRule[] = [
   // BankOps handles bank-related issue types
   { id: 'rule_bankops_any', issueType: 'Bank Integration', assetClass: '*', targetTeam: 'Production - BankOps' },
 ];
+
+// ============================================
+// MONTHLY SUMMARY REPORTS TYPES
+// ============================================
+
+export enum ReportStatus {
+  Draft = 'draft',
+  PendingReview = 'pending_review',
+  Approved = 'approved',
+  Shared = 'shared'
+}
+
+export interface ReportMetrics {
+  initiativeCount: number;
+  completedCount: number;
+  newCount: number;
+  atRiskCount: number;
+  etaChangedCount: number;
+  effortVariance: number;
+  statusChanges: { from: string; to: string; count: number }[];
+}
+
+export interface MonthlyReport {
+  id: string;
+  type: 'team' | 'department';
+  period: string; // "2026-01" format (YYYY-MM)
+  teamLeadId?: string; // For team reports
+  status: ReportStatus;
+  generatedAt: string;
+  generatedBy: string;
+  lastEditedAt?: string;
+  lastEditedBy?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  sharedAt?: string;
+  sharedTo?: string[]; // Email recipients
+  
+  // Content sections (editable rich text)
+  sections: {
+    executiveSummary: string;
+    highlights: string;
+    completedItems: string;
+    newItems: string;
+    statusChanges: string;
+    etaChanges: string;
+    tradeOffs: string;
+    risksAndBlockers: string;
+    nextMonthOutlook: string;
+  };
+  
+  // Auto-generated metrics (read-only)
+  metrics: ReportMetrics;
+}

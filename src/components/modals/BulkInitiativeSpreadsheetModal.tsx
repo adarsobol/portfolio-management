@@ -329,16 +329,16 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
           <table className="border-collapse" style={{ minWidth: '1600px' }}>
             {/* Header Row */}
             <thead>
-              <tr className="bg-blue-100 border-b-2 border-slate-300">
+              <tr className="bg-slate-100 border-b-2 border-slate-300">
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className={`${col.width} px-3 py-2 text-left text-xs font-semibold text-slate-700 border-r border-slate-300 sticky top-0 bg-blue-100 z-10`}
+                    className={`${col.width} px-3 py-2 text-left text-xs font-semibold text-slate-700 border-r border-slate-300 sticky top-0 bg-slate-100 z-10`}
                   >
                     {col.label}
                   </th>
                 ))}
-                <th className="w-16 px-3 py-2 text-left text-xs font-semibold text-slate-700 border-r border-slate-300 sticky top-0 bg-blue-100 z-10">
+                <th className="w-16 px-3 py-2 text-left text-xs font-semibold text-slate-700 border-r border-slate-300 sticky top-0 bg-slate-100 z-10">
                   Actions
                 </th>
               </tr>
@@ -572,7 +572,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                         <button
                           type="button"
                           onClick={() => onDuplicateRow(row.id)}
-                          className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600"
+                          className="w-8 h-8 flex items-center justify-center hover:bg-slate-200 rounded text-slate-400 hover:text-slate-600 transition-colors"
                           title="Duplicate row"
                         >
                           <Copy size={14} />
@@ -581,7 +581,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                           <button
                             type="button"
                             onClick={() => onRemoveRow(row.id)}
-                            className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600"
+                            className="w-8 h-8 flex items-center justify-center hover:bg-red-100 rounded text-red-400 hover:text-red-600 transition-colors"
                             title="Remove row"
                           >
                             <Trash2 size={14} />

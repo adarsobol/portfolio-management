@@ -4,10 +4,10 @@ export const StatusBadge = ({ status }: { status: Status }) => {
   const styles = {
     // Not Started: Light gray with clear text
     [Status.NotStarted]: 'text-slate-500 bg-slate-100 border-slate-200',
-    // In Progress: Vibrant blue for positive momentum
-    [Status.InProgress]: 'text-white bg-blue-600 border-blue-700 shadow-md',
-    // At Risk: Red for immediate attention (changed from amber)
-    [Status.AtRisk]: 'text-white bg-red-600 border-red-700 shadow-lg animate-pulse',
+    // In Progress: Soft blue badge (light background, dark text)
+    [Status.InProgress]: 'text-blue-700 bg-blue-100 border-blue-200',
+    // At Risk: Soft red badge but still prominent (removed animate-pulse for less distraction)
+    [Status.AtRisk]: 'text-red-700 bg-red-100 border-red-200 font-bold',
     // Done: Muted green to fade into background
     [Status.Done]: 'text-emerald-800 bg-emerald-100 border-emerald-300',
     // Obsolete: Muted gray/purple to indicate deprecated items

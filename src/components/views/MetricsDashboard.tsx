@@ -243,9 +243,9 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
             <span>Assigned: <strong className="text-slate-700">{metrics.totalEst}w</strong></span>
             <span>Total Cap (Q): <strong className="text-slate-700">{metrics.totalCapacity}w</strong></span>
           </div>
-          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+          <div className="h-1 bg-slate-200 rounded-full overflow-hidden">
              <div 
-               className={`h-full rounded-full transition-all duration-1000 ${metrics.capacityLoad > 100 ? 'bg-gradient-to-r from-red-400 to-red-500' : 'bg-gradient-to-r from-purple-400 to-purple-500'}`} 
+               className={`h-full rounded-full transition-all duration-1000 ${metrics.capacityLoad > 100 ? 'bg-red-500' : 'bg-purple-500'}`} 
                style={{ width: `${Math.min(metrics.capacityLoad, 100)}%` }}
              />
           </div>
@@ -261,7 +261,7 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
           </div>
           <div>
             <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Work mix</p>
-            <h3 className="text-2xl font-black text-slate-800 whitespace-nowrap">
+            <h3 className="text-3xl font-black text-slate-800 whitespace-nowrap">
               <span className="text-blue-600">{metrics.wpPercentage ?? 0}%</span>
               <span className="text-slate-400 mx-0.5">/</span>
               <span className="text-orange-700 font-black">{metrics.bauPercentage ?? 0}%</span>

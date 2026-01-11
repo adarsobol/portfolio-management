@@ -1169,23 +1169,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         {/* ================================================================ */}
         {mode === 'single' && activeTab === 'details' && (
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {/* Progress Indicator */}
-            <div className="px-6 pt-4 pb-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-slate-500">
-                  Required fields: {filledRequiredFields}/{requiredFieldsCount}
-                </span>
-                <span className="text-xs font-medium text-slate-500">{Math.round(progressPercent)}%</span>
-              </div>
-              <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 pt-3 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
               
               {/* ============================================ */}
               {/* CORE DETAILS SECTION - SPREADSHEET STYLE */}
@@ -2511,9 +2495,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         {/* FOOTER */}
         {/* ================================================================ */}
         <div className="flex justify-between items-center gap-3 px-6 py-4 border-t border-slate-200 bg-gradient-to-t from-slate-50 to-white">
-          <div className="text-sm text-slate-500">
+          <div className="flex items-center gap-3 text-sm text-slate-500">
             {mode === 'bulk' && (
-              <div className="flex items-center gap-3">
+              <>
                 <span>{validBulkRowsCount} of {bulkRows.length} rows ready</span>
                 {tradeOffRowsCount > 0 && (
                   <span className="flex items-center gap-1 text-indigo-600">
@@ -2521,6 +2505,16 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {tradeOffRowsCount} trade-off{tradeOffRowsCount > 1 ? 's' : ''}
                   </span>
                 )}
+              </>
+            )}
+            {mode === 'single' && activeTab === 'details' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">
+                  Required fields: {filledRequiredFields}/{requiredFieldsCount}
+                </span>
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                  {Math.round(progressPercent)}%
+                </span>
               </div>
             )}
           </div>

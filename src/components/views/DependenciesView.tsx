@@ -15,7 +15,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  History
+  History,
+  Plus
 } from 'lucide-react';
 import { Initiative, User, Status, DependencyTeam, Dependency, AppConfig } from '../../types';
 import { formatDateDisplay, isOverdue, getDateStatus, getDaysUntil } from '../../utils';
@@ -386,10 +387,49 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
 
         {filteredTableRows.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <Users size={32} className="mx-auto text-slate-300 mb-2" />
-            <p className="text-sm text-slate-500">No dependencies found</p>
-            {searchQuery && (
-              <p className="text-xs text-slate-400 mt-1">Try adjusting your search</p>
+            {tableRows.length === 0 ? (
+              // Empty state when no dependencies exist at all
+              <>
+                <div className="mb-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 mb-3">
+                    <Users size={32} className="text-slate-400" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">No dependencies found</h3>
+                <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
+                  Create your first dependency to track cross-team work and ensure smooth collaboration.
+                </p>
+                <button
+                  onClick={() => {
+                    // Navigate to an initiative or open initiative modal
+                    // This is a placeholder - actual implementation depends on how initiatives are accessed
+                    if (initiatives.length > 0 && onInitiativeClick) {
+                      onInitiativeClick(initiatives[0]);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+                >
+                  <Plus size={16} />
+                  Create your first dependency
+                </button>
+              </>
+            ) : (
+              // Empty state when filters/search return no results
+              <>
+                <Users size={32} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-sm text-slate-500">No dependencies found</p>
+                {searchQuery && (
+                  <p className="text-xs text-slate-400 mt-1">Try adjusting your search</p>
+                )}
+                {selectedTeamFilter && (
+                  <button
+                    onClick={() => setSelectedTeamFilter('')}
+                    className="mt-3 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Clear team filter
+                  </button>
+                )}
+              </>
             )}
           </div>
         ) : (
