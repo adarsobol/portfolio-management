@@ -621,6 +621,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     <Plus size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
                   </button>
                 )}
+                {/* Comment popover - moved to right-side action area */}
+                {onAddComment && onMarkCommentRead && (
+                  <CommentPopover
+                    initiative={item}
+                    currentUser={currentUser}
+                    users={users}
+                    onAddComment={onAddComment}
+                    lastReadTimestamp={commentReadState[item.id]}
+                    onMarkAsRead={onMarkCommentRead}
+                  />
+                )}
               </div>
             </div>
           {/* Compact metadata styling */}
@@ -630,6 +641,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                  <span className="font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{item.l1_assetClass}</span>
                  <span className="text-slate-400">•</span>
                  <span className="text-slate-500 truncate max-w-[100px] italic" title={item.l2_pillar}>{item.l2_pillar}</span>
+                 {item.l3_responsibility && (
+                   <>
+                     <span className="text-slate-400">•</span>
+                     <span className="text-slate-500 truncate max-w-[120px]" title={item.l3_responsibility}>{item.l3_responsibility}</span>
+                   </>
+                 )}
                </>
              )}
              {item.workType === WorkType.Unplanned && (
@@ -637,16 +654,6 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                  <AlertTriangle size={8} />
                  <span className="text-[8px]">Unplanned</span>
                </span>
-             )}
-             {onAddComment && onMarkCommentRead && (
-               <CommentPopover
-                 initiative={item}
-                 currentUser={currentUser}
-                 users={users}
-                 onAddComment={onAddComment}
-                 lastReadTimestamp={commentReadState[item.id]}
-                 onMarkAsRead={onMarkCommentRead}
-               />
              )}
           </div>
           {isAtRisk && (
