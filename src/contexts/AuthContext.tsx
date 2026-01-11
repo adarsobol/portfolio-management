@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
       name: 'Adar Sobol',
-      role: Role.TeamLead, // TEMPORARY: Changed to TeamLead for testing delete button fix
+      role: Role.TeamLead, // TeamLead for testing view-only mode
       avatar: 'https://ui-avatars.com/api/?name=Adar+Sobol&background=10B981&color=fff'
     } : null
   );

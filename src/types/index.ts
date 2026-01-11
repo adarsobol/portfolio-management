@@ -92,6 +92,7 @@ export interface Task {
   ownerId?: string; // Team Lead ID (optional, uses initiative owner for permissions)
   owner?: string; // Open text field for assignee name (UI display)
   status: Status; // NotStarted/InProgress/Done
+  priority?: Priority; // Optional priority for task
   tags?: UnplannedTag[]; // PM Item, Risk Item, Both
   comments?: Comment[];
   deletedAt?: string; // ISO date string when soft-deleted

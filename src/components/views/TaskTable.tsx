@@ -110,6 +110,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     eta: '',
     owner: '',
     status: Status.NotStarted,
+    priority: Priority.P2,
     tags: [],
     initiativeId: undefined,
     tradeOffInitiativeId: undefined,
@@ -170,6 +171,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       eta: newTaskForm.eta,
       owner: newTaskForm.owner || undefined,
       status: newTaskForm.status || Status.NotStarted,
+      priority: newTaskForm.priority || Priority.P2,
       tags: newTaskForm.tags || [],
       comments: [],
       createdAt: new Date().toISOString(),
@@ -221,6 +223,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       eta: '',
       owner: '',
       status: Status.NotStarted,
+      priority: Priority.P2,
       tags: [],
       initiativeId: undefined,
       tradeOffInitiativeId: undefined,
@@ -599,6 +602,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         eta: defaultEta,
                         owner: '',
                         status: Status.NotStarted,
+                        priority: Priority.P2,
                         tags: [],
                         initiativeId: item.id,
                         tradeOffInitiativeId: undefined,
@@ -1004,7 +1008,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 <div className="space-y-1">
                   <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.filter(t => t.status !== Status.Deleted).length})</div>
                   {tasks.filter(task => task.status !== Status.Deleted).map((task, taskIndex) => (
-                    <div key={task.id} className="bg-purple-50/30 border-l-4 border-l-purple-400 border border-purple-200 rounded-md shadow-sm hover:shadow transition-shadow relative ml-8">
+                    <div key={task.id} className="bg-purple-50/30 border-l-4 border-l-purple-400 border border-purple-200 rounded-md shadow-sm hover:shadow transition-shadow ml-8">
                       <div className="flex items-center">
                         {/* Column 1: ID - Empty, matching initiative ID column width */}
                         <div className="w-12 px-2.5 py-2 text-center border-r border-purple-200"></div>
@@ -1088,7 +1092,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                         
                         {/* Column 3: Assignee (aligned with Owner column) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 whitespace-nowrap">
+                        <div className="px-2.5 py-2 border-r border-purple-200 whitespace-nowrap min-w-[120px]">
                           {editable ? (
                             <input
                               type="text"
@@ -1098,25 +1102,18 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white w-24"
                             />
                           ) : (
-                            <div className="flex items-center gap-2.5" title="Assignee">
+                            <div className="flex items-center justify-center">
                               {task.owner ? (
-                                <>
-                                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center text-[10px] font-bold text-purple-600 border border-purple-300 shadow-sm">
-                                    {task.owner.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div className="flex flex-col justify-center gap-0.5">
-                                    <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{task.owner}</span>
-                                  </div>
-                                </>
+                                <span className="text-slate-700 font-medium text-xs truncate max-w-[100px]">{task.owner}</span>
                               ) : (
-                                <span className="text-slate-400 text-xs italic">Not assigned</span>
+                                <span className="text-slate-400 text-xs">-</span>
                               )}
                             </div>
                           )}
                         </div>
                         
                         {/* Column 4: Status (aligned with Status column) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 text-center">
+                        <div className="px-2.5 py-2 border-r border-purple-200 text-center min-w-[100px]">
                           {editable ? (
                             <select
                               value={task.status}
@@ -1128,12 +1125,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               ))}
                             </select>
                           ) : (
-                            <StatusBadge status={task.status} />
+                            <div className="flex justify-center">
+                              <StatusBadge status={task.status} />
+                            </div>
                           )}
                         </div>
                         
-                        {/* Column 5: Priority - Empty (tasks don't have priority) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 text-center"></div>
+                        {/* Column 5: Priority (aligned with Priority column) */}
+                        <div className="px-2.5 py-2 border-r border-purple-200 text-center min-w-[70px]">
+                          {editable ? (
+                            <select
+                              value={task.priority || Priority.P2}
+                              onChange={(e) => handleUpdateTask(item.id, task.id, 'priority', e.target.value as Priority)}
+                              className={`w-full text-[11px] font-bold border focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-1.5 py-1 rounded-md cursor-pointer ${getPrioritySelectStyle(task.priority || Priority.P2)}`}
+                            >
+                              {getPriorities(config).map(p => (
+                                <option key={p} value={p} className="bg-white text-slate-900">{p}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="flex justify-center">
+                              {task.priority ? <PriorityBadge priority={task.priority} /> : <span className="text-slate-400 text-xs">-</span>}
+                            </div>
+                          )}
+                        </div>
                         
                         {/* Column 6: Effort (aligned with Effort column) */}
                         <div className="px-2.5 py-2 border-r border-purple-200 min-w-[150px]">
@@ -1284,44 +1299,51 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             // Get display unit from parent initiative for read-only display
                             const taskDisplayUnit = getDisplayUnit(item.id);
                             return (
-                            <div className="font-mono text-slate-700 text-xs font-semibold text-right bg-purple-50 px-2 py-1 rounded">
-                              {taskDisplayUnit === 'days'
-                                ? `${weeksToDays(task.actualEffort || 0).toFixed(1)}/${weeksToDays(task.estimatedEffort || 0).toFixed(1)}d`
-                                : `${task.actualEffort || 0}/${task.estimatedEffort || 0}w`}
+                            <div className="flex justify-center">
+                              <span className="font-mono text-slate-700 text-xs font-semibold bg-purple-50 px-2 py-1 rounded">
+                                {taskDisplayUnit === 'days'
+                                  ? `${weeksToDays(task.actualEffort || 0).toFixed(1)}/${weeksToDays(task.estimatedEffort || 0).toFixed(1)}d`
+                                  : `${(task.actualEffort || 0).toFixed(2)}/${(task.estimatedEffort || 0).toFixed(2)}w`}
+                              </span>
                             </div>
                             );
                           })()}
                         </div>
                         
                         {/* Column 7: Progress - Empty (tasks don't have progress) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 text-center"></div>
+                        <div className="px-2.5 py-2 border-r border-purple-200 text-center min-w-[60px]">
+                          <span className="text-slate-400 text-xs">-</span>
+                        </div>
                         
                         {/* Column 8: ETA (aligned with ETA / Update column) */}
-                        <div className="px-2.5 py-2 min-w-[110px]">
-                          <div className="flex flex-col gap-1">
-                            {editable ? (
-                              <input
-                                type="date"
-                                value={task.eta || ''}
-                                onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
-                                className="w-full bg-white text-xs border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md"
-                              />
-                            ) : (
+                        <div className="px-2.5 py-2 min-w-[100px] border-r border-purple-200">
+                          {editable ? (
+                            <input
+                              type="date"
+                              value={task.eta || ''}
+                              onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
+                              className="w-full bg-white text-xs border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md"
+                            />
+                          ) : (
+                            <div className="flex justify-center">
                               <span className="text-xs font-semibold text-slate-700">{task.eta || 'N/A'}</span>
-                            )}
-                          </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Column 9: Actions (Delete button) */}
+                        <div className="px-2 py-2 flex items-center justify-center min-w-[40px]">
+                          {canDeleteTask(item, task) && (
+                            <button
+                              onClick={() => handleDeleteTask(item.id, task.id)}
+                              className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete task"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
                       </div>
-                      {/* Delete Button - positioned absolutely on the right */}
-                      {canDeleteTask(item, task) && (
-                        <button
-                          onClick={() => handleDeleteTask(item.id, task.id)}
-                          className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors z-10"
-                          title="Delete task"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -1342,6 +1364,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           eta: defaultEta,
                           owner: '',
                           status: Status.NotStarted,
+                          priority: Priority.P2,
                           tags: [],
                           initiativeId: item.id,
                           tradeOffInitiativeId: undefined,
@@ -1369,6 +1392,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               eta: '',
                               owner: '',
                               status: Status.NotStarted,
+                              priority: Priority.P2,
                               tags: [],
                               initiativeId: item.id,
                               tradeOffInitiativeId: undefined,
@@ -1538,6 +1562,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             </select>
                           </div>
 
+                          {/* Priority */}
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-700 mb-1">
+                              Priority
+                            </label>
+                            <select
+                              value={newTaskForm.priority || Priority.P2}
+                              onChange={(e) => setNewTaskForm(prev => ({ ...prev, priority: e.target.value as Priority }))}
+                              className={`w-full px-1.5 py-1.5 text-xs border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${getPrioritySelectStyle(newTaskForm.priority || Priority.P2)}`}
+                            >
+                              {getPriorities(config).map(p => (
+                                <option key={p} value={p} className="bg-white text-slate-900">{p}</option>
+                              ))}
+                            </select>
+                          </div>
+
                           {/* Tags */}
                           <div>
                             <label className="block text-[10px] font-medium text-slate-700 mb-1">
@@ -1619,14 +1659,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               >
                                 <option value="">Select...</option>
                                 {allInitiativesList
-                                  .filter(i => i.ownerId === item.ownerId)
+                                  .filter(i => i.ownerId === item.ownerId && i.status !== Status.Deleted)
                                   .map(i => (
                                     <option key={i.id} value={i.id}>
-                                      {i.title} ({i.l1_assetClass}) {i.initiativeType === InitiativeType.BAU ? '[BAU]' : '[WP]'}
+                                      {i.title} [{i.priority}] ({i.l1_assetClass}) {i.initiativeType === InitiativeType.BAU ? '[BAU]' : '[WP]'}
                                     </option>
                                   ))}
                                 {allInitiativesList
-                                  .filter(i => i.ownerId === item.ownerId).length === 0 && (
+                                  .filter(i => i.ownerId === item.ownerId && i.status !== Status.Deleted).length === 0 && (
                                     <option value="" disabled>No initiatives found</option>
                                   )}
                               </select>
@@ -1649,17 +1689,19 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 }}
                                 disabled={!newTaskForm.tradeOffInitiativeId || (() => {
                                   const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
-                                  return !tradeOffInitiative || !tradeOffInitiative.tasks || tradeOffInitiative.tasks.length === 0;
+                                  const activeTasks = tradeOffInitiative?.tasks?.filter(t => t.status !== Status.Deleted) || [];
+                                  return !tradeOffInitiative || activeTasks.length === 0;
                                 })()}
                                 className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               >
                                 <option value="">Select task...</option>
                                 {newTaskForm.tradeOffInitiativeId && (() => {
                                   const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
-                                  if (tradeOffInitiative?.tasks && tradeOffInitiative.tasks.length > 0) {
-                                    return tradeOffInitiative.tasks.map(task => (
+                                  const activeTasks = tradeOffInitiative?.tasks?.filter(t => t.status !== Status.Deleted) || [];
+                                  if (activeTasks.length > 0) {
+                                    return activeTasks.map(task => (
                                       <option key={task.id} value={task.id}>
-                                        {task.title || `Task ${task.id.slice(-4)}`} ({task.eta || 'No ETA'})
+                                        {task.title || `Task ${task.id.slice(-4)}`} {task.priority ? `[${task.priority}]` : ''} ({task.eta || 'No ETA'})
                                       </option>
                                     ));
                                   }
@@ -1715,6 +1757,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               eta: '',
                               owner: '',
                               status: Status.NotStarted,
+                              priority: Priority.P2,
                               tags: [],
                               initiativeId: item.id,
                               tradeOffInitiativeId: undefined,

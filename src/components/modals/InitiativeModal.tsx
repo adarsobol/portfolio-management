@@ -357,7 +357,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // ============================================================================
   
   const tradeOffCandidates = allInitiatives.filter(i => 
-    i.status === Status.InProgress && i.id !== formData.id
+    i.status !== Status.Deleted && i.id !== formData.id
   );
 
   const canEdit = (): boolean => {
@@ -1919,7 +1919,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             >
                               <option value="">Select initiative to impact...</option>
                               {tradeOffCandidates.map(i => (
-                                <option key={i.id} value={i.id}>{i.title} ({users.find(u => u.id === i.ownerId)?.name})</option>
+                                <option key={i.id} value={i.id}>{i.title} [{i.priority}] ({users.find(u => u.id === i.ownerId)?.name})</option>
                               ))}
                             </select>
                           </div>
