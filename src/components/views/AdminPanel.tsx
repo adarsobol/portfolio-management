@@ -1,11 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, List } from 'lucide-react';
+import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, List, Sparkles } from 'lucide-react';
 import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata } from '../../types';
-import { migrateEnumsToConfig } from '../../utils/valueLists';
+import { migrateEnumsToConfig, getAssetClasses } from '../../utils/valueLists';
 import { canBeOwner } from '../../utils';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
@@ -300,6 +300,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [taskImportResult, setTaskImportResult] = useState<ImportResult | null>(null);
   const taskFileInputRef = useRef<HTMLInputElement>(null);
   const permissionsTableRef = useRef<HTMLDivElement>(null);
+  
   
   // Permission tab state
   const [activePermissionTab, setActivePermissionTab] = useState<'tabs' | 'tasks' | 'admin'>('tabs');
@@ -1117,8 +1118,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // Team options based on asset classes + custom options
-  const teamOptions = ['PL', 'Auto', 'POS', 'Advisory', 'Platform', 'Operations', 'Other'];
+  // Team options based on asset classes + "Other"
+  const teamOptions = [...getAssetClasses(config), 'Other'];
 
   // Handle lazy loading when section becomes active
   React.useEffect(() => {
@@ -2591,6 +2592,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+      
     </div>
   );
 };
