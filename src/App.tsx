@@ -1380,7 +1380,7 @@ export default function App() {
     }
   };
 
-  const handleSave = (item: Initiative, tradeOffAction?: TradeOffAction) => {
+  const handleSave = (item: Initiative, tradeOffAction?: TradeOffAction, skipImmediateSync = false) => {
     const today = new Date().toISOString().split('T')[0];
     
     // Check if this is a new initiative and apply Team-Based Asset Class Assignment workflow
@@ -1622,7 +1622,8 @@ export default function App() {
       }
       
       // Force immediate sync for new initiatives to prevent data loss on refresh
-      if (existingIndex === -1) {
+      // Skip immediate sync for bulk operations to prevent race conditions
+      if (existingIndex === -1 && !skipImmediateSync) {
         sheetsSync.forceSyncNow();
       }
 

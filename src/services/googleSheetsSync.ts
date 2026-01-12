@@ -286,18 +286,35 @@ class SheetsSyncManager {
   }
 
   /** Load initiatives from Google Sheets (primary source) with localStorage fallback */
+  /** CRITICAL: Merges local + server data to prevent data loss on refresh */
   async loadInitiatives(): Promise<Initiative[]> {
     this.status.isLoading = true;
     this.notify();
 
     try {
-      // Try to load from Google Sheets first
+      // Load from localStorage first to preserve local state
+      const localCached = loadFromLocalStorageCache();
+      let localInitiatives: Initiative[] = [];
+      
+      if (localCached && localCached.length > 0) {
+        // Deduplicate local cache
+        const seenIds = new Set<string>();
+        localInitiatives = localCached.filter((init: Initiative) => {
+          if (seenIds.has(init.id)) {
+            return false;
+          }
+          seenIds.add(init.id);
+          return true;
+        });
+      }
+
+      // Try to load from Google Sheets
       if (this.status.isOnline && authService.isAuthenticated()) {
         const data = await this.pullFromSheets();
         if (data && data.initiatives.length > 0) {
-          // Deduplicate initiatives by ID (keep first occurrence) before caching
+          // Deduplicate server initiatives by ID (keep first occurrence)
           const seenIds = new Set<string>();
-          const deduplicated = data.initiatives.filter((init: Initiative) => {
+          const serverInitiatives = data.initiatives.filter((init: Initiative) => {
             if (seenIds.has(init.id)) {
               logger.warn('Found duplicate initiative ID', { context: 'SheetsSyncManager.loadInitiatives', metadata: { id: init.id } });
               return false;
@@ -306,19 +323,59 @@ class SheetsSyncManager {
             return true;
           });
 
-          if (data.initiatives.length !== deduplicated.length) {
-            logger.info('Deduplicated initiatives from Sheets', { 
+          // MERGE: Combine local + server data intelligently
+          // Strategy: Keep local items that don't exist on server OR have newer timestamps
+          const merged = new Map<string, Initiative>();
+          
+          // First, add all server initiatives
+          serverInitiatives.forEach(init => {
+            merged.set(init.id, init);
+          });
+          
+          // Then, add local initiatives that are missing on server OR newer
+          localInitiatives.forEach(localInit => {
+            const serverInit = merged.get(localInit.id);
+            if (!serverInit) {
+              // Local item doesn't exist on server - keep it (likely failed to sync)
+              logger.info('Keeping local initiative not found on server', { 
+                context: 'SheetsSyncManager.loadInitiatives', 
+                metadata: { id: localInit.id, title: localInit.title } 
+              });
+              merged.set(localInit.id, localInit);
+            } else {
+              // Both exist - keep the one with newer lastUpdated timestamp
+              const localTime = localInit.lastUpdated || localInit.createdAt || '';
+              const serverTime = serverInit.lastUpdated || serverInit.createdAt || '';
+              if (localTime > serverTime) {
+                logger.info('Keeping local initiative with newer timestamp', { 
+                  context: 'SheetsSyncManager.loadInitiatives', 
+                  metadata: { id: localInit.id, localTime, serverTime } 
+                });
+                merged.set(localInit.id, localInit);
+              }
+            }
+          });
+
+          const mergedArray = Array.from(merged.values());
+          
+          if (mergedArray.length > serverInitiatives.length) {
+            logger.info('Merged local + server data', { 
               context: 'SheetsSyncManager.loadInitiatives', 
-              metadata: { before: data.initiatives.length, after: deduplicated.length, removed: data.initiatives.length - deduplicated.length } 
+              metadata: { 
+                serverCount: serverInitiatives.length, 
+                localCount: localInitiatives.length,
+                mergedCount: mergedArray.length,
+                addedFromLocal: mergedArray.length - serverInitiatives.length
+              } 
             });
           }
 
-          // Cache deduplicated initiatives to localStorage for offline access
-          cacheToLocalStorage(deduplicated);
+          // Cache merged initiatives to localStorage
+          cacheToLocalStorage(mergedArray);
           this.status.isLoading = false;
           this.status.lastSync = new Date().toISOString();
           this.notify();
-          return deduplicated;
+          return mergedArray;
         }
       }
 

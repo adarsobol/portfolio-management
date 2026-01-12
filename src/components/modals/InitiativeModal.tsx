@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  Initiative, User, Role, Status, Priority, WorkType, UnplannedTag, AssetClass, PermissionKey, PermissionValue, TradeOffAction, Dependency, DependencyTeam, InitiativeType, Task, AppConfig
+  Initiative, User, Role, Status, Priority, WorkType, UnplannedTag, AssetClass, PermissionKey, PermissionValue, TradeOffAction, Dependency, DependencyTeam, InitiativeType, Task, AppConfig, Snapshot
 } from '../../types';
 import { getAssetClassFromTeam } from '../../constants';
 import { getHierarchy, getDependencyTeamCategories } from '../../utils/valueLists';
@@ -107,7 +107,7 @@ interface BulkEntryRow {
 interface InitiativeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (initiative: Initiative, tradeOff?: TradeOffAction) => void;
+  onSave: (initiative: Initiative, tradeOff?: TradeOffAction, skipImmediateSync?: boolean) => void;
   currentUser: User;
   initiativeToEdit?: Initiative | null;
   rolePermissions: Record<Role, Record<PermissionKey, PermissionValue>>;
@@ -696,9 +696,30 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
     const now = new Date().toISOString().split('T')[0];
     
+    // CRITICAL: Create automatic backup snapshot before bulk operations
+    // This provides a recovery point in case the bulk upload fails or causes data loss
+    try {
+      const timestamp = new Date().toISOString();
+      const snapshot: Snapshot = {
+        id: `bulk-pre-${Date.now()}`,
+        name: `Pre-Bulk Upload Backup (${bulkRows.length} items)`,
+        timestamp,
+        data: [...allInitiatives], // Current state before bulk operations
+        config,
+        createdBy: currentUser?.email || currentUser?.id || 'system'
+      };
+      sheetsSync.queueSnapshot(snapshot);
+      console.log(`[BULK] Created pre-bulk backup snapshot: ${snapshot.name}`);
+    } catch (error) {
+      // Log but don't block bulk operation if backup fails
+      console.warn('[BULK] Failed to create pre-bulk backup:', error);
+    }
+    
     // Track generated initiatives to ensure unique sequential IDs
     const generatedInitiatives: Initiative[] = [...allInitiatives];
+    const initiativesToSave: Array<{ initiative: Initiative; tradeOffAction?: TradeOffAction }> = [];
 
+    // Collect all initiatives first (don't sync yet)
     bulkRows.forEach(row => {
       const initiative: Initiative = {
         id: generateInitiativeId(bulkSharedSettings.quarter, generatedInitiatives),
@@ -740,10 +761,33 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
             }
           : undefined;
 
-      onSave(initiative, tradeOffAction);
+      initiativesToSave.push({ initiative, tradeOffAction });
     });
 
-    onClose();
+    // Save all initiatives with skipImmediateSync=true to prevent race conditions
+    // This queues them all in the sync manager without triggering immediate syncs
+    initiativesToSave.forEach(({ initiative, tradeOffAction }) => {
+      onSave(initiative, tradeOffAction, true); // Skip immediate sync for bulk operations
+    });
+
+    // Trigger a single batch sync after all items are queued
+    // Increased delay to 500ms to ensure all React state updates and queue operations complete
+    // Wait for sync to complete before closing modal to prevent data loss
+    setTimeout(async () => {
+      try {
+        // Force a single batch sync for all queued initiatives
+        // This prevents race conditions from multiple simultaneous syncs
+        await sheetsSync.forceSyncNow();
+        console.log(`[BULK] Successfully synced ${initiativesToSave.length} initiative(s) to Google Sheets`);
+        // Close modal after successful sync
+        onClose();
+      } catch (error) {
+        console.error(`[BULK] Failed to sync initiatives:`, error);
+        // Still close modal but log error - user can check sync status badge
+        // The merge-on-load fix will preserve local items if sync partially failed
+        onClose();
+      }
+    }, 500); // Increased from 100ms to 500ms for better reliability
   };
 
   // Update bulk rows when shared asset class changes
