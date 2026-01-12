@@ -4,7 +4,7 @@ import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
-import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata } from '../../types';
+import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata, Status } from '../../types';
 import { migrateEnumsToConfig, getAssetClasses } from '../../utils/valueLists';
 import { canBeOwner } from '../../utils';
 import * as XLSX from 'xlsx';
@@ -2193,7 +2193,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                </thead>
                <tbody className="divide-y divide-slate-100">
                  {users.map(u => {
-                   const ownerCount = initiatives.filter(i => i.ownerId === u.id).length;
+                   const ownerCount = initiatives.filter(i => i.ownerId === u.id && i.status !== Status.Deleted).length;
                    const userCanBeOwner = canBeOwner(u.role);
                    return (
                      <tr key={u.id} className="hover:bg-slate-50">
@@ -2445,7 +2445,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                const adjustedCapacity = Math.max(0, baseCapacity - adjustment);
                const buffer = config.teamBuffers?.[user.id] || 0;
                const effectiveCapacity = Math.max(0, adjustedCapacity - buffer);
-               const load = initiatives.filter(i => i.ownerId === user.id).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
+               const load = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
                const utilization = effectiveCapacity > 0 ? Math.round((load / effectiveCapacity) * 100) : 0;
                let utilColor = 'text-emerald-600';
                if (utilization > 80) utilColor = 'text-amber-600';

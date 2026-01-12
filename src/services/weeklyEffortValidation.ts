@@ -1,4 +1,4 @@
-import { Initiative, AppConfig } from '../types';
+import { Initiative, AppConfig, Status } from '../types';
 
 export interface ValidationResult {
   flagged: boolean;
@@ -58,8 +58,8 @@ export function validateWeeklyTeamEffort(
   config: AppConfig,
   teamLeadId: string
 ): ValidationResult {
-  // Filter initiatives by Team Lead
-  const teamLeadInitiatives = initiatives.filter(i => i.ownerId === teamLeadId);
+  // Filter initiatives by Team Lead (exclude deleted items)
+  const teamLeadInitiatives = initiatives.filter(i => i.ownerId === teamLeadId && i.status !== Status.Deleted);
   
   if (teamLeadInitiatives.length === 0) {
     return {
