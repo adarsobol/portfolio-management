@@ -418,11 +418,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   }, [tasks, taskActualEffortSum]);
 
   // Progress indicator for required fields
+  // ETA is only required when status is In Progress, so don't count it in progress unless needed
   const requiredFieldsCount = isBAU ? 5 : 6; // BAU doesn't require definitionOfDone
   const filledRequiredFields = [
     formData.title,
     formData.ownerId,
-    formData.eta,
+    // Only count ETA if status is In Progress
+    (formData.status === Status.InProgress ? formData.eta : true),
     formData.quarter,
     formData.estimatedEffort !== undefined && formData.estimatedEffort >= 0,
     !isBAU && formData.definitionOfDone && formData.definitionOfDone.trim()
@@ -438,6 +440,18 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   };
 
   const handleChange = (field: keyof Initiative, value: any) => {
+    // Validate ETA when changing status to In Progress
+    if (field === 'status' && value === Status.InProgress) {
+      if (!formData.eta || !formData.eta.trim()) {
+        setErrors(prev => ({
+          ...prev,
+          eta: "ETA is required when status is In Progress",
+          status: "Cannot move to In Progress without ETA"
+        }));
+        return; // Prevent status change
+      }
+    }
+    
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
@@ -495,7 +509,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
     if (!formData.title) newErrors.title = "Title is required";
     if (!formData.ownerId) newErrors.ownerId = "Primary Owner is required";
-    if (!formData.eta) newErrors.eta = "ETA is required";
+    // ETA is only required when status is In Progress
+    if (formData.status === Status.InProgress && !formData.eta) {
+      newErrors.eta = "ETA is required when status is In Progress";
+    }
     if (!formData.quarter) newErrors.quarter = "Quarter is required";
     // For WP without tasks, effort is required; if tasks exist, effort can be auto-calculated
     if (!isBAU && (formData.estimatedEffort === undefined || formData.estimatedEffort < 0)) {
@@ -661,7 +678,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       
       if (!row.title.trim()) rowErrors.title = "Required";
       if (!row.ownerId) rowErrors.ownerId = "Required";
-      if (!row.eta) rowErrors.eta = "Required";
+      // ETA is not required in plan mode - will be validated when moving to In Progress
       if (row.estimatedEffort === undefined || row.estimatedEffort < 0) rowErrors.estimatedEffort = "Required";
       
       if (Object.keys(rowErrors).length > 0) {
