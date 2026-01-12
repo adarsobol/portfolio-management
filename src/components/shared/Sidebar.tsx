@@ -27,13 +27,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Get base capacity (set by admin) and adjustment (set by user)
   const baseCapacityWeeks = config.teamCapacities[currentUser.id] || 0;
   const adjustmentWeeks = config.teamCapacityAdjustments?.[currentUser.id] || 0;
+  // adjustmentWeeks is signed: positive = deduct, negative = add
   const adjustedCapacityWeeks = Math.max(0, baseCapacityWeeks - adjustmentWeeks);
   
-  // Convert adjustment to weeks and days for display
+  // Convert adjustment to weeks and days for display (use absolute value)
   const adjustmentDisplay = useMemo(() => {
-    const totalWeeks = adjustmentWeeks;
-    const wholeWeeks = Math.floor(totalWeeks);
-    const fractionalWeeks = totalWeeks - wholeWeeks;
+    const absWeeks = Math.abs(adjustmentWeeks);
+    const wholeWeeks = Math.floor(absWeeks);
+    const fractionalWeeks = absWeeks - wholeWeeks;
     const days = Math.round(fractionalWeeks * DAYS_PER_WEEK);
     return { weeks: wholeWeeks, days };
   }, [adjustmentWeeks]);
@@ -57,13 +58,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [weeksInput, setWeeksInput] = useState<string>(adjustmentDisplay.weeks.toString());
   const [daysInput, setDaysInput] = useState<string>(adjustmentDisplay.days.toString());
   const [hasChanges, setHasChanges] = useState(false);
+  // Adjustment mode: 'add' for negative adjustment (adds to capacity), 'deduct' for positive (deducts from capacity)
+  const [adjustmentMode, setAdjustmentMode] = useState<'add' | 'deduct'>(adjustmentWeeks < 0 ? 'add' : 'deduct');
   
-  // Update inputs when adjustment changes externally
+  // Update inputs and mode when adjustment changes externally
   useEffect(() => {
     setWeeksInput(adjustmentDisplay.weeks.toString());
     setDaysInput(adjustmentDisplay.days.toString());
+    setAdjustmentMode(adjustmentWeeks < 0 ? 'add' : 'deduct');
     setHasChanges(false);
-  }, [adjustmentDisplay]);
+  }, [adjustmentDisplay, adjustmentWeeks]);
   
   // Handle capacity adjustment update
   const handleCapacityChange = () => {
@@ -85,13 +89,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     
     // Convert to total weeks (adjustment amount)
     const totalAdjustmentWeeks = weeks + daysToWeeks(days);
+    // Apply sign based on mode: 'add' = negative (adds to capacity), 'deduct' = positive (deducts from capacity)
+    const signedAdjustment = adjustmentMode === 'add' ? -totalAdjustmentWeeks : totalAdjustmentWeeks;
     
     // Update config with adjustment
     setConfig((prev: AppConfig) => ({
       ...prev,
       teamCapacityAdjustments: {
         ...(prev.teamCapacityAdjustments || {}),
-        [currentUser.id]: totalAdjustmentWeeks
+        [currentUser.id]: signedAdjustment
       }
     }));
     
@@ -181,6 +187,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Adjusted: {adjustedCapacityDisplay.weeks}w {adjustedCapacityDisplay.days > 0 ? `${adjustedCapacityDisplay.days}d` : ''}
               </p>
             </div>
+            {/* Add/Deduct Toggle */}
+            <div className="mb-2 flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-slate-700/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdjustmentMode('add');
+                  // Trigger save if there are input values
+                  const weeks = parseFloat(weeksInput) || 0;
+                  const days = parseFloat(daysInput) || 0;
+                  if (weeks > 0 || days > 0) {
+                    setTimeout(() => handleCapacityChange(), 0);
+                  }
+                }}
+                className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                  adjustmentMode === 'add'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdjustmentMode('deduct');
+                  // Trigger save if there are input values
+                  const weeks = parseFloat(weeksInput) || 0;
+                  const days = parseFloat(daysInput) || 0;
+                  if (weeks > 0 || days > 0) {
+                    setTimeout(() => handleCapacityChange(), 0);
+                  }
+                }}
+                className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                  adjustmentMode === 'deduct'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Deduct
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <input
@@ -225,7 +272,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {hasChanges && (
               <p className="text-[10px] text-amber-400 mt-1 text-center">Press Enter or click outside to save</p>
             )}
-            <p className="text-[10px] text-slate-500 mt-1 text-center">Deduct from base capacity</p>
+            <p className="text-[10px] text-slate-500 mt-1 text-center">
+              {adjustmentMode === 'add' ? 'Add to base capacity' : 'Deduct from base capacity'}
+            </p>
           </div>
         )}
         
