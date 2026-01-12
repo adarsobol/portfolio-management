@@ -2436,7 +2436,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                <th className="px-3 py-2 font-semibold text-slate-600">Effective Capacity</th>
                <th className="px-3 py-2 font-semibold text-slate-600">WP Load</th>
                <th className="px-3 py-2 font-semibold text-slate-600">BAU Load</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">WP Actual</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">BAU Actual</th>
                <th className="px-3 py-2 font-semibold text-slate-600">Utilization</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">Actual Utilization</th>
              </tr>
            </thead>
            <tbody className="divide-y divide-slate-100">
@@ -2446,16 +2449,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                const adjustedCapacity = Math.max(0, baseCapacity - adjustment);
                const buffer = config.teamBuffers?.[user.id] || 0;
                const effectiveCapacity = Math.max(0, adjustedCapacity - buffer);
-               // Calculate WP load (exclude BAU and deleted)
+               // Calculate WP load (planned effort, exclude BAU and deleted)
                const wpLoad = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted && i.initiativeType === InitiativeType.WP).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
-               // Calculate BAU load (exclude WP and deleted)
+               // Calculate BAU load (planned effort, exclude WP and deleted)
                const bauLoad = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted && i.initiativeType === InitiativeType.BAU).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
-               // Utilization = (WP Load + BAU Load) / Total Capacity
+               // Calculate WP actual (actual effort, exclude BAU and deleted)
+               const wpActual = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted && i.initiativeType === InitiativeType.WP).reduce((sum, i) => sum + (i.actualEffort ?? 0), 0);
+               // Calculate BAU actual (actual effort, exclude WP and deleted)
+               const bauActual = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted && i.initiativeType === InitiativeType.BAU).reduce((sum, i) => sum + (i.actualEffort ?? 0), 0);
+               // Planned Utilization = (WP Load + BAU Load) / Total Capacity
                const totalLoad = wpLoad + bauLoad;
                const utilization = baseCapacity > 0 ? Math.round((totalLoad / baseCapacity) * 100) : 0;
+               // Actual Utilization = (WP Actual + BAU Actual) / Total Capacity
+               const totalActual = wpActual + bauActual;
+               const actualUtilization = baseCapacity > 0 ? Math.round((totalActual / baseCapacity) * 100) : 0;
                let utilColor = 'text-emerald-600';
                if (utilization > 80) utilColor = 'text-amber-600';
                if (utilization > 100) utilColor = 'text-red-600 font-bold';
+               let actualUtilColor = 'text-emerald-600';
+               if (actualUtilization > 80) actualUtilColor = 'text-amber-600';
+               if (actualUtilization > 100) actualUtilColor = 'text-red-600 font-bold';
 
                return (
                  <tr key={user.id} className="hover:bg-slate-50">
@@ -2501,7 +2514,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                    <td className="px-3 py-2 text-slate-600">{effectiveCapacity.toFixed(1)} wks</td>
                    <td className="px-3 py-2">{wpLoad.toFixed(1)} wks</td>
                    <td className="px-3 py-2">{bauLoad.toFixed(1)} wks</td>
+                   <td className="px-3 py-2 text-slate-500">{wpActual.toFixed(1)} wks</td>
+                   <td className="px-3 py-2 text-slate-500">{bauActual.toFixed(1)} wks</td>
                    <td className={`px-3 py-2 ${utilColor}`}>{utilization}%</td>
+                   <td className={`px-3 py-2 ${actualUtilColor}`}>{actualUtilization}%</td>
                  </tr>
                );
              })}
