@@ -545,7 +545,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     e.stopPropagation();
                     navigate(`/item/${encodeURIComponent(item.id)}`);
                   }}
-                  className={`font-semibold text-slate-900 text-sm leading-relaxed break-words text-left flex-1 min-w-0 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`font-semibold text-slate-900 text-xs leading-relaxed break-words text-left flex-1 min-w-0 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer ${
                     isBAU ? 'bg-purple-50/50 border border-purple-200' : 'bg-blue-50/30 border border-blue-200'
                   }`}
                   title={item.title}
@@ -749,11 +749,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         <td className="px-2.5 py-1.5 border-r border-slate-200 whitespace-nowrap">
           <div className="flex items-center gap-2.5" title="Owner">
             <div className="flex flex-col justify-center gap-0.5">
-              {item.assignee ? (
-                <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{item.assignee}</span>
-              ) : (
-                <span className="text-slate-400 text-xs italic">-</span>
-              )}
+              {(() => {
+                const ownerName = users.find(u => u.id === item.ownerId)?.name;
+                return ownerName ? (
+                  <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{ownerName}</span>
+                ) : (
+                  <span className="text-slate-400 text-xs italic">-</span>
+                );
+              })()}
             </div>
           </div>
         </td>
