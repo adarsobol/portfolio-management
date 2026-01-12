@@ -87,7 +87,7 @@ interface BulkEntryRow {
   l2_pillar: string;
   l3_responsibility: string;
   l4_target: string;
-  secondaryOwner: string;
+  assignee: string;
   // Additional fields
   definitionOfDone?: string;
   unplannedTags?: UnplannedTag[];
@@ -166,7 +166,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const [bulkRows, setBulkRows] = useState<BulkEntryRow[]>([]);
   const [bulkSharedSettings, setBulkSharedSettings] = useState({
     quarter: 'Q4 2025',
-    l1_assetClass: AssetClass.PL
+    l1_assetClass: AssetClass.PL,
+    ownerId: ''
   });
   const [bulkErrors, setBulkErrors] = useState<Record<string, Record<string, string>>>({});
 
@@ -224,7 +225,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     return {
       id: generateId(),
       title: '',
-      ownerId: '',
+      ownerId: bulkSharedSettings.ownerId,
       priority: Priority.P1,
       status: Status.NotStarted,
       eta: '',
@@ -232,7 +233,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       l2_pillar: defaultPillar,
       l3_responsibility: defaultResp,
       l4_target: '',
-      secondaryOwner: '',
+      assignee: '',
       definitionOfDone: '',
       unplannedTags: [],
       dependencies: [],
@@ -243,7 +244,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       tradeOffField: 'eta',
       tradeOffValue: ''
     };
-  }, [bulkSharedSettings.l1_assetClass]);
+  }, [bulkSharedSettings.l1_assetClass, bulkSharedSettings.ownerId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -686,7 +687,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         id: generateInitiativeId(bulkSharedSettings.quarter, generatedInitiatives),
         title: row.title,
         ownerId: row.ownerId,
-        secondaryOwner: row.secondaryOwner || undefined,
+        assignee: row.assignee || undefined,
         priority: row.priority,
         status: row.status,
         eta: row.eta,
@@ -740,6 +741,16 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       l3_responsibility: defaultResp
     })));
   }, [bulkSharedSettings.l1_assetClass]);
+
+  // Update bulk rows when shared ownerId changes
+  useEffect(() => {
+    if (bulkSharedSettings.ownerId) {
+      setBulkRows(prev => prev.map(row => ({
+        ...row,
+        ownerId: bulkSharedSettings.ownerId
+      })));
+    }
+  }, [bulkSharedSettings.ownerId]);
 
   // ============================================================================
   // HANDLERS - TASK MANAGEMENT (ALL INITIATIVE TYPES)
@@ -1262,15 +1273,15 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       </select>
                     </div>
                     <div className="bg-slate-100 px-3 py-2 font-medium text-slate-600 border-r border-slate-200 flex items-center">
-                      Secondary
+                      Assignee
                     </div>
                     <div className="bg-white">
                       <input 
                         disabled={isReadOnly}
                         type="text"
-                        value={formData.secondaryOwner || ''} 
-                        onChange={(e) => handleChange('secondaryOwner', e.target.value)}
-                        placeholder="Stakeholder name..."
+                        value={formData.assignee || ''} 
+                        onChange={(e) => handleChange('assignee', e.target.value)}
+                        placeholder="Assignee name..."
                         className="w-full px-3 py-2 text-sm focus:outline-none focus:bg-blue-50"
                       />
                     </div>

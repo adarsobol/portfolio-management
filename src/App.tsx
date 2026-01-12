@@ -824,7 +824,7 @@ export default function App() {
       data = data.filter(i => 
         i.title.toLowerCase().includes(q) || 
         i.ownerId.toLowerCase().includes(q) ||
-        (i.secondaryOwner && i.secondaryOwner.toLowerCase().includes(q)) ||
+        (i.assignee && i.assignee.toLowerCase().includes(q)) ||
         i.l2_pillar.toLowerCase().includes(q)
       );
     }

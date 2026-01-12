@@ -111,7 +111,7 @@ function transformInitiativeForExport(initiative: Initiative, users: User[]): Re
     // Initiative Details (L5)
     'Title': initiative.title || '',
     'Owner': getOwnerName(users, initiative.ownerId),
-    'Secondary Owner': initiative.secondaryOwner || '',
+    'Assignee': initiative.assignee || '',
     'Quarter': initiative.quarter || '',
     'Status': initiative.status || '',
     'Priority': initiative.priority || '',

@@ -749,14 +749,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           )}
         </td>
         <td className="px-2.5 py-1.5 border-r border-slate-200 whitespace-nowrap">
-          <div className="flex items-center gap-2.5" title="Primary Owner">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-300 shadow-sm">
-              {getOwnerNameById(item.ownerId)?.charAt(0)}
-            </div>
+          <div className="flex items-center gap-2.5" title="Assignee">
             <div className="flex flex-col justify-center gap-0.5">
-              <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{getOwnerNameById(item.ownerId)}</span>
-              {item.secondaryOwner && (
-                <span className="text-[9px] text-slate-400 italic truncate max-w-[90px] leading-none">{item.secondaryOwner}</span>
+              {item.assignee ? (
+                <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{item.assignee}</span>
+              ) : (
+                <span className="text-slate-400 text-xs italic">-</span>
               )}
             </div>
           </div>
@@ -1831,7 +1829,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 ID
               </th>
               <SortableHeader label={`Initiative (${filteredInitiatives.length})`} sortKey="title" />
-              <SortableHeader label="Owner" sortKey="owner" />
+              <SortableHeader label="Assignee" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">

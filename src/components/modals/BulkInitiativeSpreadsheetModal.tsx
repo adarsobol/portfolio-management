@@ -18,7 +18,7 @@ interface BulkEntryRow {
   l2_pillar: string;
   l3_responsibility: string;
   l4_target: string;
-  secondaryOwner: string;
+  assignee: string;
   definitionOfDone?: string;
   unplannedTags?: UnplannedTag[];
   dependencies?: Dependency[];
@@ -37,8 +37,9 @@ interface BulkInitiativeSpreadsheetModalProps {
   sharedSettings: {
     quarter: string;
     l1_assetClass: AssetClass;
+    ownerId: string;
   };
-  onSharedSettingsChange: (settings: { quarter: string; l1_assetClass: AssetClass }) => void;
+  onSharedSettingsChange: (settings: { quarter: string; l1_assetClass: AssetClass; ownerId: string }) => void;
   users: User[];
   allInitiatives: Initiative[];
   onRowChange: (rowId: string, field: keyof BulkEntryRow, value: any) => void;
@@ -116,7 +117,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
     { key: 'priority', label: 'Priority', width: 'w-24' },
     { key: 'definitionOfDone', label: 'Definition of Done', width: 'w-48' },
     { key: 'estimatedEffort', label: 'Q1 Effort (weeks)', width: 'w-32' },
-    { key: 'ownerId', label: 'Owner', width: 'w-40' },
+    { key: 'assignee', label: 'Assignee', width: 'w-40' },
     { key: 'eta', label: 'ETA', width: 'w-32' },
     { key: 'pmItem', label: 'PM Item', width: 'w-20' },
     { key: 'riskItem', label: 'Risk Item', width: 'w-20' },
@@ -128,7 +129,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
   // Template headers for download (matches column labels)
   const TEMPLATE_HEADERS = [
     'Type', 'Pillar', 'Responsibilities', 'Target', 'Initiatives', 'Priority',
-    'Definition of Done', 'Q1 Effort (weeks)', 'Owner', 'ETA',
+    'Definition of Done', 'Q1 Effort (weeks)', 'Assignee', 'ETA',
     'PM Item', 'Risk Item', 'Dependencies Department', 'Dependencies Deliverable', 'Dependencies ETA'
   ];
 
@@ -170,10 +171,11 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
           const definitionOfDone = String(row['Definition of Done'] || row['definitionOfDone'] || '').trim();
           const effort = parseFloat(String(row['Q1 Effort (weeks)'] || row['Effort'] || row['estimatedEffort'] || '0')) || 0;
           
-          // Owner lookup by name
-          const ownerName = String(row['Owner'] || row['owner'] || '').trim().toLowerCase();
-          const owner = teamLeads.find(u => u.name.toLowerCase() === ownerName);
-          const ownerId = owner?.id || '';
+          // Assignee (free text)
+          const assignee = String(row['Assignee'] || row['assignee'] || '').trim();
+          
+          // Owner comes from shared settings
+          const ownerId = sharedSettings.ownerId || '';
 
           // Parse ETA (handle Excel date serial numbers)
           let eta = '';
@@ -235,7 +237,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
             l2_pillar: pillar,
             l3_responsibility: responsibility,
             l4_target: target,
-            secondaryOwner: '',
+            assignee,
             definitionOfDone,
             unplannedTags,
             dependencies,
@@ -299,7 +301,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Quarter</label>
             <select
@@ -318,6 +320,19 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Owner</label>
+            <select
+              value={sharedSettings.ownerId}
+              onChange={(e) => onSharedSettingsChange({ ...sharedSettings, ownerId: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select...</option>
+              {teamLeads.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -483,20 +498,17 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                       </div>
                     </td>
 
-                    {/* Owner */}
+                    {/* Assignee */}
                     <td className="px-3 py-2 border-r border-slate-200">
-                      <select
-                        value={row.ownerId}
-                        onChange={(e) => onRowChange(row.id, 'ownerId', e.target.value)}
+                      <input
+                        type="text"
+                        value={row.assignee}
+                        onChange={(e) => onRowChange(row.id, 'assignee', e.target.value)}
+                        placeholder="Assignee name..."
                         className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                          rowErrors.ownerId ? 'border-red-500 bg-red-50' : 'border-slate-200'
+                          rowErrors.assignee ? 'border-red-500 bg-red-50' : 'border-slate-200'
                         }`}
-                      >
-                        <option value="">Select...</option>
-                        {teamLeads.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
+                      />
                     </td>
 
                     {/* ETA */}

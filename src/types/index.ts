@@ -142,7 +142,7 @@ export interface Initiative {
   // L5 Initiative Details
   title: string;
   ownerId: string; // Links to a User (Team Lead)
-  secondaryOwner?: string; // Open text for stakeholder/support
+  assignee?: string; // Open text for assignee/stakeholder
   quarter: string; // e.g., "Q4 2024"
   status: Status;
   priority: Priority;

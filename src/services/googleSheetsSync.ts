@@ -56,7 +56,7 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     l4_target: i.l4_target,
     title: i.title,
     ownerId: i.ownerId,
-    secondaryOwner: i.secondaryOwner || '',
+    assignee: i.assignee || '',
     quarter: i.quarter,
     status: i.status,
     priority: i.priority,
