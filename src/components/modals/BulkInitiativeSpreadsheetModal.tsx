@@ -153,34 +153,71 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as Record<string, unknown>[];
+
+        // Helper function to find column value with multiple name variations (case-insensitive, trimmed)
+        const getColumnValue = (row: Record<string, unknown>, possibleNames: string[]): string => {
+          for (const name of possibleNames) {
+            // Try exact match first
+            if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') {
+              return String(row[name]).trim();
+            }
+            // Try case-insensitive match
+            const foundKey = Object.keys(row).find(key => key.trim().toLowerCase() === name.trim().toLowerCase());
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
+              return String(row[foundKey]).trim();
+            }
+          }
+          return '';
+        };
+
+        // Debug: Log first row keys to see what columns are actually present
+        if (jsonData.length > 0) {
+          console.log('Available columns in uploaded sheet:', Object.keys(jsonData[0]));
+        }
 
         const hierarchy = getHierarchy(config);
         const defaultPillar = hierarchy[sharedSettings.l1_assetClass][0]?.name || '';
         const defaultResp = hierarchy[sharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
 
         const parsedRows: BulkEntryRow[] = jsonData.map((row) => {
-          // Map columns to BulkEntryRow fields
-          const typeVal = String(row['Type'] || row['type'] || row['Initiative Type'] || row['initiativeType'] || 'WP').trim().toUpperCase();
+          // Map columns to BulkEntryRow fields with robust name matching
+          const typeVal = String(
+            getColumnValue(row, ['Type', 'type', 'Initiative Type', 'initiativeType', 'InitiativeType']) || 'WP'
+          ).trim().toUpperCase();
           const initiativeType = (typeVal === 'BAU' ? InitiativeType.BAU : InitiativeType.WP);
-          const pillar = String(row['Pillar'] || row['pillar'] || defaultPillar).trim();
-          const responsibility = String(row['Responsibilities'] || row['responsibilities'] || row['Responsibility'] || defaultResp).trim();
-          const target = String(row['Target'] || row['target'] || '').trim();
-          const title = String(row['Initiatives'] || row['Initiative'] || row['Title'] || row['title'] || '').trim();
-          const priority = String(row['Priority'] || row['priority'] || 'P1').trim() as Priority;
-          const definitionOfDone = String(row['Definition of Done'] || row['definitionOfDone'] || '').trim();
-          const effort = parseFloat(String(row['Q1 Effort (weeks)'] || row['Effort'] || row['estimatedEffort'] || '0')) || 0;
           
-          // Assignee (free text)
-          const assignee = String(row['Assignee'] || row['assignee'] || '').trim();
+          const pillar = getColumnValue(row, ['Pillar', 'pillar', 'L2 Pillar', 'l2_pillar', 'L2_Pillar']) || defaultPillar;
+          const responsibility = getColumnValue(row, ['Responsibilities', 'responsibilities', 'Responsibility', 'responsibility', 'L3 Responsibility', 'l3_responsibility', 'L3_Responsibility']) || defaultResp;
+          const target = getColumnValue(row, ['Target', 'target', 'L4 Target', 'l4_target', 'L4_Target']);
+          const title = getColumnValue(row, ['Initiatives', 'initiatives', 'Initiative', 'initiative', 'Title', 'title', 'Initiative Name', 'InitiativeName']);
+          const priority = (getColumnValue(row, ['Priority', 'priority', 'Priorities']) || 'P1').trim() as Priority;
+          const definitionOfDone = getColumnValue(row, ['Definition of Done', 'definitionOfDone', 'DefinitionOfDone', 'DoD', 'dod']);
+          const effort = parseFloat(getColumnValue(row, ['Q1 Effort (weeks)', 'Q1 Effort', 'Effort', 'effort', 'estimatedEffort', 'Estimated Effort']) || '0') || 0;
+          
+          // Assignee (free text) - handle multiple column name variations
+          const assignee = getColumnValue(row, [
+            'Assignee', 
+            'assignee', 
+            'Owner Within Team', 
+            'owner within team',
+            'Owner',
+            'owner'
+          ]);
           
           // Owner comes from shared settings
           const ownerId = sharedSettings.ownerId || '';
 
           // Parse ETA (handle Excel date serial numbers)
           let eta = '';
-          const rawEta = row['ETA'] || row['eta'];
-          if (rawEta) {
+          // Find ETA column key first, then get the raw value (might be number for Excel dates)
+          const etaKey = Object.keys(row).find(key => 
+            ['ETA', 'eta', 'Eta', 'Due Date', 'dueDate'].some(name => 
+              key.trim().toLowerCase() === name.trim().toLowerCase()
+            )
+          );
+          const rawEta = etaKey ? row[etaKey] : null;
+          if (rawEta !== undefined && rawEta !== null && rawEta !== '') {
             if (typeof rawEta === 'number') {
               // Excel date serial number conversion
               const excelEpoch = new Date(1899, 11, 30);
@@ -192,8 +229,8 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
           }
 
           // PM Item and Risk Item (checkboxes)
-          const pmItemVal = row['PM Item'] || row['pmItem'];
-          const riskItemVal = row['Risk Item'] || row['riskItem'];
+          const pmItemVal = getColumnValue(row, ['PM Item', 'pmItem', 'PM', 'pm']) || row['PM Item'] || row['pmItem'];
+          const riskItemVal = getColumnValue(row, ['Risk Item', 'riskItem', 'Risk', 'risk']) || row['Risk Item'] || row['riskItem'];
           const unplannedTags: UnplannedTag[] = [];
           if (pmItemVal === true || pmItemVal === 'true' || pmItemVal === 'TRUE' || pmItemVal === 'Yes' || pmItemVal === 'yes' || pmItemVal === 'X' || pmItemVal === 'x') {
             unplannedTags.push(UnplannedTag.PMItem);
@@ -202,11 +239,28 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
             unplannedTags.push(UnplannedTag.RiskItem);
           }
 
-          // Dependencies
-          const depDepartment = String(row['Dependencies Department'] || row['depDepartment'] || '').trim();
-          const depDeliverable = String(row['Dependencies Deliverable'] || row['depDeliverable'] || '').trim();
+          // Dependencies - handle multiple column name variations (with spaces, dashes, or underscores)
+          const depDepartment = getColumnValue(row, [
+            'Dependencies Department', 
+            'Dependencies - Department',
+            'Dependencies_Department',
+            'depDepartment'
+          ]);
+          const depDeliverable = getColumnValue(row, [
+            'Dependencies Deliverable', 
+            'Dependencies - Deliverable',
+            'Dependencies_Deliverable',
+            'Dependencies',  // Sometimes just "Dependencies" refers to deliverable
+            'depDeliverable'
+          ]);
           let depEta = '';
-          const rawDepEta = row['Dependencies ETA'] || row['depEta'];
+          // Find Dependencies ETA column key first, then get the raw value (might be number for Excel dates)
+          const depEtaKey = Object.keys(row).find(key => 
+            ['Dependencies ETA', 'Dependencies - ETA', 'Dependencies_ETA', 'depEta'].some(name => 
+              key.trim().toLowerCase() === name.trim().toLowerCase()
+            )
+          );
+          const rawDepEta = depEtaKey ? row[depEtaKey] : null;
           if (rawDepEta) {
             if (typeof rawDepEta === 'number') {
               const excelEpoch = new Date(1899, 11, 30);
