@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRig
 import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserCommentReadState, InitiativeType, Task, Role, UnplannedTag } from '../../types';
 import { StatusBadge, PriorityBadge, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
-import { getOwnerName, checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
+import { checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
@@ -356,8 +356,6 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       alert('Failed to delete task. Please try again.');
     }
   };
-
-  const getOwnerNameById = (id?: string) => getOwnerName(users, id);
 
   const canInlineEdit = (item: Initiative): boolean => {
     // Check if user can edit all tasks
