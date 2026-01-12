@@ -747,7 +747,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           )}
         </td>
         <td className="px-2.5 py-1.5 border-r border-slate-200 whitespace-nowrap">
-          <div className="flex items-center gap-2.5" title="Assignee">
+          <div className="flex items-center gap-2.5" title="Owner">
             <div className="flex flex-col justify-center gap-0.5">
               {item.assignee ? (
                 <span className="text-slate-800 font-medium text-xs truncate max-w-[110px]">{item.assignee}</span>
@@ -1102,14 +1102,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           </div>
                         </div>
                         
-                        {/* Column 3: Assignee (aligned with Owner column) */}
+                        {/* Column 3: Owner */}
                         <div className="px-2.5 py-2 border-r border-purple-200 whitespace-nowrap min-w-[120px]">
                           {editable ? (
                             <input
                               type="text"
                               value={task.owner || ''}
                               onChange={(e) => handleUpdateTask(item.id, task.id, 'owner', e.target.value || undefined)}
-                              placeholder="Assignee..."
+                              placeholder="Owner..."
                               className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white w-24"
                             />
                           ) : (
@@ -1543,10 +1543,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             />
                           </div>
 
-                          {/* Assignee */}
+                          {/* Owner */}
                           <div>
                             <label className="block text-[10px] font-medium text-slate-700 mb-1">
-                              Assignee
+                              Owner
                             </label>
                             <input
                               type="text"
@@ -1827,7 +1827,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 ID
               </th>
               <SortableHeader label={`Initiative (${filteredInitiatives.length})`} sortKey="title" />
-              <SortableHeader label="Assignee" sortKey="owner" />
+              <SortableHeader label="Owner" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
               <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">
