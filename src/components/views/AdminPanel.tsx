@@ -4,7 +4,7 @@ import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
-import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata, Status } from '../../types';
+import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata, Status, InitiativeType } from '../../types';
 import { migrateEnumsToConfig, getAssetClasses } from '../../utils/valueLists';
 import { canBeOwner } from '../../utils';
 import * as XLSX from 'xlsx';
@@ -2434,7 +2434,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                <th className="px-3 py-2 font-semibold text-slate-600">Adjusted Capacity</th>
                <th className="px-3 py-2 font-semibold text-slate-600">Buffer (wks)</th>
                <th className="px-3 py-2 font-semibold text-slate-600">Effective Capacity</th>
-               <th className="px-3 py-2 font-semibold text-slate-600">Assigned Load</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">WP Load</th>
+               <th className="px-3 py-2 font-semibold text-slate-600">BAU Load</th>
                <th className="px-3 py-2 font-semibold text-slate-600">Utilization</th>
              </tr>
            </thead>
@@ -2445,8 +2446,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                const adjustedCapacity = Math.max(0, baseCapacity - adjustment);
                const buffer = config.teamBuffers?.[user.id] || 0;
                const effectiveCapacity = Math.max(0, adjustedCapacity - buffer);
-               const load = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
-               const utilization = effectiveCapacity > 0 ? Math.round((load / effectiveCapacity) * 100) : 0;
+               // Calculate WP load (exclude BAU and deleted)
+               const wpLoad = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted && i.initiativeType === InitiativeType.WP).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
+               // Calculate BAU load (exclude WP and deleted)
+               const bauLoad = initiatives.filter(i => i.ownerId === user.id && i.status !== Status.Deleted && i.initiativeType === InitiativeType.BAU).reduce((sum, i) => sum + (i.estimatedEffort ?? 0), 0);
+               // Utilization = (WP Load + BAU Load) / Total Capacity
+               const totalLoad = wpLoad + bauLoad;
+               const utilization = baseCapacity > 0 ? Math.round((totalLoad / baseCapacity) * 100) : 0;
                let utilColor = 'text-emerald-600';
                if (utilization > 80) utilColor = 'text-amber-600';
                if (utilization > 100) utilColor = 'text-red-600 font-bold';
@@ -2493,7 +2499,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                      />
                    </td>
                    <td className="px-3 py-2 text-slate-600">{effectiveCapacity.toFixed(1)} wks</td>
-                   <td className="px-3 py-2">{load.toFixed(1)} wks</td>
+                   <td className="px-3 py-2">{wpLoad.toFixed(1)} wks</td>
+                   <td className="px-3 py-2">{bauLoad.toFixed(1)} wks</td>
                    <td className={`px-3 py-2 ${utilColor}`}>{utilization}%</td>
                  </tr>
                );
