@@ -615,8 +615,6 @@ function calculateStrategicWorkload(initiatives: Initiative[]): StrategicWorkloa
   // Estimation Variance: Compare Original vs Actual for Done items (address ALL pillars with done items)
   const doneItems = activeInitiatives.filter(i => i.status === Status.Done);
   if (doneItems.length > 0) {
-    const portfolioTotal = byPillar.reduce((sum, p) => sum + p.actualSpent, 0);
-    
     // Generate insights for ALL pillars that have done items
     byPillar.forEach(pillar => {
       const pillarDoneItems = doneItems.filter(i => i.l2_pillar === pillar.name);
@@ -667,8 +665,6 @@ function calculateStrategicWorkload(initiatives: Initiative[]): StrategicWorkloa
   });
 
   // Generate insights for Responsibilities as well (address ALL)
-  const respPortfolioTotal = byResponsibility.reduce((sum, r) => sum + r.actualSpent, 0);
-  
   // Efficiency Leak for Responsibilities
   byResponsibility.forEach(resp => {
     if (resp.burnRate > resp.weightedProgress + 20 && resp.totalAllocated > 0) {
@@ -1640,7 +1636,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [showBufferChart, setShowBufferChart] = useState(false);
   const [showDelayChart, setShowDelayChart] = useState(false);
   const [showCompletionTimeChart, setShowCompletionTimeChart] = useState(false);
-  const [showStrategicWorkload, setShowStrategicWorkload] = useState(false);
   
   // Strategic Workload grouping toggle
   const [workloadGroupBy, setWorkloadGroupBy] = useState<'pillar' | 'responsibility'>('pillar');

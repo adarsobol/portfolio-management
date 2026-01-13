@@ -13,7 +13,7 @@ import { getStatuses, getPriorities } from '../../utils/valueLists';
 interface TaskTableProps {
   filteredInitiatives: Initiative[];
   allInitiatives?: Initiative[]; // All initiatives for trade-off dropdown (unfiltered)
-  handleInlineUpdate: (id: string, field: keyof Initiative, value: any, suppressNotification?: boolean) => void;
+  handleInlineUpdate: (id: string, field: keyof Initiative, value: any, suppressNotification?: boolean, tradeOffSourceId?: string, tradeOffSourceTitle?: string) => void;
   setEditingItem: (item: Initiative) => void;
   setIsModalOpen: (isOpen: boolean) => void;
   sortConfig: { key: string; direction: 'asc' | 'desc' } | null;

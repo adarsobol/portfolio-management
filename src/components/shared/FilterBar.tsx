@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
-import { Filter, ChevronDown, X, Bookmark, BookmarkCheck, Trash2, Save } from 'lucide-react';
+import { Filter, ChevronDown, X, Bookmark, Trash2, Save } from 'lucide-react';
 import { User, UnplannedTag, AppConfig, Initiative, SavedFilterView } from '../../types';
 import { getAssetClasses, getQuarters, getPriorities, getStatuses } from '../../utils/valueLists';
 
@@ -153,7 +153,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   }, [initiatives, availableQuarters]);
 
   const usedStatuses = useMemo(() => {
-    const statuses = new Set(initiatives.map(i => i.status));
+    const statuses = new Set(initiatives.map(i => i.status as string));
     return availableStatuses.filter(s => statuses.has(s));
   }, [initiatives, availableStatuses]);
 
