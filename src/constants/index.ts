@@ -45,7 +45,6 @@ export const USERS: User[] = [
   { id: 'u_bb', name: 'Benny Barki', email: 'benny.barki@pagaya.com', role: Role.TeamLead, avatar: 'https://ui-avatars.com/api/?name=Benny+Barki&background=random' },
   { id: 'u_dk', name: 'Dafna Koby', email: 'dafna.koby@pagaya.com', role: Role.TeamLead, avatar: 'https://ui-avatars.com/api/?name=Dafna+Koby&background=random' },
   { id: 'u_bk_tl', name: 'Biran Kedar (TL)', email: 'biran.kedar.tl@pagaya.com', role: Role.TeamLead, avatar: 'https://ui-avatars.com/api/?name=Biran+Kedar&background=random' },
-  { id: 'u_da_tl', name: 'Doron Ariav (TL)', email: 'doron.ariav.tl@pagaya.com', role: Role.TeamLead, avatar: 'https://ui-avatars.com/api/?name=Doron+Ariav&background=random' },
 
   // Portfolio Operations
   { id: 'u_ne', name: 'Nofar Elis', email: 'nofar.elis@pagaya.com', role: Role.PortfolioOps, avatar: 'https://ui-avatars.com/api/?name=Nofar+Elis&background=F59E0B&color=fff' }, 

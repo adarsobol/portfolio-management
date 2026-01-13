@@ -159,15 +159,13 @@ export default function App() {
         if (response.ok) {
           const data = await response.json();
           if (data.users && data.users.length > 0) {
-            // Merge API users with any missing hardcoded users (as fallback)
-            const apiUserEmails = new Set(data.users.map((u: User) => u.email.toLowerCase()));
-            const fallbackUsers = USERS.filter(u => !apiUserEmails.has(u.email.toLowerCase()));
-            setUsers([...data.users, ...fallbackUsers]);
+            // Use only API users - no fallback merge to prevent deleted users from reappearing
+            setUsers(data.users);
           }
         }
       } catch (error) {
         logger.error('Failed to load users from API', { context: 'App.loadUsers', error: error instanceof Error ? error : new Error(String(error)) });
-        // Keep using USERS as fallback
+        // Keep using USERS as fallback only when API completely fails
       } finally {
         setUsersLoaded(true);
       }
