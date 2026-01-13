@@ -415,6 +415,261 @@ function calculateCompletionTimeDistribution(initiatives: Initiative[]) {
   };
 }
 
+// Strategic workload calculation (Active Portfolio: In Progress, At Risk, Done)
+interface StrategicWorkloadItem {
+  name: string;
+  totalAllocated: number;
+  actualSpent: number;
+  weightedProgress: number;
+  burnRate: number;
+  efficiencyIndex: number;
+  statusBreakdown: {
+    inProgress: number;
+    atRisk: number;
+    done: number;
+  };
+  itemCount: number;
+}
+
+interface StrategicWorkloadData {
+  byPillar: StrategicWorkloadItem[];
+  byResponsibility: StrategicWorkloadItem[];
+  insights: StrategicInsight[];
+}
+
+interface StrategicInsight {
+  type: 'efficiency_leak' | 'risk_density' | 'estimation_variance' | 'investment_heavy' | 'velocity_leader';
+  severity: 'critical' | 'warning' | 'positive';
+  pillar?: string;
+  responsibility?: string;
+  message: string;
+  metric?: number;
+}
+
+function calculateStrategicWorkload(initiatives: Initiative[]): StrategicWorkloadData {
+  // Filter to Active Portfolio: In Progress, At Risk, Done only
+  const activeInitiatives = initiatives.filter(i => 
+    i.status === Status.InProgress || 
+    i.status === Status.AtRisk || 
+    i.status === Status.Done
+  );
+
+  if (activeInitiatives.length === 0) {
+    return {
+      byPillar: [],
+      byResponsibility: [],
+      insights: []
+    };
+  }
+
+  // Group by Pillar
+  const pillarMap = new Map<string, Initiative[]>();
+  activeInitiatives.forEach(i => {
+    const pillar = i.l2_pillar || 'Uncategorized';
+    if (!pillarMap.has(pillar)) {
+      pillarMap.set(pillar, []);
+    }
+    pillarMap.get(pillar)!.push(i);
+  });
+
+  // Group by Responsibility
+  const responsibilityMap = new Map<string, Initiative[]>();
+  activeInitiatives.forEach(i => {
+    const resp = i.l3_responsibility || 'Uncategorized';
+    if (!responsibilityMap.has(resp)) {
+      responsibilityMap.set(resp, []);
+    }
+    responsibilityMap.get(resp)!.push(i);
+  });
+
+  const calculateGroupMetrics = (groupInitiatives: Initiative[]): StrategicWorkloadItem => {
+    const totalAllocated = groupInitiatives.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
+    const investedEffort = groupInitiatives.reduce((sum, i) => sum + (i.actualEffort || 0), 0);
+    
+    // Weighted Progress: Sum(completionRate * estimatedEffort) / Total Allocated
+    // For Done items, use 100%. For others, use the completionRate field or calculate from actual progress
+    const weightedProgressSum = groupInitiatives.reduce((sum, i) => {
+      let completionRate: number;
+      if (i.status === Status.Done) {
+        completionRate = 100; // Done items are 100% complete
+      } else {
+        // Use the completionRate field if available, otherwise calculate from actual/estimated
+        completionRate = i.completionRate ?? calculateCompletionRate(i.actualEffort, i.estimatedEffort);
+      }
+      return sum + (completionRate / 100) * (i.estimatedEffort || 0);
+    }, 0);
+    const weightedProgress = totalAllocated > 0 ? (weightedProgressSum / totalAllocated) * 100 : 0;
+    
+    const investedRate = totalAllocated > 0 ? (investedEffort / totalAllocated) * 100 : 0;
+    const efficiencyIndex = investedRate > 0 ? weightedProgress / investedRate : 0;
+
+    const statusBreakdown = {
+      inProgress: groupInitiatives.filter(i => i.status === Status.InProgress).length,
+      atRisk: groupInitiatives.filter(i => i.status === Status.AtRisk).length,
+      done: groupInitiatives.filter(i => i.status === Status.Done).length,
+    };
+
+    return {
+      name: groupInitiatives[0]?.l2_pillar || groupInitiatives[0]?.l3_responsibility || 'Uncategorized',
+      totalAllocated,
+      actualSpent: investedEffort,
+      weightedProgress: Math.round(weightedProgress * 10) / 10,
+      burnRate: Math.round(investedRate * 10) / 10,
+      efficiencyIndex: Math.round(efficiencyIndex * 100) / 100,
+      statusBreakdown,
+      itemCount: groupInitiatives.length,
+    };
+  };
+
+  const byPillar: StrategicWorkloadItem[] = Array.from(pillarMap.entries())
+    .map(([_, groupInitiatives]) => calculateGroupMetrics(groupInitiatives))
+    .sort((a, b) => b.actualSpent - a.actualSpent);
+
+  const byResponsibility: StrategicWorkloadItem[] = Array.from(responsibilityMap.entries())
+    .map(([_, groupInitiatives]) => calculateGroupMetrics(groupInitiatives))
+    .sort((a, b) => b.actualSpent - a.actualSpent);
+
+  // Insight Engine
+  const insights: StrategicInsight[] = [];
+
+  // Efficiency Leak: Invested Rate > Progress + 20%
+  byPillar.forEach(pillar => {
+    if (pillar.burnRate > pillar.weightedProgress + 20 && pillar.totalAllocated > 0) {
+      const gap = Math.round(pillar.burnRate - pillar.weightedProgress);
+      insights.push({
+        type: 'efficiency_leak',
+        severity: gap > 40 ? 'critical' : 'warning',
+        pillar: pillar.name,
+        message: `${pillar.name} has invested ${pillar.burnRate.toFixed(0)}% of allocated effort but only achieved ${pillar.weightedProgress.toFixed(0)}% progress (${gap}% gap)`,
+        metric: gap,
+      });
+    }
+  });
+
+  // Risk Density: >40% of effort is At Risk
+  byPillar.forEach(pillar => {
+    const atRiskEffort = activeInitiatives
+      .filter(i => i.l2_pillar === pillar.name && i.status === Status.AtRisk)
+      .reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
+    const riskPercentage = pillar.totalAllocated > 0 ? (atRiskEffort / pillar.totalAllocated) * 100 : 0;
+    
+    if (riskPercentage > 40) {
+      insights.push({
+        type: 'risk_density',
+        severity: riskPercentage > 60 ? 'critical' : 'warning',
+        pillar: pillar.name,
+        message: `${pillar.name} has ${riskPercentage.toFixed(0)}% of its allocated effort currently marked 'At Risk'`,
+        metric: riskPercentage,
+      });
+    }
+  });
+
+  // Estimation Variance: Compare Original vs Actual for Done items (address ALL pillars with done items)
+  const doneItems = activeInitiatives.filter(i => i.status === Status.Done);
+  if (doneItems.length > 0) {
+    const portfolioTotal = byPillar.reduce((sum, p) => sum + p.actualSpent, 0);
+    
+    // Generate insights for ALL pillars that have done items
+    byPillar.forEach(pillar => {
+      const pillarDoneItems = doneItems.filter(i => i.l2_pillar === pillar.name);
+      if (pillarDoneItems.length > 0) {
+        const totalOriginal = pillarDoneItems.reduce((sum, i) => sum + (i.originalEstimatedEffort || i.estimatedEffort || 0), 0);
+        const totalActual = pillarDoneItems.reduce((sum, i) => sum + (i.actualEffort || 0), 0);
+        const variance = totalOriginal > 0 ? ((totalActual - totalOriginal) / totalOriginal) * 100 : 0;
+        
+        if (Math.abs(variance) > 15) {
+          insights.push({
+            type: 'estimation_variance',
+            severity: Math.abs(variance) > 30 ? 'critical' : 'warning',
+            pillar: pillar.name,
+            message: `Completed work in ${pillar.name} shows ${variance > 0 ? '+' : ''}${variance.toFixed(0)}% variance from original estimates`,
+            metric: variance,
+          });
+        }
+      }
+    });
+  }
+
+  // Allocated Effort Summary: Address ALL pillars by actual effort
+  const portfolioTotal = byPillar.reduce((sum, p) => sum + p.actualSpent, 0);
+  byPillar.forEach(pillar => {
+    if (pillar.actualSpent > 0 && portfolioTotal > 0) {
+      const percentage = (pillar.actualSpent / portfolioTotal) * 100;
+      insights.push({
+        type: 'investment_heavy',
+        severity: 'positive',
+        pillar: pillar.name,
+        message: `${pillar.name} represents ${percentage.toFixed(0)}% of total portfolio allocated effort (${pillar.actualSpent.toFixed(1)} weeks)`,
+        metric: percentage,
+      });
+    }
+  });
+
+  // Velocity Leaders: Address ALL pillars with high efficiency
+  byPillar.forEach(pillar => {
+    if (pillar.efficiencyIndex > 1.1 && pillar.totalAllocated > 5) {
+      insights.push({
+        type: 'velocity_leader',
+        severity: 'positive',
+        pillar: pillar.name,
+        message: `${pillar.name} is delivering ${(pillar.efficiencyIndex * 100).toFixed(0)}% efficiency (progress vs. invested effort)`,
+        metric: pillar.efficiencyIndex,
+      });
+    }
+  });
+
+  // Generate insights for Responsibilities as well (address ALL)
+  const respPortfolioTotal = byResponsibility.reduce((sum, r) => sum + r.actualSpent, 0);
+  
+  // Efficiency Leak for Responsibilities
+  byResponsibility.forEach(resp => {
+    if (resp.burnRate > resp.weightedProgress + 20 && resp.totalAllocated > 0) {
+      const gap = Math.round(resp.burnRate - resp.weightedProgress);
+      insights.push({
+        type: 'efficiency_leak',
+        severity: gap > 40 ? 'critical' : 'warning',
+        responsibility: resp.name,
+        message: `${resp.name} has invested ${resp.burnRate.toFixed(0)}% of allocated effort but only achieved ${resp.weightedProgress.toFixed(0)}% progress (${gap}% gap)`,
+        metric: gap,
+      });
+    }
+  });
+
+  // Risk Density for Responsibilities
+  byResponsibility.forEach(resp => {
+    const atRiskEffort = activeInitiatives
+      .filter(i => i.l3_responsibility === resp.name && i.status === Status.AtRisk)
+      .reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
+    const riskPercentage = resp.totalAllocated > 0 ? (atRiskEffort / resp.totalAllocated) * 100 : 0;
+    
+    if (riskPercentage > 40) {
+      insights.push({
+        type: 'risk_density',
+        severity: riskPercentage > 60 ? 'critical' : 'warning',
+        responsibility: resp.name,
+        message: `${resp.name} has ${riskPercentage.toFixed(0)}% of its allocated effort currently marked 'At Risk'`,
+        metric: riskPercentage,
+      });
+    }
+  });
+
+  // Sort insights by severity (critical first, then warning, then positive)
+  // Within same severity, sort by metric (higher absolute value = more important)
+  const severityOrder = { critical: 0, warning: 1, positive: 2 };
+  insights.sort((a, b) => {
+    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+    if (severityDiff !== 0) return severityDiff;
+    // Within same severity, prioritize by absolute metric value
+    return Math.abs(b.metric || 0) - Math.abs(a.metric || 0);
+  });
+
+  return {
+    byPillar,
+    byResponsibility,
+    insights, // Show all insights (no limit)
+  };
+}
+
 // Health score color helper
 const _getHealthColor = (score: number): string => {
   if (score >= 80) return 'text-emerald-600';
@@ -1312,6 +1567,10 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [showBufferChart, setShowBufferChart] = useState(false);
   const [showDelayChart, setShowDelayChart] = useState(false);
   const [showCompletionTimeChart, setShowCompletionTimeChart] = useState(false);
+  const [showStrategicWorkload, setShowStrategicWorkload] = useState(false);
+  
+  // Strategic Workload grouping toggle
+  const [workloadGroupBy, setWorkloadGroupBy] = useState<'pillar' | 'responsibility'>('pillar');
   
   // Pagination state for tables
   const [delayedPage, setDelayedPage] = useState(1);
@@ -1324,6 +1583,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [bufferRef, isBufferVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [delayRef, isDelayVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [completionTimeRef, isCompletionTimeVisible] = useIntersectionObserver({ threshold: 0.1 });
+  const [strategicWorkloadRef, isStrategicWorkloadVisible] = useIntersectionObserver({ threshold: 0.1 });
 
   // Calculate total completed count independently (always runs, not lazy-loaded)
   // This is needed to determine if the chart section should render
@@ -1356,6 +1616,10 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
       setShowCompletionTimeChart(true);
     }
   }, [totalCompletedCount]);
+
+  React.useEffect(() => {
+    if (isStrategicWorkloadVisible) setShowStrategicWorkload(true);
+  }, [isStrategicWorkloadVisible]);
 
   // Invalidate cache when initiatives change significantly
   React.useEffect(() => {
@@ -1506,6 +1770,17 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     return result;
   }, [debouncedInitiatives, cacheKey, totalCompletedCount]);
 
+  // === SPLIT MEMOS: Strategic Workload & Insights ===
+  const strategicWorkload = useMemo(() => {
+    const strategicKey = `${cacheKey}-strategic-workload`;
+    const cached = metricsCache.get<ReturnType<typeof calculateStrategicWorkload>>(strategicKey);
+    if (cached) return cached;
+
+    const result = calculateStrategicWorkload(filteredInitiatives);
+    metricsCache.set(strategicKey, result, 300000); // 5 min cache
+    return result;
+  }, [filteredInitiatives, cacheKey]);
+
   // Combine all metrics
   const healthMetrics = useMemo(() => {
     // Calculate health scores
@@ -1546,8 +1821,17 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
       effortScore,
       riskScore,
       initiativeCount: filteredInitiatives.length,
+      // Strategic Workload & Insights
+      strategicWorkload,
     };
-  }, [scheduleMetrics, effortMetrics, changeMetrics, riskMetrics, completionMetrics, obsoleteEffortMetrics, delayDistribution, completionTimeDistribution, filteredInitiatives.length]);
+  }, [scheduleMetrics, effortMetrics, changeMetrics, riskMetrics, completionMetrics, obsoleteEffortMetrics, delayDistribution, completionTimeDistribution, strategicWorkload, filteredInitiatives.length]);
+
+  // Auto-show strategic workload section if there's data
+  React.useEffect(() => {
+    if (healthMetrics.strategicWorkload.byPillar.length > 0 || healthMetrics.strategicWorkload.byResponsibility.length > 0) {
+      setShowStrategicWorkload(true);
+    }
+  }, [healthMetrics.strategicWorkload]);
 
   // Health Score History data (from config or mock)
   // Note: Preserved for future use in health trend visualization
@@ -1681,6 +1965,220 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Strategic Execution & Insight Engine */}
+      <div ref={strategicWorkloadRef} className="space-y-4">
+        {(healthMetrics.strategicWorkload.byPillar.length > 0 || healthMetrics.strategicWorkload.byResponsibility.length > 0) ? (
+          <>
+          {/* Automated Insights Summary */}
+          {healthMetrics.strategicWorkload.insights.length > 0 && (
+            <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 px-4 py-3 rounded-2xl border border-indigo-200 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Gauge className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-sm font-bold text-slate-800">Automated Insights</h3>
+                <HelpCircle className="w-3 h-3 text-slate-400" />
+                <span className="text-[10px] text-slate-500 ml-auto">Based on Active Portfolio (In Progress, At Risk, Done)</span>
+              </div>
+              <div className="space-y-1.5 max-h-96 overflow-y-auto">
+                {healthMetrics.strategicWorkload.insights.map((insight, idx) => {
+                const severityColors = {
+                  critical: 'bg-red-50 border-red-200 text-red-800',
+                  warning: 'bg-amber-50 border-amber-200 text-amber-800',
+                  positive: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+                };
+                const severityIcons = {
+                  critical: '🔴',
+                  warning: '🟡',
+                  positive: '🟢',
+                };
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-start gap-2 p-2 rounded-lg border ${severityColors[insight.severity]}`}
+                  >
+                    <span className="text-sm flex-shrink-0">{severityIcons[insight.severity]}</span>
+                    <p className="text-xs font-medium flex-1 leading-relaxed">{insight.message}</p>
+                  </div>
+                );
+              })}
+              </div>
+            </div>
+          )}
+
+          {/* Execution Matrix */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Activity className="w-5 h-5 text-slate-600" />
+                <h3 className="text-lg font-bold text-slate-800">Execution Velocity & Strategic Progress</h3>
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setWorkloadGroupBy('pillar')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    workloadGroupBy === 'pillar'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                >
+                  By Pillar
+                </button>
+                <button
+                  onClick={() => setWorkloadGroupBy('responsibility')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    workloadGroupBy === 'responsibility'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                >
+                  By Responsibility
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
+                  <tr>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">
+                      {workloadGroupBy === 'pillar' ? 'Pillar' : 'Responsibility'}
+                    </th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Status Mix</th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Allocated vs. Actual</th>
+                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Invested Effort vs. Progress</th>
+                    <th className="text-right py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Efficiency</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(workloadGroupBy === 'pillar' 
+                    ? healthMetrics.strategicWorkload.byPillar 
+                    : healthMetrics.strategicWorkload.byResponsibility
+                  ).map((item) => {
+                    const totalStatus = item.statusBreakdown.inProgress + item.statusBreakdown.atRisk + item.statusBreakdown.done;
+                    const inProgressPct = totalStatus > 0 ? (item.statusBreakdown.inProgress / totalStatus) * 100 : 0;
+                    const atRiskPct = totalStatus > 0 ? (item.statusBreakdown.atRisk / totalStatus) * 100 : 0;
+                    const donePct = totalStatus > 0 ? (item.statusBreakdown.done / totalStatus) * 100 : 0;
+                    
+                    return (
+                      <tr key={item.name} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2 px-3">
+                          <div className="font-semibold text-slate-800 text-xs">{item.name}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{item.itemCount} items</div>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-1">
+                            {inProgressPct > 0 && (
+                              <div
+                                className="h-3 bg-blue-500 rounded"
+                                style={{ width: `${inProgressPct}%`, minWidth: '2px' }}
+                                title={`In Progress: ${item.statusBreakdown.inProgress}`}
+                              />
+                            )}
+                            {atRiskPct > 0 && (
+                              <div
+                                className="h-3 bg-red-500 rounded"
+                                style={{ width: `${atRiskPct}%`, minWidth: '2px' }}
+                                title={`At Risk: ${item.statusBreakdown.atRisk}`}
+                              />
+                            )}
+                            {donePct > 0 && (
+                              <div
+                                className="h-3 bg-emerald-500 rounded"
+                                style={{ width: `${donePct}%`, minWidth: '2px' }}
+                                title={`Done: ${item.statusBreakdown.done}`}
+                              />
+                            )}
+                            {totalStatus === 0 && (
+                              <span className="text-[10px] text-slate-400">No items</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <div className="text-xs font-medium text-slate-700">
+                                {item.totalAllocated.toFixed(1)}w
+                              </div>
+                              <div className="text-[10px] text-slate-500">allocated</div>
+                            </div>
+                            <div className="text-slate-300">|</div>
+                            <div>
+                              <div className="text-xs font-medium text-slate-700">
+                                {item.actualSpent.toFixed(1)}w
+                              </div>
+                              <div className="text-[10px] text-slate-500">actual</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="relative w-full h-6 bg-slate-100 rounded overflow-hidden">
+                            {/* Ghost bar for total allocated (100%) */}
+                            <div className="absolute inset-0 bg-slate-200 opacity-30" />
+                            {/* Invested Effort bar */}
+                            <div
+                              className="absolute bottom-0 left-0 bg-blue-400 opacity-60 h-full transition-all"
+                              style={{ width: `${Math.min(item.burnRate, 100)}%` }}
+                              title={`Invested Effort: ${item.actualSpent.toFixed(1)}w (${item.burnRate.toFixed(0)}%)`}
+                            />
+                            {/* Progress bar (foreground) */}
+                            <div
+                              className="absolute bottom-0 left-0 bg-emerald-500 h-3/4 transition-all"
+                              style={{ width: `${Math.min(item.weightedProgress, 100)}%` }}
+                              title={`Progress: ${item.weightedProgress.toFixed(0)}% weighted progress`}
+                            />
+                            {/* Gap indicator if progress < invested */}
+                            {item.weightedProgress < item.burnRate && (
+                              <div
+                                className="absolute bottom-0 bg-red-300 opacity-50 h-1/4 transition-all"
+                                style={{
+                                  left: `${item.weightedProgress}%`,
+                                  width: `${Math.min(item.burnRate - item.weightedProgress, 100 - item.weightedProgress)}%`,
+                                }}
+                                title={`Efficiency gap: ${(item.burnRate - item.weightedProgress).toFixed(0)}%`}
+                              />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-[10px]">
+                            <span className="text-slate-600">
+                              Invested: <span className="font-medium">{item.burnRate.toFixed(0)}%</span>
+                            </span>
+                            <span className="text-emerald-600">
+                              Progress: <span className="font-medium">{item.weightedProgress.toFixed(0)}%</span>
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            item.efficiencyIndex >= 1.0
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : item.efficiencyIndex >= 0.8
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {(item.efficiencyIndex * 100).toFixed(0)}%
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">progress/invested</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          </>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+            <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">No Active Portfolio Data</h3>
+            <p className="text-sm text-slate-500">
+              This view shows workload analysis for initiatives with status: In Progress, At Risk, or Done.
+              <br />
+              Currently, there are no initiatives matching these statuses in your filtered view.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Health Metrics Grid - Schedule & Effort Sections */}
