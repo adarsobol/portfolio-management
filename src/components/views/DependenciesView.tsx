@@ -549,7 +549,7 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <Users size={13} className={colorClasses.icon} />
-                            <span className={`text-sm font-medium ${colorClasses.text}`}>{row.team}</span>
+                            <span className={`text-xs font-medium ${colorClasses.text}`}>{row.team}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -557,14 +557,14 @@ export const DependenciesView: React.FC<DependenciesViewProps> = ({
                             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono font-medium rounded flex-shrink-0">
                               {row.initiative.id}
                             </span>
-                            <span className="text-sm font-medium text-slate-800 truncate">{row.initiative.title}</span>
+                            <span className="text-xs font-medium text-slate-800 truncate">{row.initiative.title}</span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="flex items-center gap-1.5">
                               <Clock size={13} className={statusIconClasses[dateStatus]} />
-                              <span className={`text-sm font-medium ${dateStatus === 'overdue' ? 'text-red-700' : dateStatus === 'due-soon' ? 'text-amber-700' : 'text-slate-700'}`}>
+                              <span className={`text-xs font-medium ${dateStatus === 'overdue' ? 'text-red-700' : dateStatus === 'due-soon' ? 'text-amber-700' : 'text-slate-700'}`}>
                                 {formatDateDisplay(row.dependency.eta || '')}
                               </span>
                             </div>
