@@ -57,6 +57,16 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const [statusSearchQuery, setStatusSearchQuery] = useState('');
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Work Type dropdown state
+  const [isWorkTypeDropdownOpen, setIsWorkTypeDropdownOpen] = useState(false);
+  const [workTypeSearchQuery, setWorkTypeSearchQuery] = useState('');
+  const workTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Priority dropdown state
+  const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
+  const [prioritySearchQuery, setPrioritySearchQuery] = useState('');
+  const priorityDropdownRef = useRef<HTMLDivElement>(null);
+
   // Saved views state
   const [savedViews, setSavedViews] = useState<SavedFilterView[]>(() => {
     try {
@@ -110,15 +120,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         setIsStatusDropdownOpen(false);
         setStatusSearchQuery('');
       }
+      if (workTypeDropdownRef.current && !workTypeDropdownRef.current.contains(event.target as Node)) {
+        setIsWorkTypeDropdownOpen(false);
+        setWorkTypeSearchQuery('');
+      }
+      if (priorityDropdownRef.current && !priorityDropdownRef.current.contains(event.target as Node)) {
+        setIsPriorityDropdownOpen(false);
+        setPrioritySearchQuery('');
+      }
       if (savedViewsDropdownRef.current && !savedViewsDropdownRef.current.contains(event.target as Node)) {
         setIsSavedViewsDropdownOpen(false);
       }
     };
-    if (isOwnerDropdownOpen || isQuarterDropdownOpen || isStatusDropdownOpen || isSavedViewsDropdownOpen) {
+    if (isOwnerDropdownOpen || isQuarterDropdownOpen || isStatusDropdownOpen || isWorkTypeDropdownOpen || isPriorityDropdownOpen || isSavedViewsDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isOwnerDropdownOpen, isQuarterDropdownOpen, isStatusDropdownOpen, isSavedViewsDropdownOpen]);
+  }, [isOwnerDropdownOpen, isQuarterDropdownOpen, isStatusDropdownOpen, isWorkTypeDropdownOpen, isPriorityDropdownOpen, isSavedViewsDropdownOpen]);
 
   const hasActiveFilters = filterAssetClass || filterOwners.length > 0 || filterWorkType.length > 0 || 
     filterQuarter.length > 0 || filterPriority.length > 0 || filterStatus.length > 0 || searchQuery;
@@ -228,6 +246,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     { label: 'PM', value: UnplannedTag.PMItem, singleSelect: false },
   ];
 
+  // Filter work types by search query
+  const filteredWorkTypes = useMemo(() => {
+    if (!workTypeSearchQuery.trim()) return workTypeOptions;
+    const query = workTypeSearchQuery.toLowerCase();
+    return workTypeOptions.filter(opt => opt.label.toLowerCase().includes(query));
+  }, [workTypeSearchQuery]);
+
   const toggleWorkType = (value: string, singleSelect: boolean) => {
     if (value === '') {
       // "All" clears all filters
@@ -254,20 +279,27 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     }
   };
 
+  // Filter priorities by search query
+  const filteredPriorities = useMemo(() => {
+    if (!prioritySearchQuery.trim()) return availablePriorities;
+    const query = prioritySearchQuery.toLowerCase();
+    return availablePriorities.filter(p => p.toLowerCase().includes(query));
+  }, [availablePriorities, prioritySearchQuery]);
+
   return (
-    <div className="flex flex-col gap-4 mb-6 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
       {/* Filter Row */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex items-center text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg">
-          <Filter size={16} className="mr-2 text-blue-500" />
-          <span className="text-sm font-bold tracking-wide">Filters</span>
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex items-center text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg">
+          <Filter size={14} className="mr-1.5 text-blue-500" />
+          <span className="text-xs font-bold tracking-wide">Filters</span>
         </div>
         
         {/* Asset Class Filter */}
         <select 
           value={filterAssetClass}
           onChange={(e) => setFilterAssetClass(e.target.value)}
-          className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors min-w-[140px]"
+          className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors min-w-[120px]"
         >
           <option value="">All Asset Classes</option>
           {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
@@ -277,36 +309,36 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={ownerDropdownRef}>
           <button
             onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
-            className="flex items-center gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
           >
-            <Filter size={16} className="text-blue-500" />
+            <Filter size={14} className="text-blue-500" />
             <span className="text-slate-700">Owners</span>
             {filterOwners.length > 0 && (
-              <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
+              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
                 {filterOwners.length}
               </span>
             )}
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isOwnerDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[240px] max-h-[300px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[220px] max-h-[280px] flex flex-col">
               {/* Search input */}
-              <div className="p-2 border-b border-slate-200">
+              <div className="p-1.5 border-b border-slate-200">
                 <input
                   type="text"
                   placeholder="Search owners..."
                   value={ownerSearchQuery}
                   onChange={(e) => setOwnerSearchQuery(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
                   autoFocus
                 />
               </div>
               
               {/* Owner list */}
-              <div className="overflow-y-auto max-h-[240px]">
+              <div className="overflow-y-auto max-h-[220px]">
                 {filteredOwners.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
                     No owners found
                   </div>
                 ) : (
@@ -316,7 +348,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={owner.id}
                         onClick={() => toggleOwner(owner.id)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
                           isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
                         }`}
                       >
@@ -324,7 +356,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                         />
                         <span className="flex-1">{owner.name}</span>
                       </button>
@@ -335,15 +367,15 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterOwners.length > 0 && (
-                <div className="p-2 border-t border-slate-200">
+                <div className="p-1.5 border-t border-slate-200">
                   <button
                     onClick={() => {
                       setFilterOwners([]);
                       setOwnerSearchQuery('');
                     }}
-                    className="w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
                   >
-                    <X size={14} />
+                    <X size={12} />
                     Clear selection
                   </button>
                 </div>
@@ -352,62 +384,121 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           )}
         </div>
         
-        {/* Work Type Segmented Control */}
-        <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner border border-slate-200">
-          {workTypeOptions.map(opt => {
-            const isSelected = opt.value === '' 
-              ? filterWorkType.length === 0
-              : filterWorkType.includes(opt.value);
-            return (
-              <button
-                key={opt.label}
-                onClick={() => toggleWorkType(opt.value, opt.singleSelect)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
-                  isSelected
-                    ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+        {/* Work Type Filter - Dropdown */}
+        <div className="relative" ref={workTypeDropdownRef}>
+          <button
+            onClick={() => setIsWorkTypeDropdownOpen(!isWorkTypeDropdownOpen)}
+            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+          >
+            <Filter size={14} className="text-blue-500" />
+            <span className="text-slate-700">Work Type</span>
+            {filterWorkType.length > 0 && (
+              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+                {filterWorkType.length}
+              </span>
+            )}
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isWorkTypeDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {isWorkTypeDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[180px] max-h-[280px] flex flex-col">
+              {/* Search input */}
+              <div className="p-1.5 border-b border-slate-200">
+                <input
+                  type="text"
+                  placeholder="Search work types..."
+                  value={workTypeSearchQuery}
+                  onChange={(e) => setWorkTypeSearchQuery(e.target.value)}
+                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              
+              {/* Work Type list */}
+              <div className="overflow-y-auto max-h-[220px]">
+                {filteredWorkTypes.length === 0 ? (
+                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                    No work types found
+                  </div>
+                ) : (
+                  filteredWorkTypes.map(opt => {
+                    const isSelected = opt.value === '' 
+                      ? filterWorkType.length === 0
+                      : filterWorkType.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.label}
+                        onClick={() => toggleWorkType(opt.value, opt.singleSelect)}
+                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
+                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="flex-1">{opt.label}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* Clear selection */}
+              {filterWorkType.length > 0 && (
+                <div className="p-1.5 border-t border-slate-200">
+                  <button
+                    onClick={() => {
+                      setFilterWorkType([]);
+                      setWorkTypeSearchQuery('');
+                    }}
+                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                  >
+                    <X size={12} />
+                    Clear selection
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Quarter Filter - Dropdown */}
         <div className="relative" ref={quarterDropdownRef}>
           <button
             onClick={() => setIsQuarterDropdownOpen(!isQuarterDropdownOpen)}
-            className="flex items-center gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
           >
-            <Filter size={16} className="text-blue-500" />
+            <Filter size={14} className="text-blue-500" />
             <span className="text-slate-700">Quarter</span>
             {filterQuarter.length > 0 && (
-              <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
+              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
                 {filterQuarter.length}
               </span>
             )}
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isQuarterDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isQuarterDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isQuarterDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[180px] max-h-[280px] flex flex-col">
               {/* Search input */}
-              <div className="p-2 border-b border-slate-200">
+              <div className="p-1.5 border-b border-slate-200">
                 <input
                   type="text"
                   placeholder="Search quarters..."
                   value={quarterSearchQuery}
                   onChange={(e) => setQuarterSearchQuery(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
                   autoFocus
                 />
               </div>
               
               {/* Quarter list */}
-              <div className="overflow-y-auto max-h-[240px]">
+              <div className="overflow-y-auto max-h-[220px]">
                 {filteredQuarters.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
                     No quarters found
                   </div>
                 ) : (
@@ -417,7 +508,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={quarter}
                         onClick={() => toggleQuarter(quarter)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
                           isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
                         }`}
                       >
@@ -425,7 +516,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                         />
                         <span className="flex-1">{quarter}</span>
                       </button>
@@ -436,15 +527,15 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterQuarter.length > 0 && (
-                <div className="p-2 border-t border-slate-200">
+                <div className="p-1.5 border-t border-slate-200">
                   <button
                     onClick={() => {
                       setFilterQuarter([]);
                       setQuarterSearchQuery('');
                     }}
-                    className="w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
                   >
-                    <X size={14} />
+                    <X size={12} />
                     Clear selection
                   </button>
                 </div>
@@ -453,76 +544,119 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           )}
         </div>
 
-        {/* Priority Segmented Control */}
-        <div className="flex bg-slate-100 p-1 rounded-lg shadow-inner border border-slate-200">
+        {/* Priority Filter - Dropdown */}
+        <div className="relative" ref={priorityDropdownRef}>
           <button
-            onClick={() => {
-              if (filterPriority.length === 0) {
-                setFilterPriority([...availablePriorities]);
-              } else {
-                setFilterPriority([]);
-              }
-            }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
-              filterPriority.length === 0
-                ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-            }`}
+            onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
+            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
           >
-            All
+            <Filter size={14} className="text-blue-500" />
+            <span className="text-slate-700">Priority</span>
+            {filterPriority.length > 0 && (
+              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+                {filterPriority.length}
+              </span>
+            )}
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isPriorityDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
-          {availablePriorities.map(priority => {
-            const isSelected = filterPriority.includes(priority);
-            return (
-              <button
-                key={priority}
-                onClick={() => togglePriority(priority)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
-                  isSelected
-                    ? 'bg-white text-blue-600 shadow-sm border border-blue-200' 
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'
-                }`}
-              >
-                {priority}
-              </button>
-            );
-          })}
+          
+          {isPriorityDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[150px] max-h-[280px] flex flex-col">
+              {/* Search input */}
+              <div className="p-1.5 border-b border-slate-200">
+                <input
+                  type="text"
+                  placeholder="Search priorities..."
+                  value={prioritySearchQuery}
+                  onChange={(e) => setPrioritySearchQuery(e.target.value)}
+                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              
+              {/* Priority list */}
+              <div className="overflow-y-auto max-h-[220px]">
+                {filteredPriorities.length === 0 ? (
+                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                    No priorities found
+                  </div>
+                ) : (
+                  filteredPriorities.map(priority => {
+                    const isSelected = filterPriority.includes(priority);
+                    return (
+                      <button
+                        key={priority}
+                        onClick={() => togglePriority(priority)}
+                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
+                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="flex-1">{priority}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* Clear selection */}
+              {filterPriority.length > 0 && (
+                <div className="p-1.5 border-t border-slate-200">
+                  <button
+                    onClick={() => {
+                      setFilterPriority([]);
+                      setPrioritySearchQuery('');
+                    }}
+                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                  >
+                    <X size={12} />
+                    Clear selection
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Status Filter - Dropdown */}
         <div className="relative" ref={statusDropdownRef}>
           <button
             onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-            className="flex items-center gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
           >
-            <Filter size={16} className="text-blue-500" />
+            <Filter size={14} className="text-blue-500" />
             <span className="text-slate-700">Status</span>
             {filterStatus.length > 0 && (
-              <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
+              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
                 {filterStatus.length}
               </span>
             )}
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isStatusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[200px] max-h-[300px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[180px] max-h-[280px] flex flex-col">
               {/* Search input */}
-              <div className="p-2 border-b border-slate-200">
+              <div className="p-1.5 border-b border-slate-200">
                 <input
                   type="text"
                   placeholder="Search statuses..."
                   value={statusSearchQuery}
                   onChange={(e) => setStatusSearchQuery(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
                   autoFocus
                 />
               </div>
               
               {/* Status list */}
-              <div className="overflow-y-auto max-h-[240px]">
+              <div className="overflow-y-auto max-h-[220px]">
                 {filteredStatuses.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
                     No statuses found
                   </div>
                 ) : (
@@ -532,7 +666,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={status}
                         onClick={() => toggleStatus(status)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
                           isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
                         }`}
                       >
@@ -540,7 +674,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                         />
                         <span className="flex-1">{status}</span>
                       </button>
@@ -551,15 +685,15 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterStatus.length > 0 && (
-                <div className="p-2 border-t border-slate-200">
+                <div className="p-1.5 border-t border-slate-200">
                   <button
                     onClick={() => {
                       setFilterStatus([]);
                       setStatusSearchQuery('');
                     }}
-                    className="w-full px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
                   >
-                    <X size={14} />
+                    <X size={12} />
                     Clear selection
                   </button>
                 </div>
@@ -572,56 +706,56 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={savedViewsDropdownRef}>
           <button
             onClick={() => setIsSavedViewsDropdownOpen(!isSavedViewsDropdownOpen)}
-            className="flex items-center gap-2 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
           >
-            <Bookmark size={16} className="text-blue-500" />
+            <Bookmark size={14} className="text-blue-500" />
             <span className="text-slate-700">Saved Views</span>
             {savedViews.length > 0 && (
-              <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
+              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
                 {savedViews.length}
               </span>
             )}
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isSavedViewsDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isSavedViewsDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isSavedViewsDropdownOpen && (
-            <div className="absolute top-full right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[280px] max-h-[400px] flex flex-col">
+            <div className="absolute top-full right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[260px] max-h-[360px] flex flex-col">
               {/* Header */}
-              <div className="p-3 border-b border-slate-200">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-slate-700">Saved Filter Views</span>
+              <div className="p-2.5 border-b border-slate-200">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-slate-700">Saved Filter Views</span>
                 </div>
                 <button
                   onClick={() => {
                     setIsSaveViewModalOpen(true);
                     setIsSavedViewsDropdownOpen(false);
                   }}
-                  className="w-full px-3 py-1.5 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                  className="w-full px-2.5 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <Save size={14} />
+                  <Save size={12} />
                   Save Current View
                 </button>
               </div>
               
               {/* Saved views list */}
-              <div className="overflow-y-auto max-h-[300px]">
+              <div className="overflow-y-auto max-h-[280px]">
                 {savedViews.length === 0 ? (
-                  <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
                     No saved views
                   </div>
                 ) : (
                   savedViews.map(view => (
                     <div
                       key={view.id}
-                      className="px-3 py-2 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                      className="px-2.5 py-1.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <button
                           onClick={() => loadSavedView(view)}
-                          className="flex-1 text-left text-sm text-slate-700 hover:text-blue-600 transition-colors"
+                          className="flex-1 text-left text-xs text-slate-700 hover:text-blue-600 transition-colors"
                         >
                           <div className="font-medium">{view.name}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">
+                          <div className="text-[10px] text-slate-500 mt-0.5">
                             {new Date(view.createdAt).toLocaleDateString()}
                           </div>
                         </button>
@@ -630,10 +764,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                             e.stopPropagation();
                             deleteSavedView(view.id);
                           }}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                           title="Delete view"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
@@ -647,7 +781,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         {hasActiveFilters && (
           <button 
             onClick={resetFilters}
-            className="text-sm text-red-600 hover:text-red-800 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+            className="text-xs text-red-600 hover:text-red-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
           >
             Clear All
           </button>
@@ -658,8 +792,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       {/* Save View Modal */}
       {isSaveViewModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setIsSaveViewModalOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-800 mb-4">Save Filter View</h3>
+          <div className="bg-white rounded-lg shadow-xl p-4 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">Save Filter View</h3>
             <input
               type="text"
               placeholder="Enter view name..."
@@ -673,7 +807,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   setSaveViewName('');
                 }
               }}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none mb-4"
+              className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none mb-3"
               autoFocus
             />
             <div className="flex gap-2 justify-end">
@@ -682,14 +816,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   setIsSaveViewModalOpen(false);
                   setSaveViewName('');
                 }}
-                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={saveCurrentView}
                 disabled={!saveViewName.trim()}
-                className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save
               </button>
