@@ -6,7 +6,7 @@ import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata, Status, InitiativeType } from '../../types';
 import { migrateEnumsToConfig, getAssetClasses } from '../../utils/valueLists';
-import { canBeOwner } from '../../utils';
+import { canBeOwner, syncCapacitiesWithUsers } from '../../utils';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
@@ -340,7 +340,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [retentionDays, setRetentionDays] = useState<number>(30);
   
   // Fetch users from spreadsheet
-  const fetchUsers = async () => {
+  const fetchUsers = async (): Promise<User[] | null> => {
     setIsLoadingUsers(true);
     setUsersError(null);
     try {
@@ -354,18 +354,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         const data = await response.json();
         if (data.users && data.users.length > 0) {
           setUsers(data.users);
+          return data.users;
         } else {
           setUsers([]);
+          return [];
         }
       } else if (response.status === 403) {
         setUsersError('Admin access required to view users');
+        return null;
       } else {
         const errorData = await response.json().catch(() => ({}));
         setUsersError(errorData.error || 'Failed to load users');
+        return null;
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
       setUsersError('Network error while fetching users');
+      return null;
     } finally {
       setIsLoadingUsers(false);
     }
@@ -834,7 +839,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       
       if (result.success && result.created > 0) {
         // Refresh users list from API
-        await fetchUsers();
+        const updatedUsers = await fetchUsers();
+        
+        // Sync capacities with updated users list (in case Team Leads were imported)
+        if (updatedUsers) {
+          const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
+          setConfig(prev => ({ ...prev, ...syncedConfig }));
+        }
       }
     } catch (err) {
       console.error('Import failed:', err);
@@ -1007,7 +1018,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Refresh users list from API
-      await fetchUsers();
+      const updatedUsers = await fetchUsers();
+      
+      // Sync capacities with updated users list if a Team Lead was added
+      if (updatedUsers && (newUser.role === Role.TeamLead || !newUser.role)) {
+        const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
+        setConfig(prev => ({ ...prev, ...syncedConfig }));
+      }
 
       // Clear form
       setNewUser({ role: Role.TeamLead });
@@ -1059,7 +1076,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Success - refresh users list from API
-      await fetchUsers();
+      const updatedUsers = await fetchUsers();
+      
+      // Sync capacities with updated users list (removes deleted Team Lead from capacities)
+      if (updatedUsers) {
+        const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
+        setConfig(prev => ({ ...prev, ...syncedConfig }));
+      }
     } catch (error) {
       console.error('Failed to delete user:', error);
       setUserError(error instanceof Error ? error.message : 'Failed to delete user');
@@ -1108,7 +1131,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Refresh users list from API to get server state
-      await fetchUsers();
+      const updatedUsers = await fetchUsers();
+      
+      // Sync capacities with updated users list if role changed (Team Lead added/removed)
+      if (updatedUsers && field === 'role') {
+        const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
+        setConfig(prev => ({ ...prev, ...syncedConfig }));
+      }
     } catch (error) {
       console.error('Failed to update user:', error);
       setUserError(error instanceof Error ? error.message : 'Failed to update user');

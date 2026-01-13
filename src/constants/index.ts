@@ -666,28 +666,15 @@ export function migratePermissions(
 export const INITIAL_CONFIG: AppConfig = {
   bauBufferSuggestion: 15,
   // Team capacities are per quarter (weeks per quarter)
-  teamCapacities: {
-    'u_ah': 40,
-    'u_tm': 40,
-    'u_yk': 40,
-    'u_tb': 40,
-    'u_ns': 40,
-    'u_rg': 40,
-    'u_bb': 40,
-    'u_dk': 40,
-    'u_bk_tl': 20,
-    'u_da_tl': 20,
-  },
+  // Capacities are now auto-synced from Team Lead users via syncCapacitiesWithUsers()
+  // Empty by default - will be populated when users are loaded
+  teamCapacities: {},
   // Team capacity adjustments are per quarter (weeks per quarter, deducted from base capacity)
   teamCapacityAdjustments: {},
   // Team buffers are per quarter (weeks per quarter reserved for BAU/unplanned work)
-  teamBuffers: {
-    'u_ah': 6,
-    'u_tm': 6,
-    'u_rg': 5,
-    'u_bb': 4,
-    'u_dk': 5,
-  },
+  // Buffers are now auto-synced from Team Lead users via syncCapacitiesWithUsers()
+  // Empty by default - will be populated when users are loaded
+  teamBuffers: {},
   healthHistory: [
     // Sample historical health data for demo purposes
     { id: 'hs1', date: new Date(Date.now() - 7 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], healthScore: 82, scheduleScore: 85, effortScore: 78, riskScore: 88, complianceScore: 75, initiativeCount: 9, atRiskCount: 1, completedCount: 1, totalEffort: 78, bufferUsed: 2, bufferTotal: 26 },
