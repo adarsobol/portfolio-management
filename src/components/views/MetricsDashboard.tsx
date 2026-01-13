@@ -17,10 +17,10 @@ const METRIC_TOOLTIPS: Record<string, { title: string; description: string; form
     thresholds: 'Shows total effort invested in BAU initiatives and percentage of allocated buffer used'
   },
   capacityLoad: {
-    title: 'Capacity Load (Quarterly)',
-    description: 'Shows how much of the team\'s total quarterly capacity is allocated to initiatives (estimated effort vs available capacity per quarter).',
-    formula: 'Load % = (Total Estimated Effort / Total Quarterly Capacity) × 100',
-    thresholds: 'Green: ≤100%  |  Red: >100% (overallocated for quarter)'
+    title: 'Capacity Load & Actual Rate',
+    description: 'Capacity Load shows planned effort vs total capacity. Actual Rate shows actual reported effort vs total capacity.',
+    formula: 'Load % = (Total Estimated Effort / Total Capacity) × 100\nActual Rate % = (Total Actual Effort / Total Capacity) × 100',
+    thresholds: 'Load: Green ≤100%, Red >100%. Actual Rate: Tracks actual reported progress against capacity.'
   },
   workMix: {
     title: 'Work Type Mix',
@@ -106,6 +106,7 @@ interface MetricsProps {
   metrics: {
     usage: number;
     capacityLoad: number;
+    actualRate: number;
     totalCapacity: number;
     totalEst: number;
     totalAct: number;
@@ -231,8 +232,12 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <HelpButton metricKey="capacityLoad" position="left" />
         <div className="flex justify-between items-start mb-4 pr-6">
           <div>
-            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Capacity load</p>
-            <h3 className="text-3xl font-black text-slate-800">{Math.round(metrics.capacityLoad)}%</h3>
+            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Capacity Load / Actual Rate</p>
+            <h3 className="text-3xl font-black text-slate-800">
+              {Math.round(metrics.capacityLoad)}%
+              <span className="text-sm font-normal text-slate-400 mx-1">/</span>
+              <span className="text-emerald-600">{Math.round(metrics.actualRate)}%</span>
+            </h3>
           </div>
           <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 shadow-sm">
             <Battery size={22} />
@@ -241,12 +246,19 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         <div className="space-y-3 flex-1 flex flex-col justify-end">
           <div className="flex justify-between text-xs text-slate-500 font-medium">
             <span>Assigned: <strong className="text-slate-700">{metrics.totalEst}w</strong></span>
-            <span>Total Cap (Q): <strong className="text-slate-700">{metrics.totalCapacity}w</strong></span>
+            <span>Actual: <strong className="text-emerald-700">{metrics.totalAct}w</strong></span>
+            <span>Total Cap: <strong className="text-slate-700">{metrics.totalCapacity}w</strong></span>
           </div>
-          <div className="h-1 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
              <div 
-               className={`h-full rounded-full transition-all duration-1000 ${metrics.capacityLoad > 100 ? 'bg-red-500' : 'bg-purple-500'}`} 
+               className={`h-full transition-all duration-1000 ${metrics.capacityLoad > 100 ? 'bg-red-500' : 'bg-purple-500'}`} 
                style={{ width: `${Math.min(metrics.capacityLoad, 100)}%` }}
+             />
+          </div>
+          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+             <div 
+               className="h-full bg-emerald-500 transition-all duration-1000" 
+               style={{ width: `${Math.min(metrics.actualRate, 100)}%` }}
              />
           </div>
         </div>

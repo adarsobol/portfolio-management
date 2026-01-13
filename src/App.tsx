@@ -914,6 +914,7 @@ export default function App() {
     const totalCapacity = relevantOwners.reduce((sum, id) => sum + getAdjustedCapacity(id), 0);
     // Capacity load: estimated effort vs quarterly capacity
     const capacityLoad = totalCapacity > 0 ? (totalEst / totalCapacity) * 100 : 0;
+    const actualRate = totalCapacity > 0 ? (totalAct / totalCapacity) * 100 : 0;
     const usage = totalEst > 0 ? (totalAct / totalEst) * 100 : 0;
     
     const countNotStarted = filteredInitiatives.filter(i => i.status === Status.NotStarted).length;
@@ -1041,6 +1042,7 @@ export default function App() {
     return {
       usage,
       capacityLoad,
+      actualRate,
       totalCapacity,
       totalEst,
       totalAct,
