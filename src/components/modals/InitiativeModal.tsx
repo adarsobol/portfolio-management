@@ -1080,7 +1080,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       }`}>
         <div className={`bg-white shadow-2xl overflow-hidden flex flex-col border border-slate-200 rounded-lg transition-all duration-300 ${
           isOpen ? 'scale-100' : 'scale-95'
-        } ${mode === 'bulk' ? 'w-[85vw] max-w-[95vw] h-[90vh]' : 'w-[85vw] max-w-[1200px] h-[90vh]'}`}>
+        } ${mode === 'bulk' ? 'w-[55vw] max-w-[61vw] h-[90vh]' : 'w-[55vw] max-w-[770px] h-[90vh]'}`}>
         
         {/* ================================================================ */}
         {/* HEADER */}
@@ -1536,13 +1536,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   )
                 }
               >
-                <div className="border border-slate-300 rounded-md overflow-hidden text-xs">
+                <div className="border border-slate-300 rounded-md overflow-hidden text-[10px]">
                   {/* Dependencies List */}
                   <div className="divide-y divide-slate-200">
                     {(formData.dependencies || []).map((dep, index) => (
                       <div key={index} className="grid grid-cols-[140px_1fr_130px] items-center">
                         {/* Team */}
-                        <div className="bg-slate-50 px-2 py-1 font-medium text-slate-600 text-xs border-r border-slate-200 flex items-center">
+                        <div className="bg-slate-50 px-2 py-1 font-medium text-slate-600 text-[10px] border-r border-slate-200 flex items-center">
                           {dep.team}
                         </div>
                         {/* Deliverable */}
@@ -1557,7 +1557,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               handleChange('dependencies', newDeps);
                             }}
                             placeholder={`What deliverable is required from ${dep.team}?`}
-                            className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white placeholder:text-slate-400"
+                            className="w-full px-2 py-1 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white placeholder:text-slate-400"
                           />
                         </div>
                         {/* ETA */}
@@ -1572,7 +1572,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               handleChange('dependencies', newDeps);
                             }}
                             placeholder="ETA"
-                            className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white"
+                            className="w-full px-2 py-1 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white"
                           />
                         </div>
                       </div>
@@ -1595,7 +1595,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             e.target.value = '';
                           }
                         }}
-                        className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white"
+                        className="w-full px-2 py-1 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white"
                       >
                         <option value="">+ Add Dependency</option>
                         {getDependencyTeamCategories(config).flatMap(c => c.teams)
@@ -1618,7 +1618,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             const newDeps = formData.dependencies?.filter((_, i) => i !== index) || [];
                             handleChange('dependencies', newDeps.length > 0 ? newDeps : undefined);
                           }}
-                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"
+                          className="px-2 py-1 text-[10px] text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"
                         >
                           Remove {dep.team}
                         </button>
@@ -2378,10 +2378,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         {/* BODY - COMMENTS TAB */}
         {/* ================================================================ */}
         {mode === 'single' && activeTab === 'comments' && (
-          <div className="flex-1 flex flex-col p-6 min-h-[400px]">
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+          <div className="flex-1 flex flex-col p-4 min-h-[300px]">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
               {(!formData.comments || formData.comments.length === 0) ? (
-                <div className="text-center text-slate-400 py-10">No comments yet. Start the conversation!</div>
+                <div className="text-center text-slate-400 py-8 text-[10px]">No comments yet. Start the conversation!</div>
               ) : (
                 formData.comments.map(comment => {
                   const author = users.find(u => u.id === comment.authorId);
@@ -2410,7 +2410,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       
                       if (user) {
                         parts.push(
-                          <span key={matchIndex} className="font-semibold text-blue-600 bg-blue-50 px-1 rounded">
+                          <span key={matchIndex} className="font-semibold text-blue-600 bg-blue-50 px-1 rounded text-[10px]">
                             @{user.name}
                           </span>
                         );
@@ -2429,25 +2429,29 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   };
                   
                   return (
-                    <div key={comment.id} className="flex gap-3">
-                      <img src={author?.avatar} alt={author?.name} className="w-8 h-8 rounded-full bg-slate-200" />
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-semibold text-xs text-slate-800">{author?.name || 'Unknown'}</span>
-                          <span className="text-xs text-slate-400">{new Date(comment.timestamp).toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-xs text-slate-700 whitespace-pre-wrap">
-                          {formatCommentText(comment.text)}
-                        </p>
-                        {mentionedUsers.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {mentionedUsers.map(user => (
-                              <span key={user.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
-                                @{user.name}
-                              </span>
-                            ))}
+                    <div key={comment.id} className="flex gap-2">
+                      <img src={author?.avatar} alt={author?.name} className="w-6 h-6 rounded-full bg-slate-200 flex-shrink-0" />
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 flex-1 flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="mb-0.5">
+                            <span className="font-semibold text-[10px] text-slate-800">{author?.name || 'Unknown'}</span>
                           </div>
-                        )}
+                          <p className="text-[10px] text-slate-700 whitespace-pre-wrap">
+                            {formatCommentText(comment.text)}
+                          </p>
+                          {mentionedUsers.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-0.5">
+                              {mentionedUsers.map(user => (
+                                <span key={user.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded">
+                                  @{user.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end text-[10px] text-slate-400 flex-shrink-0">
+                          <span>{new Date(comment.timestamp).toLocaleDateString()}</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2455,8 +2459,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
               )}
             </div>
             
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <div className="flex gap-2">
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <div className="flex gap-1.5">
                 <div className="relative flex-1">
                   <input 
                     ref={commentInputRef}
@@ -2465,14 +2469,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     onChange={handleCommentInputChange}
                     onKeyDown={handleCommentKeyDown}
                     placeholder="Type a comment... (@ to mention)"
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   
                   {/* Mention Autocomplete Dropdown */}
                   {showMentionDropdown && filteredMentionUsers.length > 0 && (
                     <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-50">
-                      <div className="px-3 py-2 bg-slate-50 border-b border-slate-100">
-                        <span className="text-xs text-slate-500 font-medium tracking-wider">Mention someone</span>
+                      <div className="px-2 py-1.5 bg-slate-50 border-b border-slate-100">
+                        <span className="text-[10px] text-slate-500 font-medium tracking-wider">Mention someone</span>
                       </div>
                       {filteredMentionUsers.map((user, index) => (
                         <button
@@ -2480,18 +2484,18 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           type="button"
                           onClick={() => insertMention(user)}
                           onMouseEnter={() => setSelectedMentionIndex(index)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-left transition-colors ${
                             index === selectedMentionIndex
                               ? 'bg-blue-50 text-blue-700'
                               : 'hover:bg-slate-50 text-slate-700'
                           }`}
                         >
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-xs font-bold text-slate-600 border border-slate-300 flex-shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-300 flex-shrink-0">
                             {user.name.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium truncate">{user.name}</div>
-                            <div className="text-xs text-slate-400 truncate">{user.email}</div>
+                            <div className="text-[10px] font-medium truncate">{user.name}</div>
+                            <div className="text-[10px] text-slate-400 truncate">{user.email}</div>
                           </div>
                         </button>
                       ))}
@@ -2501,12 +2505,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <button 
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-2 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-1.5 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send size={18} />
+                  <Send size={14} />
                 </button>
               </div>
-              <p className="text-xs text-slate-400 mt-1.5">
+              <p className="text-[10px] text-slate-400 mt-1">
                 Type @ to mention someone
               </p>
             </div>
@@ -2517,30 +2521,32 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         {/* BODY - HISTORY TAB */}
         {/* ================================================================ */}
         {mode === 'single' && activeTab === 'history' && (
-          <div className="flex-1 flex flex-col p-6 min-h-[400px]">
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+          <div className="flex-1 flex flex-col p-4 min-h-[300px]">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
               {(!formData.history || formData.history.length === 0) ? (
-                <div className="text-center text-slate-400 py-10">No change history recorded yet.</div>
+                <div className="text-center text-slate-400 py-8 text-xs">No change history recorded yet.</div>
               ) : (
                 [...(formData.history || [])]
                   .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
                   .map(change => (
-                    <div key={change.id} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
-                        <History size={16} className="text-slate-500" />
+                    <div key={change.id} className="flex gap-2">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
+                        <History size={12} className="text-slate-500" />
                       </div>
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-semibold text-xs text-slate-800">{change.field}</span>
-                          <span className="text-xs text-slate-400">{new Date(change.timestamp).toLocaleString()}</span>
+                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 flex-1 flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="mb-0.5">
+                            <span className="font-semibold text-[10px] text-slate-800">{change.field}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-700">
+                            <span className="text-red-600 line-through">{String(change.oldValue ?? 'N/A')}</span>
+                            <span className="text-slate-400">→</span>
+                            <span className="text-emerald-600 font-medium">{String(change.newValue ?? 'N/A')}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-700">
-                          <span className="text-red-600 line-through">{String(change.oldValue ?? 'N/A')}</span>
-                          <span className="text-slate-400">→</span>
-                          <span className="text-emerald-600 font-medium">{String(change.newValue ?? 'N/A')}</span>
-                        </div>
-                        <div className="mt-2 text-xs text-slate-500">
-                          Changed by: <span className="font-medium">{change.changedBy}</span>
+                        <div className="flex flex-col items-end text-[10px] text-slate-400 flex-shrink-0">
+                          <span>{new Date(change.timestamp).toLocaleString()}</span>
+                          <span>Changed by: <span className="font-medium">{change.changedBy}</span></span>
                         </div>
                       </div>
                     </div>
