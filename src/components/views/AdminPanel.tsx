@@ -1153,9 +1153,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-3">
           <div className="mb-3">
-            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-1.5">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-1.5">
               <div className="p-1.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-md">
-                <Settings className="text-white" size={22} />
+                <Settings className="text-white" size={18} />
               </div>
               Admin Configuration
             </h2>
@@ -1171,7 +1171,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <MessageSquare size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Slack Integration</h3>
+                      <h3 className="text-sm font-semibold text-slate-800">Slack Integration</h3>
                     </div>
                   </div>
                 </div>
@@ -2472,12 +2472,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                return (
                  <tr key={user.id} className="hover:bg-slate-50">
-                   <td className="px-3 py-2 font-medium flex items-center gap-2">
-                     <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                        {user.name.charAt(0)}
-                     </div>
-                     {user.name}
-                   </td>
+                  <td className="px-3 py-2 font-medium">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
+                         {user.name.charAt(0)}
+                      </div>
+                      {user.name}
+                    </div>
+                  </td>
                    <td className="px-3 py-2">
                      <input 
                        type="number" 
