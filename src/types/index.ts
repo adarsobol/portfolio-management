@@ -153,6 +153,7 @@ export interface Initiative {
   estimatedEffort?: number; // Current Plan (Staff Weeks), defaults to 0
   actualEffort?: number; // Consumed (Staff Weeks), defaults to 0
   originalEstimatedEffort?: number; // Baseline Plan (Staff Weeks), only tracked when changed
+  isSoftCap?: boolean; // Whether this initiative is a soft cap
   
   // Time Metrics
   eta?: string; // Current ETA (ISO Date String)
