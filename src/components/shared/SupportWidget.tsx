@@ -3,6 +3,7 @@ import { HelpCircle, X, Bug, MessageSquare, Send, ChevronLeft, RefreshCw, Trendi
 import { FeedbackModal } from '../modals/FeedbackModal';
 import { Feedback, FeedbackComment } from '../../types';
 import { supportService } from '../../services/supportService';
+import { logger } from '../../utils/logger';
 
 type WidgetView = 'menu' | 'my-feedback' | 'feedback-detail';
 
@@ -25,7 +26,7 @@ export const SupportWidget: React.FC = () => {
       const feedback = await supportService.getMyFeedback();
       setMyFeedback(feedback);
     } catch (error) {
-      console.error('Failed to load feedback:', error);
+      logger.error('Failed to load feedback', { context: 'SupportWidget.loadFeedback', error: error instanceof Error ? error : undefined });
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export const SupportWidget: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to add feedback comment:', error);
+      logger.error('Failed to add feedback comment', { context: 'SupportWidget.handleAddComment', error: error instanceof Error ? error : undefined });
     } finally {
       setSubmittingFeedbackComment(false);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Search, Calendar, User, CheckCircle2, RefreshCw, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { ErrorLog, LogSeverity, User as UserType } from '../../types';
 import { logService } from '../../services/logService';
+import { logger } from '../../utils/logger';
 
 interface ErrorLogViewProps {
   currentUser: UserType;
@@ -33,7 +34,7 @@ export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ users }) => {
       });
       setErrorLogs(logs);
     } catch (error) {
-      console.error('Failed to load error logs:', error);
+      logger.error('Failed to load error logs', { context: 'ErrorLogView.loadLogs', error: error instanceof Error ? error : undefined });
     } finally {
       setLoading(false);
     }

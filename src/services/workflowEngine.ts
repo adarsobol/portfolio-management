@@ -7,6 +7,7 @@ import {
   WorkflowExecutionLog,
 } from '../types';
 import { generateId } from '../utils';
+import { logger } from '../utils/logger';
 
 export class WorkflowEngine {
   /**
@@ -203,12 +204,12 @@ export class WorkflowEngine {
       case 'notify_owner':
         // Notification would be handled by Slack service or other notification system
         // This is a placeholder - actual implementation would call notification service
-        console.log(`[Workflow] Notify owner for initiative: ${initiative.title}`);
+        logger.debug('Notify owner action triggered', { context: 'WorkflowEngine.executeAction', metadata: { initiative: initiative.title } });
         break;
 
       case 'notify_slack':
         // Would integrate with Slack service
-        console.log(`[Workflow] Notify Slack channel ${action.channel} for initiative: ${initiative.title}`);
+        logger.debug('Notify Slack action triggered', { context: 'WorkflowEngine.executeAction', metadata: { channel: action.channel, initiative: initiative.title } });
         break;
 
       case 'create_comment':

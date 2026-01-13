@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, RefreshCw, CheckCircle2, Clock, AlertCircle, XCircle, ChevronDown, ChevronUp, Send, MessageCircle, Bug, TrendingUp, CheckCircle } from 'lucide-react';
 import { SupportTicket, SupportTicketStatus, SupportTicketComment, User as UserType, Feedback, FeedbackComment } from '../../types';
 import { supportService } from '../../services/supportService';
+import { logger } from '../../utils/logger';
 
 interface SupportCenterProps {
   currentUser: UserType;
@@ -40,7 +41,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
         setFeedback(allFeedback);
       }
     } catch (error) {
-      console.error('Failed to load support data:', error);
+      logger.error('Failed to load support data', { context: 'SupportCenter.loadData', error: error instanceof Error ? error : undefined });
     } finally {
       setLoading(false);
     }
@@ -65,7 +66,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
         await loadData();
       }
     } catch (error) {
-      console.error('Failed to add comment:', error);
+      logger.error('Failed to add comment', { context: 'SupportCenter.handleAddComment', error: error instanceof Error ? error : undefined });
     } finally {
       setSubmittingComment(null);
     }
@@ -177,7 +178,7 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ currentUser }) => 
         await loadData();
       }
     } catch (error) {
-      console.error('Failed to add feedback comment:', error);
+      logger.error('Failed to add feedback comment', { context: 'SupportCenter.handleAddFeedbackComment', error: error instanceof Error ? error : undefined });
     } finally {
       setSubmittingFeedbackComment(null);
     }

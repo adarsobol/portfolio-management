@@ -107,6 +107,18 @@ class ServerLogger {
         console.log(this.formatLog(entry));
     }
     /**
+     * Log a critical error (always logged, for fatal errors)
+     */
+    critical(message, options) {
+        const entry = {
+            level: LogLevel.ERROR,
+            message: `🔴 CRITICAL: ${message}`,
+            timestamp: this.formatTimestamp(),
+            ...options
+        };
+        console.error(this.formatLog(entry));
+    }
+    /**
      * Set log level dynamically
      */
     setLevel(level) {

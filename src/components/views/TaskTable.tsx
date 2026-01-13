@@ -202,17 +202,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               );
               handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'tasks', updatedTradeOffTasks, false, sourceInitiative.id, sourceInitiative.title);
             } else {
-              console.warn('Trade-off task not found:', newTaskForm.tradeOffTaskId);
+              logger.warn('Trade-off task not found', { context: 'TaskTable.handleAddTaskSubmit', metadata: { tradeOffTaskId: newTaskForm.tradeOffTaskId } });
             }
           } else {
-            console.warn('Trade-off initiative has no tasks:', newTaskForm.tradeOffInitiativeId);
+            logger.warn('Trade-off initiative has no tasks', { context: 'TaskTable.handleAddTaskSubmit', metadata: { tradeOffInitiativeId: newTaskForm.tradeOffInitiativeId } });
           }
         } else {
           // No task ID provided, update initiative ETA
           handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'eta', newTaskForm.tradeOffEta, false, sourceInitiative.id, sourceInitiative.title);
         }
       } else {
-        console.warn('Trade-off initiative not found:', newTaskForm.tradeOffInitiativeId);
+        logger.warn('Trade-off initiative not found', { context: 'TaskTable.handleAddTaskSubmit', metadata: { tradeOffInitiativeId: newTaskForm.tradeOffInitiativeId } });
       }
     }
     
@@ -235,22 +235,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   };
   
   const handleUpdateTask = (initiativeId: string, taskId: string, field: keyof Task, value: any) => {
-    console.log('handleUpdateTask called', { initiativeId, taskId, field, value });
+    logger.debug('handleUpdateTask called', { context: 'TaskTable.handleUpdateTask', metadata: { initiativeId, taskId, field, value } });
     
     // Use allInitiatives if available (full list), otherwise fall back to filteredInitiatives
     const sourceInitiatives = allInitiatives || filteredInitiatives;
     const initiative = sourceInitiatives.find(i => i.id === initiativeId);
     if (!initiative || !initiative.tasks) {
-      console.warn(`Initiative ${initiativeId} not found or has no tasks`);
+      logger.warn('Initiative not found or has no tasks', { context: 'TaskTable.handleUpdateTask', metadata: { initiativeId } });
       return;
     }
     
-    console.log('Current initiative tasks:', initiative.tasks);
+    logger.debug('Current initiative tasks', { context: 'TaskTable.handleUpdateTask', metadata: { taskCount: initiative.tasks.length } });
     
     // Find the task to update
     const taskToUpdate = initiative.tasks.find(t => t.id === taskId);
     if (!taskToUpdate) {
-      console.warn(`Task ${taskId} not found in initiative ${initiativeId}`);
+      logger.warn('Task not found in initiative', { context: 'TaskTable.handleUpdateTask', metadata: { taskId, initiativeId } });
       return;
     }
 
@@ -265,20 +265,20 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       return;
     }
     
-    console.log('Task to update:', taskToUpdate, 'new value:', value);
+    logger.debug('Task to update', { context: 'TaskTable.handleUpdateTask', metadata: { taskId, field, value } });
     
     // Create a new array with updated task - ensure we create a completely new object
     const updatedTasks = initiative.tasks.map(task =>
       task.id === taskId ? { ...task, [field]: value } : task
     );
     
-    console.log('Updated tasks:', updatedTasks);
+    logger.debug('Updated tasks', { context: 'TaskTable.handleUpdateTask', metadata: { count: updatedTasks.length } });
     
     // Recalculate actual effort if effort fields changed (planned effort is manually set for BAU initiatives)
     if (field === 'estimatedEffort' || field === 'actualEffort') {
       const totalActualEffort = updatedTasks.reduce((sum, task) => sum + (task.actualEffort || 0), 0);
       
-      console.log('Updating actual effort:', { totalActualEffort });
+      logger.debug('Updating actual effort', { context: 'TaskTable.handleUpdateTask', metadata: { totalActualEffort } });
       
       // Update tasks array first, then actual effort
       // React 18+ will batch these automatically
@@ -286,7 +286,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       handleInlineUpdate(initiativeId, 'actualEffort', totalActualEffort, true); // suppressNotification: true
     } else {
       // For non-effort fields, just update tasks
-      console.log('Updating tasks only');
+      logger.debug('Updating tasks only', { context: 'TaskTable.handleUpdateTask' });
       handleInlineUpdate(initiativeId, 'tasks', updatedTasks);
     }
   };

@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (shouldUseDevBypass) {
       if (isDevelopment) {
-        console.warn('⚠️ DEVELOPMENT MODE: Authentication bypassed. Set VITE_GOOGLE_CLIENT_ID to enable OAuth.');
+        logger.warn('DEVELOPMENT MODE: Authentication bypassed. Set VITE_GOOGLE_CLIENT_ID to enable OAuth.', { context: 'AuthContext' });
       }
       setIsLoading(false);
       return;

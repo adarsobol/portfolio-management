@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import {
   Initiative, User, Status, Priority, UnplannedTag, AssetClass, Dependency, DependencyTeam, AppConfig, InitiativeType
 } from '../../types';
-import { getEligibleOwners, generateId } from '../../utils';
+import { getEligibleOwners, generateId, logger } from '../../utils';
 import { getPriorities, getQuarters, getAssetClasses, getDependencyTeams, getHierarchy, getInitiativeTypes } from '../../utils/valueLists';
 import { Plus, Trash2, Users, ArrowDown, ArrowUp, Copy, Upload, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -173,7 +173,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
 
         // Debug: Log first row keys to see what columns are actually present
         if (jsonData.length > 0) {
-          console.log('Available columns in uploaded sheet:', Object.keys(jsonData[0]));
+          logger.debug('Available columns in uploaded sheet', { context: 'BulkInitiativeSpreadsheetModal.parseFile', metadata: { columns: Object.keys(jsonData[0]) } });
         }
 
         const hierarchy = getHierarchy(config);
@@ -308,7 +308,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
           onRowsChange(parsedRows);
         }
       } catch (err) {
-        console.error('Error parsing file:', err);
+        logger.error('Error parsing file', { context: 'BulkInitiativeSpreadsheetModal.parseFile', error: err instanceof Error ? err : undefined });
         alert('Failed to parse file. Please ensure it is a valid Excel or CSV file.');
       }
     };

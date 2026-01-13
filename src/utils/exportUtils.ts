@@ -1,6 +1,7 @@
 // Export utilities for CSV and Excel exports
 import { Initiative, User, Status, WorkType } from '../types';
 import * as XLSX from 'xlsx';
+import { logger } from './logger';
 
 /**
  * Get owner name by ID
@@ -159,7 +160,7 @@ let isDownloading = false;
 async function downloadFile(blob: Blob, filename: string): Promise<void> {
   // Prevent multiple downloads at once
   if (isDownloading) {
-    console.warn('Download already in progress, skipping...');
+    logger.warn('Download already in progress, skipping...', { context: 'exportUtils.downloadFile' });
     return;
   }
   
@@ -186,14 +187,14 @@ async function downloadFile(blob: Blob, filename: string): Promise<void> {
         await writable.write(blob);
         await writable.close();
         
-        console.log(`File saved via File System Access API: ${filename}`);
+        logger.info('File saved via File System Access API', { context: 'exportUtils.downloadFile', metadata: { filename } });
         return;
       } catch (err: any) {
         if (err.name === 'AbortError') {
-          console.log('User cancelled save dialog');
+          logger.info('User cancelled save dialog', { context: 'exportUtils.downloadFile' });
           return;
         }
-        console.log('File System Access API failed, trying fallback...', err);
+        logger.debug('File System Access API failed, trying fallback...', { context: 'exportUtils.downloadFile', error: err instanceof Error ? err : undefined });
       }
     }
     
@@ -211,13 +212,13 @@ async function downloadFile(blob: Blob, filename: string): Promise<void> {
       URL.revokeObjectURL(url);
     }, 100);
     
-    console.log(`Download initiated: ${filename}`);
+    logger.info('Download initiated', { context: 'exportUtils.downloadFile', metadata: { filename } });
     
     // Show alert with download location info
     alert(`File "${filename}" is being downloaded.\n\nIf the file has a random name, check your browser's Downloads folder or use Cmd+S / Ctrl+S after opening the file.`);
     
   } catch (error) {
-    console.error('Download failed:', error);
+    logger.error('Download failed', { context: 'exportUtils.downloadFile', error: error instanceof Error ? error : undefined });
     throw error;
   } finally {
     setTimeout(() => {
@@ -265,9 +266,9 @@ export async function exportToCSV(initiatives: Initiative[], users: User[], file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     await downloadFile(blob, fullFilename);
     
-    console.log(`Export successful: ${fullFilename}`);
+    logger.info('Export successful', { context: 'exportUtils.exportToCSV', metadata: { filename: fullFilename } });
   } catch (error) {
-    console.error('Export to CSV failed:', error);
+    logger.error('Export to CSV failed', { context: 'exportUtils.exportToCSV', error: error instanceof Error ? error : undefined });
     alert('Failed to export to CSV. See console for details.');
   }
 }
@@ -396,9 +397,9 @@ export async function exportToExcel(initiatives: Initiative[], users: User[], fi
     const fullFilename = `${filename}_${formatDateForFilename()}.xlsx`;
     await downloadFile(blob, fullFilename);
     
-    console.log(`Export successful: ${fullFilename}`);
+    logger.info('Export successful', { context: 'exportUtils.exportToExcel', metadata: { filename: fullFilename } });
   } catch (error) {
-    console.error('Export to Excel failed:', error);
+    logger.error('Export to Excel failed', { context: 'exportUtils.exportToExcel', error: error instanceof Error ? error : undefined });
     alert('Failed to export to Excel. See console for details.');
   }
 }
@@ -516,7 +517,7 @@ export async function exportToClipboard(initiatives: Initiative[], users: User[]
   // Copy to clipboard
   await navigator.clipboard.writeText(tsvContent);
   
-  console.log(`Copied ${initiatives.length} initiatives to clipboard`);
+  logger.info('Copied initiatives to clipboard', { context: 'exportUtils.copyToClipboard', metadata: { count: initiatives.length } });
 }
 
 /**
@@ -642,7 +643,7 @@ export async function exportUnplannedToNotionClipboard(initiatives: Initiative[]
   // Copy to clipboard
   await navigator.clipboard.writeText(tsvContent);
   
-  console.log(`Copied ${unplannedItems.length} unplanned items to clipboard (Notion format)`);
+  logger.info('Copied unplanned items to clipboard (Notion format)', { context: 'exportUtils.copyToClipboardNotionFormat', metadata: { count: unplannedItems.length } });
   return unplannedItems.length;
 }
 

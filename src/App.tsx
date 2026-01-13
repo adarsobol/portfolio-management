@@ -77,7 +77,7 @@ export default function App() {
       return true;
     });
     if (duplicates.length > 0) {
-      console.warn(`[DEBUG] Found ${duplicates.length} duplicate initiative IDs: ${duplicates.join(', ')}`);
+      logger.warn(`Found ${duplicates.length} duplicate initiative IDs`, { context: 'App.deduplicateInitiatives', metadata: { duplicates } });
     }
     return deduplicated;
   };
@@ -89,7 +89,7 @@ export default function App() {
     // Safety check: if duplicates are detected in state, deduplicate immediately
     const duplicateIds = initiatives.map(i => i.id).filter((id, idx, arr) => arr.indexOf(id) !== idx);
     if (duplicateIds.length > 0) {
-      console.error(`[DEBUG] CRITICAL: Duplicates detected in state! IDs: ${[...new Set(duplicateIds)].join(', ')}. Deduplicating...`);
+      logger.error('CRITICAL: Duplicates detected in state! Deduplicating...', { context: 'App.useEffect[initiatives]', metadata: { duplicateIds: [...new Set(duplicateIds)] } });
       const deduplicated = deduplicateInitiatives(initiatives);
       // Only update if the deduplicated array is different (prevents infinite loop)
       if (deduplicated.length !== initiatives.length) {
@@ -129,7 +129,7 @@ export default function App() {
           }
         }
       } catch (error) {
-        console.error('Failed to load value lists from backend:', error);
+        logger.error('Failed to load value lists from backend', { context: 'App.loadValueLists', error: error instanceof Error ? error : undefined });
         // Continue with local config if backend fails
       }
     };
@@ -201,36 +201,29 @@ export default function App() {
 
   // Load notifications from server
   useEffect(() => {
-    console.log('[APP] Notification useEffect triggered:', {
-      isAuthenticated,
-      currentUserId: currentUser?.id,
-      currentUserEmail: currentUser?.email,
-      notificationsLoaded
+    logger.debug('Notification useEffect triggered', {
+      context: 'App.useEffect[notifications]',
+      metadata: { isAuthenticated, currentUserId: currentUser?.id, currentUserEmail: currentUser?.email, notificationsLoaded }
     });
     
     if (!isAuthenticated || !currentUser?.id || notificationsLoaded) {
-      console.log('[APP] Skipping notification load:', {
-        reason: !isAuthenticated ? 'not authenticated' : !currentUser?.id ? 'no user id' : 'already loaded'
+      logger.debug('Skipping notification load', {
+        context: 'App.useEffect[notifications]',
+        metadata: { reason: !isAuthenticated ? 'not authenticated' : !currentUser?.id ? 'no user id' : 'already loaded' }
       });
       return;
     }
 
     const loadNotifications = async () => {
       try {
-        console.log('[APP] Loading notifications for user:', currentUser.id, 'email:', currentUser.email);
+        logger.debug('Loading notifications for user', { context: 'App.loadNotifications', metadata: { userId: currentUser.id, email: currentUser.email } });
         const serverNotifications = await notificationService.fetchNotifications(currentUser.id);
-        console.log('[APP] Loaded notifications from server:', serverNotifications.length, 'notifications');
+        logger.debug('Loaded notifications from server', { context: 'App.loadNotifications', metadata: { count: serverNotifications.length } });
         if (serverNotifications.length > 0) {
-          console.log('[APP] Notification details:', serverNotifications.map(n => ({
-            id: n.id,
-            title: n.title,
-            userId: n.userId,
-            type: n.type
-          })));
+          logger.debug('Notification details', { context: 'App.loadNotifications', metadata: { notifications: serverNotifications.map(n => ({ id: n.id, title: n.title, userId: n.userId, type: n.type })) } });
         }
         setNotifications(serverNotifications);
       } catch (error) {
-        console.error('[APP] Failed to load notifications:', error);
         logger.error('Failed to load notifications from server', { 
           context: 'App.loadNotifications', 
           error: error instanceof Error ? error : new Error(String(error)) 
@@ -267,7 +260,7 @@ export default function App() {
         
         const duplicatesRemoved = loadedInitiatives.length - deduplicatedInitiatives.length;
         if (duplicatesRemoved > 0) {
-          console.log(`[DEBUG] loadData: Setting ${deduplicatedInitiatives.length} initiatives (removed ${duplicatesRemoved} duplicates)`);
+          logger.debug('loadData: Setting initiatives after deduplication', { context: 'App.loadData', metadata: { count: deduplicatedInitiatives.length, duplicatesRemoved } });
         }
         
         // #region agent log
@@ -310,10 +303,10 @@ export default function App() {
         setInitiatives(prev => {
           const existing = prev.find(i => i.id === initiative.id);
           if (existing) {
-            console.warn(`[DEBUG] realtime create: Initiative ${initiative.id} already exists, skipping duplicate`);
+            logger.warn('realtime create: Initiative already exists, skipping duplicate', { context: 'App.realtimeService.onInitiativeCreate', metadata: { initiativeId: initiative.id } });
             return prev;
           }
-          console.log(`[DEBUG] realtime create: Adding new initiative ${initiative.id}`);
+          logger.debug('realtime create: Adding new initiative', { context: 'App.realtimeService.onInitiativeCreate', metadata: { initiativeId: initiative.id } });
           return [...prev, initiative];
         });
       });
@@ -331,22 +324,19 @@ export default function App() {
 
       // Subscribe to real-time notifications
       const unsubNotification = realtimeService.onNotificationReceived(({ notification }) => {
-        console.log('[APP] Received notification via Socket.IO:', {
-          notificationId: notification.id,
-          notificationTitle: notification.title,
-          notificationUserId: notification.userId,
-          currentUserId: currentUser.id,
-          currentUserEmail: currentUser.email
+        logger.debug('Received notification via Socket.IO', {
+          context: 'App.realtimeService.onNotificationReceived',
+          metadata: { notificationId: notification.id, notificationTitle: notification.title, notificationUserId: notification.userId, currentUserId: currentUser.id, currentUserEmail: currentUser.email }
         });
         
         // Add the notification to local state (it's already been filtered for current user)
         setNotifications(prev => {
           // Avoid duplicates
           if (prev.find(n => n.id === notification.id)) {
-            console.log('[APP] Notification already exists, skipping:', notification.id);
+            logger.debug('Notification already exists, skipping', { context: 'App.realtimeService.onNotificationReceived', metadata: { notificationId: notification.id } });
             return prev;
           }
-          console.log('[APP] Adding notification to state, new count:', prev.length + 1);
+          logger.debug('Adding notification to state', { context: 'App.realtimeService.onNotificationReceived', metadata: { newCount: prev.length + 1 } });
           return [notification, ...prev];
         });
       });
@@ -1150,9 +1140,9 @@ export default function App() {
       // Only validate if feature is enabled and user is a Team Lead
       if (!config.weeklyEffortValidation?.enabled || currentUser.role !== Role.TeamLead) {
         if (currentUser.role === Role.TeamLead) {
-          console.log('[Weekly Validation] Feature disabled or user not Team Lead', {
-            enabled: config.weeklyEffortValidation?.enabled,
-            role: currentUser.role
+          logger.debug('Weekly Validation: Feature disabled or user not Team Lead', {
+            context: 'App.checkWeeklyValidation',
+            metadata: { enabled: config.weeklyEffortValidation?.enabled, role: currentUser.role }
           });
         }
         return;
@@ -1160,15 +1150,9 @@ export default function App() {
 
       const result = validateWeeklyTeamEffort(initiatives, config, currentUser.id);
       
-      // Debug logging
-      console.log('[Weekly Validation] Result:', {
-        flagged: result.flagged,
-        deviationPercent: result.deviationPercent,
-        averageWeeklyEffort: result.averageWeeklyEffort,
-        currentWeekEffort: result.currentWeekEffort,
-        teamLeadId: result.teamLeadId,
-        quarter: result.quarter,
-        threshold: config.weeklyEffortValidation?.thresholdPercent || 15
+      logger.debug('Weekly Validation Result', {
+        context: 'App.checkWeeklyValidation',
+        metadata: { flagged: result.flagged, deviationPercent: result.deviationPercent, averageWeeklyEffort: result.averageWeeklyEffort, currentWeekEffort: result.currentWeekEffort, teamLeadId: result.teamLeadId, quarter: result.quarter, threshold: config.weeklyEffortValidation?.thresholdPercent || 15 }
       });
       
       if (result.flagged) {
@@ -1305,7 +1289,7 @@ export default function App() {
       ? `Task ${field} changed from ${oldValue ?? 'N/A'} to ${newValue ?? 'N/A'}`
       : `Initiative ${field} changed from ${oldValue ?? 'N/A'} to ${newValue ?? 'N/A'}`;
     
-    console.log('[ACTIVITY] Logging change:', { activityType, description, initiativeId: initiative.id, field });
+    logger.debug('Logging activity change', { context: 'App.logChange', metadata: { activityType, description, initiativeId: initiative.id, field } });
     logService.logActivity(activityType, description, {
       initiativeId: initiative.id,
       taskId: taskId,
@@ -1593,7 +1577,7 @@ export default function App() {
           // New initiative: check for duplicates before adding (safety check)
           const duplicateExists = nextInitiatives.some(i => i.id === item.id);
           if (duplicateExists) {
-            console.warn(`[DEBUG] handleSave: Initiative ${item.id} already exists, updating instead of adding`);
+            logger.warn('handleSave: Initiative already exists, updating instead of adding', { context: 'App.handleSave', metadata: { initiativeId: item.id } });
             const duplicateIndex = nextInitiatives.findIndex(i => i.id === item.id);
             nextInitiatives[duplicateIndex] = item;
           } else {
@@ -1852,7 +1836,7 @@ export default function App() {
         
         // Log task updates for debugging
         if (field === 'tasks') {
-          console.log(`[APP] Task update for ${id}: ${(value as any)?.length || 0} tasks`);
+          logger.debug('Task update', { context: 'App.updateInitiative', metadata: { id, taskCount: (value as any)?.length || 0 } });
         }
         
         // Create notification center entry (only if not suppressed)
@@ -2157,7 +2141,7 @@ export default function App() {
         
         const duplicatesRemoved = loadedInitiatives.length - deduplicatedInitiatives.length;
         if (duplicatesRemoved > 0) {
-          console.log(`[DEBUG] handleRefreshData: Setting ${deduplicatedInitiatives.length} initiatives (removed ${duplicatesRemoved} duplicates)`);
+          logger.debug('handleRefreshData: Setting initiatives after deduplication', { context: 'App.handleRefreshData', metadata: { count: deduplicatedInitiatives.length, duplicatesRemoved } });
           showSuccess(`Successfully loaded ${deduplicatedInitiatives.length} initiatives (removed ${duplicatesRemoved} duplicates)`);
         } else {
           showSuccess(`Successfully loaded ${deduplicatedInitiatives.length} initiatives`);

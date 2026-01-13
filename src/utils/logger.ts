@@ -79,15 +79,15 @@ class Logger {
     }
   }
 
-  debug(message: string, options?: { context?: string; metadata?: Record<string, unknown> }): void {
+  debug(message: string, options?: { context?: string; metadata?: Record<string, unknown>; error?: Error }): void {
     this.log(LogLevel.DEBUG, message, options);
   }
 
-  info(message: string, options?: { context?: string; metadata?: Record<string, unknown> }): void {
+  info(message: string, options?: { context?: string; metadata?: Record<string, unknown>; error?: Error }): void {
     this.log(LogLevel.INFO, message, options);
   }
 
-  warn(message: string, options?: { context?: string; metadata?: Record<string, unknown> }): void {
+  warn(message: string, options?: { context?: string; metadata?: Record<string, unknown>; error?: Error }): void {
     this.log(LogLevel.WARN, message, options);
   }
 

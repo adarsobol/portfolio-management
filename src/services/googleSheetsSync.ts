@@ -45,7 +45,7 @@ export interface SheetsPullData {
 export function flattenInitiative(i: Initiative): Record<string, string | number | boolean> {
   const taskCount = i.tasks?.length || 0;
   if (taskCount > 0) {
-    console.log(`[SYNC] flattenInitiative: ${i.id} has ${taskCount} tasks:`, i.tasks?.map(t => t.id));
+    logger.debug(`flattenInitiative: ${i.id} has ${taskCount} tasks`, { context: 'Sync', metadata: { taskIds: i.tasks?.map(t => t.id) } });
   }
   return {
     id: i.id,
@@ -491,12 +491,12 @@ class SheetsSyncManager {
   /** Queue initiative for sync (debounced, deduped) */
   queueInitiativeSync(initiative: Initiative): void {
     if (!this.enabled) {
-      console.warn('[SYNC] Sync is disabled, skipping queue');
+      logger.warn('Sync is disabled, skipping queue', { context: 'Sync' });
       return;
     }
 
     const taskCount = initiative.tasks?.length || 0;
-    console.log(`[SYNC] Queuing initiative for sync: ${initiative.id} - ${initiative.title} (${taskCount} tasks)`);
+    logger.debug(`Queuing initiative for sync: ${initiative.id}`, { context: 'Sync', metadata: { title: initiative.title, taskCount } });
     this.queue.initiatives.set(initiative.id, initiative);
     this.updatePendingCount();
     this.persistQueue();
@@ -567,11 +567,11 @@ class SheetsSyncManager {
   /** Queue change log entry */
   queueChangeLog(change: ChangeRecord): void {
     if (!this.enabled) {
-      console.warn('[SYNC] Changelog sync disabled, skipping');
+      logger.warn('Changelog sync disabled, skipping', { context: 'Sync' });
       return;
     }
 
-    console.log(`[SYNC] Queuing changelog: ${change.initiativeId} - ${change.field}: ${change.oldValue} -> ${change.newValue}`);
+    logger.debug(`Queuing changelog: ${change.initiativeId}`, { context: 'Sync', metadata: { field: change.field } });
     this.queue.changes.push(change);
     this.updatePendingCount();
     this.persistQueue();
@@ -593,7 +593,7 @@ class SheetsSyncManager {
     if (!this.enabled) return;
 
     const taskCount = tasks.length;
-    console.log(`[SYNC] Queuing ${taskCount} tasks from ${initiative.id} for sync`);
+    logger.debug(`Queuing ${taskCount} tasks from ${initiative.id} for sync`, { context: 'Sync' });
     
     tasks.forEach(task => {
       this.queue.tasks.set(task.id, { task, initiative });
@@ -926,19 +926,19 @@ class SheetsSyncManager {
 
   private async flushSync(): Promise<void> {
     if (!this.enabled) {
-      console.warn('[SYNC] flushSync: Sync is disabled');
+      logger.warn('flushSync: Sync is disabled', { context: 'Sync' });
       return;
     }
     if (!this.status.isOnline) {
-      console.warn('[SYNC] flushSync: Offline, cannot sync');
+      logger.warn('flushSync: Offline, cannot sync', { context: 'Sync' });
       return;
     }
     if (!authService.isAuthenticated()) {
-      console.warn('[SYNC] flushSync: Not authenticated, cannot sync');
+      logger.warn('flushSync: Not authenticated, cannot sync', { context: 'Sync' });
       return;
     }
 
-    console.log('[SYNC] flushSync: Starting sync...');
+    logger.debug('flushSync: Starting sync...', { context: 'Sync' });
 
     // Take snapshot of current queue
     const toSync = {
@@ -957,44 +957,42 @@ class SheetsSyncManager {
     try {
       // Sync initiatives (upsert)
       if (toSync.initiatives.length > 0) {
-        console.log(`[SYNC] Syncing ${toSync.initiatives.length} initiative(s)...`);
+        logger.debug(`Syncing ${toSync.initiatives.length} initiative(s)...`, { context: 'Sync' });
         const success = await this.syncInitiatives(toSync.initiatives);
         if (!success) {
-          console.error('[SYNC] Initiative sync FAILED, re-queuing');
+          logger.error('Initiative sync FAILED, re-queuing', { context: 'Sync' });
           // Re-queue failed initiatives
           toSync.initiatives.forEach(i => this.queue.initiatives.set(i.id, i));
           errors.push('initiatives');
         } else {
-          console.log('[SYNC] Initiative sync SUCCESS');
+          logger.debug('Initiative sync SUCCESS', { context: 'Sync' });
         }
       }
 
       // Append change logs
       if (toSync.changes.length > 0) {
-        console.log(`[SYNC] Syncing ${toSync.changes.length} changelog(s):`, toSync.changes.map(c => `${c.field}: ${c.oldValue} -> ${c.newValue}`));
+        logger.debug(`Syncing ${toSync.changes.length} changelog(s)`, { context: 'Sync' });
         const success = await this.appendChangeLogs(toSync.changes);
         if (!success) {
-          console.error('[SYNC] Changelog sync FAILED, re-queuing');
+          logger.error('Changelog sync FAILED, re-queuing', { context: 'Sync' });
           // Re-queue failed changes
           this.queue.changes.push(...toSync.changes);
           errors.push('changelog');
         } else {
-          console.log('[SYNC] Changelog sync SUCCESS');
+          logger.debug('Changelog sync SUCCESS', { context: 'Sync' });
         }
-      } else {
-        console.log('[SYNC] No changelogs to sync');
       }
 
       // Sync tasks to separate Tasks sheet
       if (toSync.tasks.length > 0) {
-        console.log(`[SYNC] Syncing ${toSync.tasks.length} task(s)...`);
+        logger.debug(`Syncing ${toSync.tasks.length} task(s)...`, { context: 'Sync' });
         const success = await this.syncTasks(toSync.tasks);
         if (!success) {
-          console.error('[SYNC] Tasks sync FAILED, re-queuing');
+          logger.error('Tasks sync FAILED, re-queuing', { context: 'Sync' });
           toSync.tasks.forEach(t => this.queue.tasks.set(t.task.id, t));
           errors.push('tasks');
         } else {
-          console.log('[SYNC] Tasks sync SUCCESS');
+          logger.debug('Tasks sync SUCCESS', { context: 'Sync' });
         }
       }
 
@@ -1027,14 +1025,14 @@ class SheetsSyncManager {
 
   private async syncInitiatives(initiatives: Initiative[]): Promise<boolean> {
     try {
-      console.log(`[SYNC] POST ${API_ENDPOINT}/api/sheets/initiatives with ${initiatives.length} initiative(s)`);
+      logger.debug(`POST ${API_ENDPOINT}/api/sheets/initiatives with ${initiatives.length} initiative(s)`, { context: 'Sync' });
       const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({ initiatives: initiatives.map(flattenInitiative) })
       });
       
-      console.log(`[SYNC] Response status: ${response.status}`);
+      logger.debug(`Response status: ${response.status}`, { context: 'Sync' });
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -1055,7 +1053,7 @@ class SheetsSyncManager {
           context: 'SheetsSyncManager.syncInitiatives', 
           metadata: { count: result.serverNewer.length } 
         });
-        console.log(`[SYNC] ${result.serverNewer.length} item(s) skipped - server has newer data`);
+        logger.info(`${result.serverNewer.length} item(s) skipped - server has newer data`, { context: 'Sync' });
       }
       
       return true;
@@ -1101,7 +1099,7 @@ class SheetsSyncManager {
   private async syncTasks(tasksWithParent: TaskWithParent[]): Promise<boolean> {
     try {
       const flatTasks = tasksWithParent.map(({ task, initiative }) => flattenTask(task, initiative));
-      console.log(`[SYNC] POST ${API_ENDPOINT}/api/sheets/tasks with ${flatTasks.length} task(s)`);
+      logger.debug(`POST ${API_ENDPOINT}/api/sheets/tasks with ${flatTasks.length} task(s)`, { context: 'Sync' });
       
       const response = await fetch(`${API_ENDPOINT}/api/sheets/tasks`, {
         method: 'POST',
@@ -1109,7 +1107,7 @@ class SheetsSyncManager {
         body: JSON.stringify({ tasks: flatTasks })
       });
       
-      console.log(`[SYNC] Tasks response status: ${response.status}`);
+      logger.debug(`Tasks response status: ${response.status}`, { context: 'Sync' });
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -1135,20 +1133,16 @@ class SheetsSyncManager {
 
   private async createSnapshotTab(snapshot: Snapshot): Promise<boolean> {
     try {
-      console.log('[SYNC] createSnapshotTab called with:', {
-        hasSnapshot: !!snapshot,
-        hasData: !!(snapshot && snapshot.data),
-        dataType: snapshot?.data ? typeof snapshot.data : 'undefined',
-        dataLength: Array.isArray(snapshot?.data) ? snapshot.data.length : 'not array',
-        snapshotId: snapshot?.id,
-        snapshotName: snapshot?.name,
-        timestamp: snapshot?.timestamp
-      });
+      logger.debug('createSnapshotTab called', { context: 'Sync', metadata: { 
+        hasData: !!(snapshot?.data), 
+        dataLength: Array.isArray(snapshot?.data) ? snapshot.data.length : 0,
+        snapshotId: snapshot?.id
+      }});
 
       // Validate snapshot data before sending
       if (!snapshot) {
         const errorMsg = 'Snapshot is missing';
-        console.error('[SYNC] Snapshot validation failed:', errorMsg);
+        logger.error('Snapshot validation failed', { context: 'Sync', metadata: { error: errorMsg } });
         logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
         this.notify();
@@ -1158,7 +1152,7 @@ class SheetsSyncManager {
       // If snapshot.data is missing or empty, try to fetch current initiatives from server
       let snapshotData = snapshot.data;
       if (!snapshotData || !Array.isArray(snapshotData) || snapshotData.length === 0) {
-        console.log('[SYNC] Snapshot data is empty, attempting to fetch current initiatives from server...');
+        logger.debug('Snapshot data is empty, fetching from server...', { context: 'Sync' });
         try {
           const response = await fetch(`${API_ENDPOINT}/api/sheets/pull`, {
             method: 'GET',
@@ -1169,27 +1163,24 @@ class SheetsSyncManager {
             const pullData = await response.json();
             if (pullData.initiatives && Array.isArray(pullData.initiatives) && pullData.initiatives.length > 0) {
               snapshotData = pullData.initiatives;
-              console.log(`[SYNC] Fetched ${snapshotData.length} initiatives from server as fallback`);
+              logger.info(`Fetched ${snapshotData.length} initiatives from server as fallback`, { context: 'Sync' });
             } else {
               const errorMsg = 'Snapshot data is empty and no initiatives found on server';
-              console.error('[SYNC] Snapshot validation failed:', errorMsg);
-              logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+              logger.error('Create snapshot failed', { context: 'Sync', metadata: { error: errorMsg } });
               this.status.error = `Snapshot failed: ${errorMsg}`;
               this.notify();
               return false;
             }
           } else {
             const errorMsg = 'Failed to fetch initiatives from server as fallback';
-            console.error('[SYNC] Snapshot validation failed:', errorMsg);
-            logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+            logger.error('Create snapshot failed', { context: 'Sync', metadata: { error: errorMsg } });
             this.status.error = `Snapshot failed: ${errorMsg}`;
             this.notify();
             return false;
           }
         } catch (fetchError) {
           const errorMsg = 'Snapshot data is empty and cannot fetch from server';
-          console.error('[SYNC] Snapshot validation failed:', errorMsg, fetchError);
-          logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+          logger.error('Create snapshot failed', { context: 'Sync', metadata: { error: errorMsg }, error: fetchError as Error });
           this.status.error = `Snapshot failed: ${errorMsg}`;
           this.notify();
           return false;
@@ -1201,37 +1192,28 @@ class SheetsSyncManager {
         snapshot = { ...snapshot, data: snapshotData };
       }
 
-      console.log(`[SYNC] Validated snapshot: ${snapshotData.length} initiatives, flattening data...`);
+      logger.debug(`Validated snapshot: ${snapshotData.length} initiatives, flattening data...`, { context: 'Sync' });
 
       // Flatten initiatives for sending
       const flattenedData = snapshotData.map((initiative, index) => {
         try {
           const flattened = flattenInitiative(initiative);
-          if (index < 3) {
-            const titleStr = typeof flattened.title === 'string' ? flattened.title : String(flattened.title || '');
-            console.log(`[SYNC] Flattened initiative ${index}:`, {
-              id: flattened.id,
-              title: titleStr.substring(0, 50),
-              hasAllRequiredFields: !!flattened.id && !!flattened.title
-            });
-          }
           return flattened;
         } catch (flattenError) {
-          console.error(`[SYNC] Error flattening initiative ${index}:`, flattenError, initiative);
+          logger.error(`Error flattening initiative ${index}`, { context: 'Sync', error: flattenError as Error });
           throw flattenError;
         }
       });
       
       if (flattenedData.length === 0) {
         const errorMsg = 'Failed to flatten snapshot data';
-        console.error('[SYNC] Snapshot flattening failed:', errorMsg);
-        logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { error: errorMsg } });
+        logger.error('Snapshot flattening failed', { context: 'Sync', metadata: { error: errorMsg } });
         this.status.error = `Snapshot failed: ${errorMsg}`;
         this.notify();
         return false;
       }
 
-      console.log(`[SYNC] Flattened ${flattenedData.length} initiatives, sending to server...`);
+      logger.debug(`Flattened ${flattenedData.length} initiatives, sending to server...`, { context: 'Sync' });
 
       const requestBody = {
         snapshot: {
@@ -1240,11 +1222,7 @@ class SheetsSyncManager {
         }
       };
 
-      console.log('[SYNC] Sending snapshot request:', {
-        snapshotId: requestBody.snapshot.id,
-        dataCount: flattenedData.length,
-        firstItemKeys: flattenedData[0] ? Object.keys(flattenedData[0]).slice(0, 10) : []
-      });
+      logger.debug('Sending snapshot request', { context: 'Sync', metadata: { snapshotId: requestBody.snapshot.id, dataCount: flattenedData.length } });
 
       const response = await fetch(`${API_ENDPOINT}/api/sheets/snapshot`, {
         method: 'POST',
@@ -1255,12 +1233,7 @@ class SheetsSyncManager {
       if (!response.ok) {
         const errorText = await response.text();
         const errorTextStr = String(errorText || '');
-        console.error('[SYNC] Snapshot creation failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: errorTextStr.substring(0, 200)
-        });
-        logger.error('Create snapshot failed', { context: 'SheetsSyncManager.createSnapshotTab', metadata: { status: response.status, errorText: errorTextStr.substring(0, 100) } });
+        logger.error('Snapshot creation failed', { context: 'Sync', metadata: { status: response.status, errorText: errorTextStr.substring(0, 100) } });
         const errorMsg = errorTextStr.length > 0 ? errorTextStr.substring(0, 100) : response.statusText;
         this.status.error = `Snapshot failed (${response.status}): ${errorMsg}`;
         this.notify();
@@ -1268,11 +1241,7 @@ class SheetsSyncManager {
       }
 
       const result = await response.json();
-      console.log(`[SYNC] Snapshot created successfully:`, {
-        tabName: result.tabName,
-        count: result.count,
-        expectedCount: snapshotData.length
-      });
+      logger.info('Snapshot created successfully', { context: 'Sync', metadata: { tabName: result.tabName, count: result.count } });
       
       // If this snapshot came from a version, mark it as synced
       // The snapshot.id should match the version id
@@ -1283,14 +1252,13 @@ class SheetsSyncManager {
           versionService.markSyncedToSheets(snapshot.id, result.tabName);
         } catch (error) {
           // Log but don't fail if version service is not available
-          console.warn('[SYNC] Could not mark version as synced:', error);
+          logger.warn('Could not mark version as synced', { context: 'Sync', error: error as Error });
         }
       }
       
       return true;
     } catch (error) {
-      console.error('[SYNC] Snapshot creation error:', error);
-      logger.error('Create snapshot error', { context: 'SheetsSyncManager.createSnapshotTab', error: error instanceof Error ? error : new Error(String(error)) });
+      logger.error('Snapshot creation error', { context: 'Sync', error: error instanceof Error ? error : new Error(String(error)) });
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         this.status.error = 'Cannot connect to server. Make sure the backend server is running on port 3001.';
       } else {

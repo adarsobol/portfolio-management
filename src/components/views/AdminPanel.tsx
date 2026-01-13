@@ -6,7 +6,7 @@ import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata, Status, InitiativeType } from '../../types';
 import { migrateEnumsToConfig, getAssetClasses } from '../../utils/valueLists';
-import { canBeOwner, syncCapacitiesWithUsers } from '../../utils';
+import { canBeOwner, syncCapacitiesWithUsers, logger } from '../../utils';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
@@ -368,7 +368,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return null;
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      logger.error('Failed to fetch users', { context: 'AdminPanel.fetchUsers', error: error instanceof Error ? error : undefined });
       setUsersError('Network error while fetching users');
       return null;
     } finally {
@@ -397,7 +397,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setLoginHistoryError(errorData.error || 'Failed to load login history');
       }
     } catch (error) {
-      console.error('Failed to fetch login history:', error);
+      logger.error('Failed to fetch login history', { context: 'AdminPanel.fetchLoginHistory', error: error instanceof Error ? error : undefined });
       setLoginHistoryError('Network error while fetching login history');
     } finally {
       setIsLoadingHistory(false);
@@ -424,7 +424,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setBackupError('Failed to fetch backups');
       }
     } catch (error) {
-      console.error('Failed to fetch backups:', error);
+      logger.error('Failed to fetch backups', { context: 'AdminPanel.fetchBackups', error: error instanceof Error ? error : undefined });
       setBackupError('Network error while fetching backups');
     } finally {
       setIsLoadingBackups(false);
@@ -445,7 +445,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setSelectedBackup(data.backup);
       }
     } catch (error) {
-      console.error('Failed to fetch backup details:', error);
+      logger.error('Failed to fetch backup details', { context: 'AdminPanel.fetchBackupDetails', error: error instanceof Error ? error : undefined });
     }
   };
   
@@ -474,7 +474,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setBackupError(data.error || 'Failed to create backup');
       }
     } catch (error) {
-      console.error('Failed to create backup:', error);
+      logger.error('Failed to create backup', { context: 'AdminPanel.createBackup', error: error instanceof Error ? error : undefined });
       setBackupError('Network error while creating backup');
     } finally {
       setIsCreatingBackup(false);
@@ -507,7 +507,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setBackupError(`Restore failed: ${data.errors?.join(', ') || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to restore backup:', error);
+      logger.error('Failed to restore backup', { context: 'AdminPanel.restoreBackup', error: error instanceof Error ? error : undefined });
       setBackupError('Network error while restoring backup');
     } finally {
       setIsRestoring(false);
@@ -533,7 +533,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setVersions(allVersions);
       setRetentionDays(versionService.getRetentionDays());
     } catch (error) {
-      console.error('Failed to fetch versions:', error);
+      logger.error('Failed to fetch versions', { context: 'AdminPanel.fetchVersions', error: error instanceof Error ? error : undefined });
       setVersionError('Failed to load versions');
     } finally {
       setIsLoadingVersions(false);
@@ -548,7 +548,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setTimeout(() => setVersionSuccess(null), 3000);
       fetchVersions();
     } catch (error) {
-      console.error('Failed to cleanup versions:', error);
+      logger.error('Failed to cleanup versions', { context: 'AdminPanel.cleanupVersions', error: error instanceof Error ? error : undefined });
       setVersionError('Failed to cleanup old versions');
       setTimeout(() => setVersionError(null), 5000);
     }
@@ -576,7 +576,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       // Trigger window reload to apply changes
       window.location.reload();
     } catch (error) {
-      console.error('Failed to restore version:', error);
+      logger.error('Failed to restore version', { context: 'AdminPanel.restoreVersion', error: error instanceof Error ? error : undefined });
       setVersionError('Failed to restore version');
       setTimeout(() => setVersionError(null), 5000);
     } finally {
@@ -627,7 +627,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setTimeout(() => setVersionError(null), 5000);
       }
     } catch (error) {
-      console.error('Failed to sync version:', error);
+      logger.error('Failed to sync version', { context: 'AdminPanel.syncVersion', error: error instanceof Error ? error : undefined });
       setVersionError('Failed to sync version to Google Sheets');
       setTimeout(() => setVersionError(null), 5000);
     } finally {
@@ -653,7 +653,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setTimeout(() => setVersionError(null), 5000);
       }
     } catch (error) {
-      console.error('Failed to delete version:', error);
+      logger.error('Failed to delete version', { context: 'AdminPanel.deleteVersion', error: error instanceof Error ? error : undefined });
       setVersionError('Failed to delete version');
       setTimeout(() => setVersionError(null), 5000);
     }
@@ -735,7 +735,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setUserImportData(parsed);
         setUserImportResult(null);
       } catch (err) {
-        console.error('Error parsing file:', err);
+        logger.error('Error parsing file', { context: 'AdminPanel.parseFile', error: err instanceof Error ? err : undefined });
         alert('Failed to parse file. Please ensure it is a valid Excel or CSV file.');
       }
     };
@@ -811,7 +811,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setTaskImportData(parsed);
         setTaskImportResult(null);
       } catch (err) {
-        console.error('Error parsing file:', err);
+        logger.error('Error parsing file', { context: 'AdminPanel.parseFile', error: err instanceof Error ? err : undefined });
         alert('Failed to parse file. Please ensure it is a valid Excel or CSV file.');
       }
     };
@@ -848,7 +848,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }
     } catch (err) {
-      console.error('Import failed:', err);
+      logger.error('Import failed', { context: 'AdminPanel.import', error: err instanceof Error ? err : undefined });
       setUserImportResult({ success: false, errors: [{ row: 0, error: 'Network error' }] });
     } finally {
       setUserImportLoading(false);
@@ -879,7 +879,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         window.location.reload();
       }
     } catch (err) {
-      console.error('Import failed:', err);
+      logger.error('Import failed', { context: 'AdminPanel.import', error: err instanceof Error ? err : undefined });
       setTaskImportResult({ success: false, errors: [{ row: 0, error: 'Network error' }] });
     } finally {
       setTaskImportLoading(false);
@@ -1029,7 +1029,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       // Clear form
       setNewUser({ role: Role.TeamLead });
     } catch (error) {
-      console.error('Failed to add user:', error);
+      logger.error('Failed to add user', { context: 'AdminPanel.addUser', error: error instanceof Error ? error : undefined });
       setUserError(error instanceof Error ? error.message : 'Failed to add user');
       alert(`Failed to add user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
@@ -1084,7 +1084,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setConfig(prev => ({ ...prev, ...syncedConfig }));
       }
     } catch (error) {
-      console.error('Failed to delete user:', error);
+      logger.error('Failed to delete user', { context: 'AdminPanel.deleteUser', error: error instanceof Error ? error : undefined });
       setUserError(error instanceof Error ? error.message : 'Failed to delete user');
       alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
@@ -1139,7 +1139,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setConfig(prev => ({ ...prev, ...syncedConfig }));
       }
     } catch (error) {
-      console.error('Failed to update user:', error);
+      logger.error('Failed to update user', { context: 'AdminPanel.updateUser', error: error instanceof Error ? error : undefined });
       setUserError(error instanceof Error ? error.message : 'Failed to update user');
       // Error is silent for inline updates - user can see the revert
     } finally {
@@ -1356,7 +1356,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           );
                         } catch (error) {
-                          console.error('Error parsing lastLogin timestamp:', error, user.lastLogin);
+                          logger.error('Error parsing lastLogin timestamp', { context: 'AdminPanel.render', error: error instanceof Error ? error : undefined, metadata: { lastLogin: user.lastLogin } });
                           return <span className="text-slate-400 italic">Invalid timestamp</span>;
                         }
                       })() : (

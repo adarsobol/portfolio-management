@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { Initiative, Comment, User, Notification } from '../types';
+import { logger } from '../utils/logger';
 
 const SOCKET_URL = import.meta.env.VITE_API_ENDPOINT || (typeof window !== 'undefined' ? window.location.origin : '');
 
@@ -60,7 +61,7 @@ class RealtimeService {
     });
 
     this.socket.on('connect', () => {
-      console.log('🔌 Connected to realtime service');
+      logger.info('Connected to realtime service', { context: 'RealtimeService.connect' });
       this.isConnected = true;
       
       // Send user info
@@ -73,12 +74,12 @@ class RealtimeService {
     });
 
     this.socket.on('disconnect', () => {
-      console.log('🔌 Disconnected from realtime service');
+      logger.info('Disconnected from realtime service', { context: 'RealtimeService.connect' });
       this.isConnected = false;
     });
 
     this.socket.on('connect_error', (error) => {
-      console.warn('Realtime connection error:', error.message);
+      logger.warn('Realtime connection error', { context: 'RealtimeService.connect', metadata: { message: error.message } });
     });
 
     // Handle presence updates
@@ -112,13 +113,9 @@ class RealtimeService {
 
     // Handle real-time notifications
     this.socket.on('notification:received', (data: { userId: string; notification: Notification }) => {
-      console.log('[REALTIME] Received notification:', {
-        dataUserId: data.userId,
-        notificationUserId: data.notification.userId,
-        currentUserId: this.currentUser?.id,
-        currentUserEmail: this.currentUser?.email,
-        notificationId: data.notification.id,
-        notificationTitle: data.notification.title
+      logger.debug('Received notification', {
+        context: 'RealtimeService.notification:received',
+        metadata: { dataUserId: data.userId, notificationUserId: data.notification.userId, currentUserId: this.currentUser?.id, notificationId: data.notification.id, notificationTitle: data.notification.title }
       });
       
       // Only trigger callback if notification is for the current user
@@ -130,10 +127,10 @@ class RealtimeService {
         data.notification.userId === this.currentUser.email
       );
       
-      console.log('[REALTIME] Notification matches current user:', matches);
+      logger.debug('Notification match check', { context: 'RealtimeService.notification:received', metadata: { matches } });
       
       if (matches) {
-        console.log('[REALTIME] Calling notification callbacks, count:', this.notificationCallbacks.size);
+        logger.debug('Calling notification callbacks', { context: 'RealtimeService.notification:received', metadata: { callbackCount: this.notificationCallbacks.size } });
         this.notificationCallbacks.forEach(cb => cb(data));
       }
     });

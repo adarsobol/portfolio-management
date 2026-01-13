@@ -709,10 +709,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         createdBy: currentUser?.email || currentUser?.id || 'system'
       };
       sheetsSync.queueSnapshot(snapshot);
-      console.log(`[BULK] Created pre-bulk backup snapshot: ${snapshot.name}`);
+      logger.info('Created pre-bulk backup snapshot', { context: 'InitiativeModal.handleBulkCreate', metadata: { snapshotName: snapshot.name } });
     } catch (error) {
       // Log but don't block bulk operation if backup fails
-      console.warn('[BULK] Failed to create pre-bulk backup:', error);
+      logger.warn('Failed to create pre-bulk backup', { context: 'InitiativeModal.handleBulkCreate', error: error instanceof Error ? error : undefined });
     }
     
     // Track generated initiatives to ensure unique sequential IDs
@@ -778,11 +778,11 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         // Force a single batch sync for all queued initiatives
         // This prevents race conditions from multiple simultaneous syncs
         await sheetsSync.forceSyncNow();
-        console.log(`[BULK] Successfully synced ${initiativesToSave.length} initiative(s) to Google Sheets`);
+        logger.info('Successfully synced bulk initiatives to Google Sheets', { context: 'InitiativeModal.handleBulkCreate', metadata: { count: initiativesToSave.length } });
         // Close modal after successful sync
         onClose();
       } catch (error) {
-        console.error(`[BULK] Failed to sync initiatives:`, error);
+        logger.error('Failed to sync initiatives', { context: 'InitiativeModal.handleBulkCreate', error: error instanceof Error ? error : undefined });
         // Still close modal but log error - user can check sync status badge
         // The merge-on-load fix will preserve local items if sync partially failed
         onClose();
@@ -935,7 +935,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     
     if (mentionedUserIds.length > 0 && initiativeToEdit && formData.id) {
       const initiative = { ...initiativeToEdit, ...formData } as Initiative;
-      slackService.notifyTagging(comment, initiative, mentionedUserIds, users).catch(console.error);
+      slackService.notifyTagging(comment, initiative, mentionedUserIds, users).catch(err => logger.error('Failed to notify tagging', { context: 'InitiativeModal.handleCommentSubmit', error: err instanceof Error ? err : undefined }));
     }
     
     setNewComment('');
@@ -1053,7 +1053,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         setShowActionsMenu(false);
       }, 1500);
     } catch (err) {
-      console.error('Failed to copy', err);
+      logger.error('Failed to copy', { context: 'InitiativeModal.copyToClipboard', error: err instanceof Error ? err : undefined });
     }
   };
 
@@ -1153,12 +1153,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {(() => {
                       const canDeleteResult = canDelete();
                       const showDelete = isEditMode && canDeleteResult && onDelete;
-                      console.log('[InitiativeModal] Delete button visibility check:', {
-                        isEditMode,
-                        canDeleteResult,
-                        hasOnDelete: !!onDelete,
-                        showDelete
-                      });
+                      logger.debug('Delete button visibility check', { context: 'InitiativeModal.render', metadata: { isEditMode, canDeleteResult, hasOnDelete: !!onDelete, showDelete } });
                       return showDelete;
                     })() && (
                       <>

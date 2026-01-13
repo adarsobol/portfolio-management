@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Download, FileSpreadsheet, FileText, ChevronDown, Copy, Check, Table2 } from 'lucide-react';
 import { Initiative, User, WorkType } from '../../types';
-import { exportToClipboard, exportUnplannedToNotionClipboard } from '../../utils';
+import { exportToClipboard, exportUnplannedToNotionClipboard, logger } from '../../utils';
 import { authService } from '../../services/authService';
 
 interface ExportDropdownProps {
@@ -79,9 +79,9 @@ export function ExportDropdown({ initiatives, users, filters }: ExportDropdownPr
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      console.log(`Server export successful: ${filename}`);
+      logger.info('Server export successful', { context: 'ExportDropdown.handleServerExport', metadata: { filename } });
     } catch (error) {
-      console.error('Server export failed:', error);
+      logger.error('Server export failed', { context: 'ExportDropdown.handleServerExport', error: error instanceof Error ? error : undefined });
       alert('Export failed. Please try the "Copy to Clipboard" option instead.');
     } finally {
       setIsExporting(false);
@@ -100,7 +100,7 @@ export function ExportDropdown({ initiatives, users, filters }: ExportDropdownPr
         setIsOpen(false);
       }, 1500);
     } catch (error) {
-      console.error('Copy to clipboard failed:', error);
+      logger.error('Copy to clipboard failed', { context: 'ExportDropdown.handleCopyToClipboard', error: error instanceof Error ? error : undefined });
       alert('Failed to copy to clipboard');
     }
   }, [initiatives, users]);
@@ -119,7 +119,7 @@ export function ExportDropdown({ initiatives, users, filters }: ExportDropdownPr
         }, 1500);
       }
     } catch (error) {
-      console.error('Notion export failed:', error);
+      logger.error('Notion export failed', { context: 'ExportDropdown.handleNotionExport', error: error instanceof Error ? error : undefined });
       alert('Failed to copy to clipboard');
     }
   }, [initiatives, users]);

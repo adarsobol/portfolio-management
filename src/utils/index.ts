@@ -1,4 +1,5 @@
 import { User, Role, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, AppConfig } from '../types';
+import { logger } from './logger';
 
 /**
  * Generate a unique ID for entities
@@ -318,7 +319,7 @@ export const getPermission = (config: AppConfig, role: Role, key: PermissionKey)
   // Normalize role to ensure it matches enum values
   const normalizedRole = normalizeRole(role);
   if (!normalizedRole) {
-    console.warn(`[getPermission] Invalid role: "${role}". Available roles:`, Object.values(Role));
+    logger.warn('Invalid role for permission check', { context: 'utils.getPermission', metadata: { role, availableRoles: Object.values(Role) } });
     // Return default based on permission type
     if (key.startsWith('access')) {
       return 'none';
@@ -330,15 +331,9 @@ export const getPermission = (config: AppConfig, role: Role, key: PermissionKey)
   
   // Debug logging for delete permission checks
   if (key === 'deleteTasks') {
-    console.log('[getPermission] Delete permission check:', {
-      role,
-      normalizedRole,
-      key,
-      hasConfig: !!config,
-      hasRolePermissions: !!config?.rolePermissions,
-      hasPermsForRole: !!perms,
-      permValue: perms?.[key],
-      allRoleKeys: Object.keys(config.rolePermissions || {})
+    logger.debug('Delete permission check', {
+      context: 'utils.getPermission',
+      metadata: { role, normalizedRole, key, hasConfig: !!config, hasRolePermissions: !!config?.rolePermissions, hasPermsForRole: !!perms, permValue: perms?.[key], allRoleKeys: Object.keys(config.rolePermissions || {}) }
     });
   }
   
@@ -503,28 +498,24 @@ export const canDeleteTaskItem = (config: AppConfig, role: Role, taskOwnerId: st
 export const canDeleteInitiative = (config: AppConfig, role: Role, initiativeOwnerId: string, currentUserId: string, currentUserEmail?: string): boolean => {
   const deleteScope = getTaskManagementScope(config, role, 'deleteTasks');
   
-  console.log('[canDeleteInitiative] Checking permission:', {
-    role,
-    deleteScope,
-    initiativeOwnerId,
-    currentUserId,
-    currentUserEmail,
-    hasConfig: !!config
+  logger.debug('Checking delete initiative permission', {
+    context: 'utils.canDeleteInitiative',
+    metadata: { role, deleteScope, initiativeOwnerId, currentUserId, currentUserEmail, hasConfig: !!config }
   });
   
   if (deleteScope === 'yes') {
     // Can delete any initiative
-    console.log('[canDeleteInitiative] Permission granted - can delete all');
+    logger.debug('Permission granted - can delete all', { context: 'utils.canDeleteInitiative' });
     return true;
   } else if (deleteScope === 'own') {
     // Can delete only own initiatives
     const canDelete = matchesUserId(initiativeOwnerId, currentUserId, currentUserEmail);
-    console.log('[canDeleteInitiative] Own scope check result:', canDelete);
+    logger.debug('Own scope check result', { context: 'utils.canDeleteInitiative', metadata: { canDelete } });
     return canDelete;
   }
   
   // Cannot delete
-  console.log('[canDeleteInitiative] Permission denied - deleteScope:', deleteScope);
+  logger.debug('Permission denied', { context: 'utils.canDeleteInitiative', metadata: { deleteScope } });
   return false;
 };
 

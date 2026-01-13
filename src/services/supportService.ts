@@ -6,6 +6,7 @@
 import { SupportTicket, Feedback, SupportTicketStatus, SupportTicketPriority } from '../types';
 import { API_ENDPOINT } from '../config';
 import { authService } from './authService';
+import { logger } from '../utils/logger';
 
 class SupportService {
   async createTicket(
@@ -30,16 +31,14 @@ class SupportService {
       const data = await response.json();
       return { success: data.success, ticket: data.ticket };
     } catch (error) {
-      console.error('Error creating support ticket:', error);
+      logger.error('Error creating support ticket', { context: 'Support', error: error as Error });
       return { success: false };
     }
   }
 
   async getTickets(status?: SupportTicketStatus): Promise<SupportTicket[]> {
     try {
-      console.log('[TICKETS GET] Fetching tickets...');
-      const token = authService.getToken();
-      console.log('[TICKETS GET] Token from authService:', token ? `${token.substring(0, 20)}...` : 'none');
+      logger.debug('Fetching tickets...', { context: 'Support' });
       const queryParams = status ? `?status=${status}` : '';
       const response = await fetch(`${API_ENDPOINT}/api/support/tickets${queryParams}`, {
         headers: {
@@ -47,16 +46,14 @@ class SupportService {
         },
       });
 
-      console.log('[TICKETS GET] Response status:', response.status);
       if (!response.ok) {
         throw new Error(`Failed to fetch tickets: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('[TICKETS GET] Response data:', data);
       return data.tickets || [];
     } catch (error) {
-      console.error('Error fetching support tickets:', error);
+      logger.error('Error fetching support tickets', { context: 'Support', error: error as Error });
       return [];
     }
   }
@@ -82,7 +79,7 @@ class SupportService {
       const data = await response.json();
       return data.success || false;
     } catch (error) {
-      console.error('Error updating support ticket:', error);
+      logger.error('Error updating support ticket', { context: 'Support', error: error as Error });
       return false;
     }
   }
@@ -95,7 +92,7 @@ class SupportService {
     screenshot?: string
   ): Promise<{ success: boolean; feedback?: Feedback }> {
     try {
-      console.log('[FEEDBACK] Submitting feedback:', { type, title, endpoint: `${API_ENDPOINT}/api/support/feedback` });
+      logger.debug('Submitting feedback', { context: 'Feedback', metadata: { type, title } });
       
       const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
         method: 'POST',
@@ -106,44 +103,37 @@ class SupportService {
         body: JSON.stringify({ type, title, description, metadata, screenshot }),
       });
 
-      console.log('[FEEDBACK] Response status:', response.status, response.statusText);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[FEEDBACK] Error response:', errorText);
+        logger.error('Feedback submit failed', { context: 'Feedback', metadata: { status: response.status, errorText } });
         throw new Error(`Failed to submit feedback: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('[FEEDBACK] Response data:', data);
       return { success: data.success, feedback: data.feedback };
     } catch (error) {
-      console.error('[FEEDBACK] Exception occurred:', error);
+      logger.error('Error submitting feedback', { context: 'Feedback', error: error as Error });
       return { success: false };
     }
   }
 
   async getFeedback(): Promise<Feedback[]> {
     try {
-      console.log('[FEEDBACK GET] Fetching feedback...');
-      const token = authService.getToken();
-      console.log('[FEEDBACK GET] Token from authService:', token ? `${token.substring(0, 20)}...` : 'none');
+      logger.debug('Fetching feedback...', { context: 'Feedback' });
       const response = await fetch(`${API_ENDPOINT}/api/support/feedback`, {
         headers: {
           ...authService.getAuthHeader(),
         },
       });
 
-      console.log('[FEEDBACK GET] Response status:', response.status);
       if (!response.ok) {
         throw new Error(`Failed to fetch feedback: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('[FEEDBACK GET] Response data:', data);
       return data.feedback || [];
     } catch (error) {
-      console.error('Error fetching feedback:', error);
+      logger.error('Error fetching feedback', { context: 'Feedback', error: error as Error });
       return [];
     }
   }
@@ -163,7 +153,7 @@ class SupportService {
       const data = await response.json();
       return data.tickets || [];
     } catch (error) {
-      console.error('Error fetching my tickets:', error);
+      logger.error('Error fetching my tickets', { context: 'Support', error: error as Error });
       return [];
     }
   }
@@ -189,7 +179,7 @@ class SupportService {
       const data = await response.json();
       return data.success || false;
     } catch (error) {
-      console.error('Error adding comment:', error);
+      logger.error('Error adding comment', { context: 'Support', error: error as Error });
       return false;
     }
   }
@@ -209,7 +199,7 @@ class SupportService {
       const data = await response.json();
       return data.ticket || null;
     } catch (error) {
-      console.error('Error fetching ticket:', error);
+      logger.error('Error fetching ticket', { context: 'Support', error: error as Error });
       return null;
     }
   }
@@ -235,7 +225,7 @@ class SupportService {
       const data = await response.json();
       return data.success || false;
     } catch (error) {
-      console.error('Error updating feedback:', error);
+      logger.error('Error updating feedback', { context: 'Feedback', error: error as Error });
       return false;
     }
   }
@@ -258,7 +248,7 @@ class SupportService {
       const data = await response.json();
       return data.success || false;
     } catch (error) {
-      console.error('Error adding feedback comment:', error);
+      logger.error('Error adding feedback comment', { context: 'Feedback', error: error as Error });
       return false;
     }
   }

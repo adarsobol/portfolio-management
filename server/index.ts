@@ -34,12 +34,13 @@ import {
   slackWebhookSchema,
   bulkImportUsersSchema,
 } from './validation.js';
+import { serverLogger } from './logger.js';
 
 dotenv.config();
 
-console.log('🚀 Starting Portfolio Manager Server...');
-console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`Port: ${process.env.PORT || 8080}`);
+serverLogger.startup('Starting Portfolio Manager Server...');
+serverLogger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+serverLogger.info(`Port: ${process.env.PORT || 8080}`);
 
 const app = express();
 const httpServer = createServer(app);
@@ -48,15 +49,15 @@ const HOST = '0.0.0.0';
 
 // Start listening IMMEDIATELY to satisfy Cloud Run health checks
 httpServer.listen(Number(PORT), HOST, () => {
-  console.log(`\n🚀 Portfolio Manager API Server running on http://${HOST}:${PORT}`);
-  console.log(`🔌 Socket.IO real-time collaboration enabled`);
+  serverLogger.startup(`Portfolio Manager API Server running on http://${HOST}:${PORT}`);
+  serverLogger.info('Socket.IO real-time collaboration enabled');
 });
 
 // ============================================
 // STORAGE BACKEND INITIALIZATION (In Background)
 // ============================================
 const STORAGE_BACKEND = isGCSEnabled() ? 'gcs' : 'sheets';
-console.log(`Storage backend: ${STORAGE_BACKEND}`);
+serverLogger.info(`Storage backend: ${STORAGE_BACKEND}`);
 
 // Initialize GCS if enabled (non-blocking)
 if (STORAGE_BACKEND === 'gcs') {
@@ -64,11 +65,11 @@ if (STORAGE_BACKEND === 'gcs') {
   if (gcsConfig) {
     initializeGCSStorage(gcsConfig).then(storage => {
       if (storage) {
-        console.log('GCS Storage initialized successfully');
+        serverLogger.success('GCS Storage initialized successfully');
         // Initialize backup service
         if (isBackupServiceEnabled()) {
           initializeBackupService(gcsConfig.bucketName, gcsConfig.projectId);
-          console.log('Backup Service initialized');
+          serverLogger.success('Backup Service initialized');
         }
         // Initialize log storage
         initializeLogStorage({
@@ -76,62 +77,65 @@ if (STORAGE_BACKEND === 'gcs') {
           projectId: gcsConfig.projectId,
           keyFilename: gcsConfig.keyFilename,
         });
-        console.log('Log Storage initialized');
+        serverLogger.success('Log Storage initialized');
         // Initialize support storage
         initializeSupportStorage({
           bucketName: gcsConfig.bucketName,
           projectId: gcsConfig.projectId,
           keyFilename: gcsConfig.keyFilename,
         });
-        console.log('Support Storage initialized with GCS');
+        serverLogger.success('Support Storage initialized with GCS');
       } else {
-        console.error('Failed to initialize GCS Storage, falling back to Sheets');
-        console.log('Support Storage will use in-memory fallback');
+        serverLogger.error('Failed to initialize GCS Storage, falling back to Sheets');
+        serverLogger.info('Support Storage will use in-memory fallback');
       }
     }).catch(error => {
-      console.error('Error initializing GCS Storage:', error);
-      console.log('Continuing with Sheets backend...');
-      console.log('Support Storage will use in-memory fallback');
+      serverLogger.error('Error initializing GCS Storage', { error: error as Error });
+      serverLogger.info('Continuing with Sheets backend...');
+      serverLogger.info('Support Storage will use in-memory fallback');
     });
   } else {
-    console.log('GCS config not available, using Sheets backend');
-    console.log('Support Storage will use in-memory fallback');
+    serverLogger.info('GCS config not available, using Sheets backend');
+    serverLogger.info('Support Storage will use in-memory fallback');
   }
 } else {
-  console.log('Using Sheets backend');
+  serverLogger.info('Using Sheets backend');
 }
 
 // Always try to initialize support storage with GCS if available (even if main backend is Sheets)
 // This ensures support tickets/feedback persist across Cloud Run instances
-console.log('[INIT] Checking if GCS is enabled for support storage...');
-console.log('[INIT] isGCSEnabled():', isGCSEnabled());
+serverLogger.debug('Checking if GCS is enabled for support storage...', { context: 'INIT' });
+serverLogger.debug(`isGCSEnabled(): ${isGCSEnabled()}`, { context: 'INIT' });
 
 if (isGCSEnabled()) {
   const gcsConfig = getGCSConfig();
-  console.log('[INIT] GCS config:', gcsConfig ? {
-    bucketName: gcsConfig.bucketName,
-    hasProjectId: !!gcsConfig.projectId,
-    hasKeyFilename: !!gcsConfig.keyFilename
-  } : 'null');
+  serverLogger.debug('GCS config', { 
+    context: 'INIT',
+    metadata: gcsConfig ? {
+      bucketName: gcsConfig.bucketName,
+      hasProjectId: !!gcsConfig.projectId,
+      hasKeyFilename: !!gcsConfig.keyFilename
+    } : { config: 'null' }
+  });
   
   if (gcsConfig) {
     try {
-      console.log('[INIT] Calling initializeSupportStorage...');
+      serverLogger.debug('Calling initializeSupportStorage...', { context: 'INIT' });
       const storage = initializeSupportStorage({
         bucketName: gcsConfig.bucketName,
         projectId: gcsConfig.projectId,
         keyFilename: gcsConfig.keyFilename,
       });
-      console.log('[INIT] Support Storage initialized with GCS (independent of main storage backend), isInitialized:', storage.isInitialized());
+      serverLogger.success(`Support Storage initialized with GCS (independent of main storage backend), isInitialized: ${storage.isInitialized()}`);
     } catch (error) {
-      console.error('[INIT] Failed to initialize Support Storage with GCS:', error);
-      console.log('[INIT] Support Storage will use in-memory fallback');
+      serverLogger.error('Failed to initialize Support Storage with GCS', { context: 'INIT', error: error as Error });
+      serverLogger.info('Support Storage will use in-memory fallback', { context: 'INIT' });
     }
   } else {
-    console.log('[INIT] GCS config is null, Support Storage will use in-memory fallback');
+    serverLogger.info('GCS config is null, Support Storage will use in-memory fallback', { context: 'INIT' });
   }
 } else {
-  console.log('[INIT] GCS not enabled, Support Storage will use in-memory fallback');
+  serverLogger.info('GCS not enabled, Support Storage will use in-memory fallback', { context: 'INIT' });
 }
 
 // ============================================
@@ -182,7 +186,7 @@ interface UserPresence {
 const connectedUsers = new Map<string, UserPresence>();
 
 io.on('connection', (socket) => {
-  console.log('🔌 User connected:', socket.id);
+  serverLogger.debug(`User connected: ${socket.id}`, { context: 'Socket' });
 
   // Handle user joining
   socket.on('user:join', (userData: { id: string; name: string; email: string; avatar?: string }) => {
@@ -196,7 +200,7 @@ io.on('connection', (socket) => {
     
     // Broadcast updated user list to all clients
     io.emit('users:presence', Array.from(connectedUsers.values()));
-    console.log(`👤 ${userData.name} joined (${connectedUsers.size} users online)`);
+    serverLogger.info(`${userData.name} joined`, { context: 'Socket', metadata: { usersOnline: connectedUsers.size } });
   });
 
   // Handle view changes
@@ -267,7 +271,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const user = connectedUsers.get(socket.id);
     if (user) {
-      console.log(`👋 ${user.name} disconnected`);
+      serverLogger.info(`${user.name} disconnected`, { context: 'Socket' });
       // Notify others this user stopped editing
       if (user.editingInitiativeId) {
         io.emit('initiative:editEnded', { 
@@ -289,7 +293,7 @@ setInterval(() => {
   for (const [socketId, user] of connectedUsers.entries()) {
     if (now - user.lastActivity > timeout) {
       connectedUsers.delete(socketId);
-      console.log(`⏰ ${user.name} timed out due to inactivity`);
+      serverLogger.info(`${user.name} timed out due to inactivity`, { context: 'Socket' });
     }
   }
   io.emit('users:presence', Array.from(connectedUsers.values()));
@@ -348,10 +352,10 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   if (NODE_ENV === 'production') {
-    console.error('WARNING: JWT_SECRET environment variable is not set in production. Using fallback (not recommended for security).');
-    console.error('Please set JWT_SECRET via Secret Manager or environment variables.');
+    serverLogger.error('WARNING: JWT_SECRET environment variable is not set in production. Using fallback (not recommended for security).');
+    serverLogger.error('Please set JWT_SECRET via Secret Manager or environment variables.');
   } else {
-    console.warn('WARNING: JWT_SECRET not set. Using insecure default for development only.');
+    serverLogger.warn('WARNING: JWT_SECRET not set. Using insecure default for development only.');
   }
 }
 const EFFECTIVE_JWT_SECRET = JWT_SECRET || 'production-fallback-please-set-jwt-secret';
@@ -398,7 +402,7 @@ function logActivity(
 
   // Don't await - log asynchronously to avoid blocking requests
   logStorage.storeActivityLog(activityLog).catch(err => {
-    console.error('Failed to store activity log:', err);
+    serverLogger.error('Failed to store activity log', { error: err as Error });
   });
 }
 
@@ -461,10 +465,10 @@ if (NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
         etag: true,
         lastModified: true
       }));
-      console.log(`📁 Serving static files from ${distPath}`);
+      serverLogger.info(`Serving static files from ${distPath}`);
     }
   } catch (error) {
-    console.warn('Could not serve static files:', error);
+    serverLogger.warn('Could not serve static files', { error: error as Error });
   }
 }
 
@@ -511,7 +515,7 @@ const authenticateToken = async (req: AuthenticatedRequest, res: Response, next:
   // DEVELOPMENT MODE: Allow bypass when JWT_SECRET is not set (dev mode)
   // This allows local development without OAuth setup
   if (NODE_ENV !== 'production' && !JWT_SECRET) {
-    console.warn('⚠️ DEVELOPMENT MODE: Authentication bypassed. Set JWT_SECRET to enable auth.');
+    serverLogger.warn('DEVELOPMENT MODE: Authentication bypassed. Set JWT_SECRET to enable auth.', { context: 'Auth' });
     req.user = {
       id: 'u_as',
       email: 'adar.sobol@pagaya.com',
@@ -554,16 +558,14 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
   }
 
   const authHeader = req.headers['authorization'];
-  console.log('[AUTH] Authorization header present:', !!authHeader);
-  console.log('[AUTH] Authorization header value (first 30 chars):', authHeader ? `${authHeader.substring(0, 30)}...` : 'none');
+  serverLogger.debug(`Authorization header present: ${!!authHeader}`, { context: 'Auth' });
   
   const token = authHeader && authHeader.split(' ')[1];
-  console.log('[AUTH] Token extracted:', !!token, token ? `${token.substring(0, 20)}...` : 'none');
-  console.log('[AUTH] Split result:', authHeader ? authHeader.split(' ') : 'no header');
+  serverLogger.debug(`Token extracted: ${!!token}`, { context: 'Auth' });
 
   if (!token) {
     // No token - proceed without user (will return empty data for protected resources)
-    console.log('[AUTH] No token provided, proceeding without user');
+    serverLogger.debug('No token provided, proceeding without user', { context: 'Auth' });
     next();
     return;
   }
@@ -571,11 +573,11 @@ const optionalAuthenticateToken = async (req: AuthenticatedRequest, res: Respons
   try {
     const decoded = jwt.verify(token, EFFECTIVE_JWT_SECRET) as { email: string; name: string; role: string; id: string };
     req.user = decoded;
-    console.log('[AUTH] Token verified successfully, user:', decoded.email, 'role:', decoded.role);
+    serverLogger.debug(`Token verified successfully, user: ${decoded.email}`, { context: 'Auth' });
     next();
   } catch (error) {
     // Invalid token - proceed without user (will return empty data)
-    console.error('[AUTH] Token verification failed:', error instanceof Error ? error.message : String(error));
+    serverLogger.error('Token verification failed', { context: 'Auth', error: error as Error });
     next();
   }
 };
@@ -592,7 +594,7 @@ async function getDoc(): Promise<GoogleSpreadsheet | null> {
       (!SPREADSHEET_ID ? 'SPREADSHEET_ID ' : '') +
       (!SERVICE_ACCOUNT_EMAIL ? 'EMAIL ' : '') +
       (!SERVICE_ACCOUNT_PRIVATE_KEY ? 'PRIVATE_KEY' : '');
-    console.error(lastConnectionError);
+    serverLogger.error(lastConnectionError, { context: 'Sheets' });
     return null;
   }
 
@@ -609,7 +611,7 @@ async function getDoc(): Promise<GoogleSpreadsheet | null> {
     return doc;
   } catch (error) {
     lastConnectionError = error instanceof Error ? error.message : String(error);
-    console.error('Failed to connect to Google Sheets:', lastConnectionError);
+    serverLogger.error(`Failed to connect to Google Sheets: ${lastConnectionError}`, { context: 'Sheets' });
     return null;
   }
 }
@@ -671,7 +673,7 @@ async function loadAppConfig(doc: GoogleSpreadsheet): Promise<any> {
     
     return JSON.parse(configData);
   } catch (error) {
-    console.error('[loadAppConfig] Error loading config:', error);
+    serverLogger.error('Error loading config', { context: 'loadAppConfig', error: error as Error });
     return null;
   }
 }
@@ -744,7 +746,7 @@ function canUserDeleteTask(
   }
   
   if (!config || !config.rolePermissions) {
-    console.warn('[canUserDeleteTask] Config or rolePermissions missing');
+    serverLogger.warn('Config or rolePermissions missing', { context: 'canUserDeleteTask' });
     return false;
   }
   
@@ -813,10 +815,10 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
       const currentHeaders = usersSheet.headerValues || [];
       const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
       if (missingHeaders.length > 0) {
-        console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+        serverLogger.info('Adding missing Users columns', { context: 'Auth', metadata: { missingHeaders } });
         await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
         // After updating headers, we need to reload rows to get the new column structure
-        console.log('[SERVER] Headers updated, will reload rows after header update');
+        serverLogger.debug('Headers updated, will reload rows after header update', { context: 'Auth' });
       }
     }
 
@@ -836,7 +838,7 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     await usersSheet.loadHeaderRow().catch(() => {});
     const headers = usersSheet.headerValues || [];
     if (!headers.includes('lastLogin')) {
-      console.log(`[SERVER] lastLogin column missing for ${email}, adding it now`);
+      serverLogger.info(`lastLogin column missing for ${email}, adding it now`, { context: 'Auth' });
       await usersSheet.setHeaderRow([...headers, 'lastLogin']);
       
       // CRITICAL: Reload header row to refresh the sheet's column structure
@@ -847,7 +849,7 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
       userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
       
       if (!userRow) {
-        console.error(`[SERVER] ERROR: Could not find user row after adding lastLogin column`);
+        serverLogger.error('Could not find user row after adding lastLogin column', { context: 'Auth' });
         res.status(500).json({ error: 'Failed to update login history' });
         return;
       }
@@ -863,7 +865,7 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
         rows = await usersSheet.getRows();
         userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
         if (!userRow) {
-          console.error(`[SERVER] ERROR: Could not find user row after initializing lastLogin column`);
+          serverLogger.error('Could not find user row after initializing lastLogin column', { context: 'Auth' });
           res.status(500).json({ error: 'Failed to update login history' });
           return;
         }
@@ -872,11 +874,11 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
 
     // Update last login timestamp
     const loginTimestamp = new Date().toISOString();
-    console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
+    serverLogger.debug(`Setting lastLogin for ${email}`, { context: 'Auth', metadata: { loginTimestamp } });
     
     // Ensure userRow exists before attempting save operations
     if (!userRow) {
-      console.error(`[SERVER] ERROR: userRow is null/undefined for ${email} before save attempt`);
+      serverLogger.error(`userRow is null/undefined for ${email} before save attempt`, { context: 'Auth' });
       throw new Error('Failed to retrieve user row before login update');
     }
     
@@ -886,16 +888,16 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
         userRow.set('avatar', picture);
       }
       userRow.set('lastLogin', loginTimestamp);
-      console.log(`[SERVER] Prepared lastLogin update for ${email}, attempting save...`);
+      serverLogger.debug(`Prepared lastLogin update for ${email}, attempting save...`, { context: 'Auth' });
     } catch (preSaveError) {
-      console.error(`[SERVER] ERROR: Failed to set lastLogin value for ${email} before save:`, preSaveError);
+      serverLogger.error(`Failed to set lastLogin value for ${email} before save`, { context: 'Auth', error: preSaveError as Error });
       throw new Error(`Failed to prepare login update: ${preSaveError instanceof Error ? preSaveError.message : String(preSaveError)}`);
     }
     
     let savedLastLogin: string | null = loginTimestamp; // Default to what we set
     try {
       await userRow.save();
-      console.log(`[SERVER] Successfully saved lastLogin for ${email}: ${loginTimestamp}`);
+      serverLogger.debug(`Successfully saved lastLogin for ${email}`, { context: 'Auth', metadata: { loginTimestamp } });
       
       // Try to verify by reloading, but don't fail if verification doesn't work
       try {
@@ -906,38 +908,33 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
           if (savedTimestamp) {
             savedLastLogin = savedTimestamp;
             if (savedTimestamp === loginTimestamp) {
-              console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+              serverLogger.debug(`Verified lastLogin save successful for ${email}`, { context: 'Auth' });
             } else {
-              console.warn(`[SERVER] WARNING: lastLogin value differs after save for ${email}. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+              serverLogger.warn(`lastLogin value differs after save for ${email}`, { context: 'Auth', metadata: { expected: loginTimestamp, got: savedTimestamp } });
             }
           } else {
-            console.warn(`[SERVER] WARNING: lastLogin is empty after save for ${email}, but save() succeeded`);
+            serverLogger.warn(`lastLogin is empty after save for ${email}, but save() succeeded`, { context: 'Auth' });
           }
         } else {
-          console.warn(`[SERVER] WARNING: Could not find user row after save for ${email} during verification`);
+          serverLogger.warn(`Could not find user row after save for ${email} during verification`, { context: 'Auth' });
         }
       } catch (verifyError) {
-        console.warn(`[SERVER] WARNING: Could not verify lastLogin save for ${email}, but save() appeared successful:`, verifyError instanceof Error ? verifyError.message : String(verifyError));
+        serverLogger.warn(`Could not verify lastLogin save for ${email}, but save() appeared successful`, { context: 'Auth', error: verifyError as Error });
         // Keep savedLastLogin as loginTimestamp since save() succeeded
       }
     } catch (saveError) {
-      console.error(`[SERVER] ERROR: Failed to save lastLogin for ${email}:`, saveError instanceof Error ? saveError.message : String(saveError));
-      console.error(`[SERVER] ERROR: Save error details for ${email}:`, {
-        error: saveError,
-        errorType: saveError instanceof Error ? saveError.constructor.name : typeof saveError,
-        stack: saveError instanceof Error ? saveError.stack : undefined
-      });
+      serverLogger.error(`Failed to save lastLogin for ${email}`, { context: 'Auth', error: saveError as Error });
       
       // Retry the save operation once
       try {
-        console.log(`[SERVER] Retrying lastLogin save for ${email}...`);
+        serverLogger.debug(`Retrying lastLogin save for ${email}...`, { context: 'Auth' });
         // Reload the row to get a fresh reference
         rows = await usersSheet.getRows();
         userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
         if (userRow) {
           userRow.set('lastLogin', loginTimestamp);
           await userRow.save();
-          console.log(`[SERVER] Retry successful: Saved lastLogin for ${email}: ${loginTimestamp}`);
+          serverLogger.debug(`Retry successful: Saved lastLogin for ${email}`, { context: 'Auth', metadata: { loginTimestamp } });
           savedLastLogin = loginTimestamp;
           
           // Verify the retry save
@@ -947,20 +944,20 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
             if (userRow) {
               const retryTimestamp = userRow.get('lastLogin');
               if (retryTimestamp === loginTimestamp) {
-                console.log(`[SERVER] Verified retry save successful for ${email}`);
+                serverLogger.debug(`Verified retry save successful for ${email}`, { context: 'Auth' });
               } else {
-                console.warn(`[SERVER] WARNING: Retry save value differs for ${email}. Expected: ${loginTimestamp}, Got: ${retryTimestamp}`);
+                serverLogger.warn(`Retry save value differs for ${email}`, { context: 'Auth', metadata: { expected: loginTimestamp, got: retryTimestamp } });
               }
             }
           } catch (verifyError) {
-            console.warn(`[SERVER] Could not verify retry save for ${email}:`, verifyError instanceof Error ? verifyError.message : String(verifyError));
+            serverLogger.warn(`Could not verify retry save for ${email}`, { context: 'Auth', error: verifyError as Error });
           }
         } else {
-          console.error(`[SERVER] ERROR: Could not find user row for ${email} during retry`);
+          serverLogger.error(`Could not find user row for ${email} during retry`, { context: 'Auth' });
           savedLastLogin = null;
         }
       } catch (retryError) {
-        console.error(`[SERVER] ERROR: Retry save also failed for ${email}:`, retryError instanceof Error ? retryError.message : String(retryError));
+        serverLogger.error(`Retry save also failed for ${email}`, { context: 'Auth', error: retryError as Error });
         // Try to read existing value as fallback
         try {
           rows = await usersSheet.getRows();
@@ -969,24 +966,24 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
             const existingTimestamp = userRow.get('lastLogin');
             if (existingTimestamp) {
               savedLastLogin = existingTimestamp;
-              console.log(`[SERVER] Using existing lastLogin value for ${email}: ${existingTimestamp}`);
+              serverLogger.debug(`Using existing lastLogin value for ${email}`, { context: 'Auth', metadata: { existingTimestamp } });
             } else {
               savedLastLogin = null;
-              console.warn(`[SERVER] No existing lastLogin value found for ${email} after retry failure`);
+              serverLogger.warn(`No existing lastLogin value found for ${email} after retry failure`, { context: 'Auth' });
             }
           } else {
-            console.error(`[SERVER] ERROR: Could not find user row for ${email} after retry error`);
+            serverLogger.error(`Could not find user row for ${email} after retry error`, { context: 'Auth' });
             savedLastLogin = null;
           }
         } catch (loadError) {
-          console.error(`[SERVER] ERROR: Failed to reload rows after retry error for ${email}:`, loadError instanceof Error ? loadError.message : String(loadError));
+          serverLogger.error(`Failed to reload rows after retry error for ${email}`, { context: 'Auth', error: loadError as Error });
           savedLastLogin = null;
         }
       }
     }
 
     if (!userRow) {
-      console.error(`[SERVER] ERROR: userRow is null/undefined for ${email} after login update attempt`);
+      serverLogger.error(`userRow is null/undefined for ${email} after login update attempt`, { context: 'Auth' });
       throw new Error('Failed to retrieve user after login update');
     }
 
@@ -1015,7 +1012,7 @@ app.post('/api/auth/google', loginLimiter, validate(googleAuthSchema), async (re
     });
 
   } catch (error) {
-    console.error('Google login error:', error);
+    serverLogger.error('Google login error', { context: 'Auth', error: error as Error });
     res.status(401).json({ error: 'Google authentication failed' });
   }
 });
@@ -1051,17 +1048,17 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
         avatar: 'https://ui-avatars.com/api/?name=Adar+Sobol&background=10B981&color=fff',
         lastLogin: ''
       });
-      console.log('Created Users sheet with default admin user');
+      serverLogger.info('Created Users sheet with default admin user', { context: 'Auth' });
     } else {
       // Ensure headers are up-to-date (adds missing columns like lastLogin)
       await usersSheet.loadHeaderRow().catch(() => {});
       const currentHeaders = usersSheet.headerValues || [];
       const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
       if (missingHeaders.length > 0) {
-        console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+        serverLogger.info('Adding missing Users columns', { context: 'Login', metadata: { missingHeaders } });
         await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
         // After updating headers, we need to reload rows to get the new column structure
-        console.log('[SERVER] Headers updated, will reload rows after header update');
+        serverLogger.debug('Headers updated, will reload rows after header update', { context: 'Login' });
       }
     }
 
@@ -1086,7 +1083,7 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
     await usersSheet.loadHeaderRow().catch(() => {});
     const headers = usersSheet.headerValues || [];
     if (!headers.includes('lastLogin')) {
-      console.log(`[SERVER] lastLogin column missing for ${email}, adding it now`);
+      serverLogger.info(`lastLogin column missing for ${email}, adding it now`, { context: 'Login' });
       await usersSheet.setHeaderRow([...headers, 'lastLogin']);
       
       // CRITICAL: Reload header row to refresh the sheet's column structure
@@ -1097,7 +1094,7 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
       userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
       
       if (!userRow) {
-        console.error(`[SERVER] ERROR: Could not find user row after adding lastLogin column`);
+        serverLogger.error('Could not find user row after adding lastLogin column', { context: 'Login' });
         res.status(500).json({ error: 'Failed to update login history' });
         return;
       }
@@ -1113,7 +1110,7 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
         rows = await usersSheet.getRows();
         userRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email')?.toLowerCase() === email.toLowerCase());
         if (!userRow) {
-          console.error(`[SERVER] ERROR: Could not find user row after initializing lastLogin column`);
+          serverLogger.error('Could not find user row after initializing lastLogin column', { context: 'Login' });
           res.status(500).json({ error: 'Failed to update login history' });
           return;
         }
@@ -1122,14 +1119,14 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
 
     // Update last login timestamp
     const loginTimestamp = new Date().toISOString();
-    console.log(`[SERVER] Setting lastLogin for ${email} to: ${loginTimestamp}`);
+    serverLogger.debug(`Setting lastLogin for ${email}`, { context: 'Login', metadata: { loginTimestamp } });
     
     // Set and save lastLogin
     userRow.set('lastLogin', loginTimestamp);
     let savedLastLogin: string | null = loginTimestamp; // Default to what we set
     try {
       await userRow.save();
-      console.log(`[SERVER] Saved lastLogin for ${email}: ${loginTimestamp}`);
+      serverLogger.debug(`Saved lastLogin for ${email}`, { context: 'Login', metadata: { loginTimestamp } });
       
       // Try to verify by reloading, but don't fail if verification doesn't work
       try {
@@ -1140,18 +1137,18 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
           if (savedTimestamp) {
             savedLastLogin = savedTimestamp;
             if (savedTimestamp === loginTimestamp) {
-              console.log(`[SERVER] Verified lastLogin save successful for ${email}`);
+              serverLogger.debug(`Verified lastLogin save successful for ${email}`, { context: 'Login' });
             } else {
-              console.warn(`[SERVER] lastLogin value differs after save. Expected: ${loginTimestamp}, Got: ${savedTimestamp}`);
+              serverLogger.warn(`lastLogin value differs after save`, { context: 'Login', metadata: { expected: loginTimestamp, got: savedTimestamp } });
             }
           }
         }
       } catch (verifyError) {
-        console.warn(`[SERVER] Could not verify lastLogin save, but save appeared successful:`, verifyError);
+        serverLogger.warn(`Could not verify lastLogin save, but save appeared successful`, { context: 'Login', error: verifyError as Error });
         // Keep savedLastLogin as loginTimestamp since save() succeeded
       }
     } catch (saveError) {
-      console.error(`[SERVER] Failed to save lastLogin for ${email}:`, saveError);
+      serverLogger.error(`Failed to save lastLogin for ${email}`, { context: 'Login', error: saveError as Error });
       // Try to read existing value as fallback
       try {
         rows = await usersSheet.getRows();
@@ -1165,7 +1162,7 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
           }
         }
       } catch (loadError) {
-        console.error(`[SERVER] Failed to reload rows after save error:`, loadError);
+        serverLogger.error(`Failed to reload rows after save error`, { context: 'Login', error: loadError as Error });
         savedLastLogin = null;
       }
     }
@@ -1199,7 +1196,7 @@ app.post('/api/auth/login', loginLimiter, validate(loginSchema), async (req: Req
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    serverLogger.error('Login error', { context: 'Login', error: error as Error });
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -1257,7 +1254,7 @@ app.post('/api/auth/register', authenticateToken, validate(registerUserSchema), 
       user: { id: userId, email, name, role, avatar: userAvatar, team: team || undefined }
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    serverLogger.error('Registration error', { context: 'Auth', error: error as Error });
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -1295,7 +1292,7 @@ app.get('/api/auth/me', authenticateToken, async (req: AuthenticatedRequest, res
       }
     });
   } catch (error) {
-    console.error('Get user error:', error);
+    serverLogger.error('Get user error', { context: 'Auth', error: error as Error });
     res.status(500).json({ error: 'Failed to get user' });
   }
 });
@@ -1337,7 +1334,7 @@ app.post('/api/auth/change-password', authenticateToken, validate(changePassword
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
-    console.error('Change password error:', error);
+    serverLogger.error('Change password error', { context: 'Auth', error: error as Error });
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
@@ -1362,7 +1359,7 @@ app.get('/api/auth/users', authenticateToken, async (req: AuthenticatedRequest, 
     const currentHeaders = usersSheet.headerValues || [];
     const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
     if (missingHeaders.length > 0) {
-      console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+      serverLogger.info('Adding missing Users columns', { context: 'Users', metadata: { missingHeaders } });
       await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
     }
 
@@ -1379,7 +1376,7 @@ app.get('/api/auth/users', authenticateToken, async (req: AuthenticatedRequest, 
 
     res.json({ users });
   } catch (error) {
-    console.error('Get users error:', error);
+    serverLogger.error('Get users error', { context: 'Users', error: error as Error });
     res.status(500).json({ error: 'Failed to get users' });
   }
 });
@@ -1419,7 +1416,7 @@ app.put('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest, r
     const currentHeaders = usersSheet.headerValues || [];
     const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
     if (missingHeaders.length > 0) {
-      console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+      serverLogger.info('Adding missing Users columns', { context: 'Users', metadata: { missingHeaders } });
       await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
       // Reload rows after header update to get the new column structure
       await usersSheet.loadHeaderRow().catch(() => {});
@@ -1460,7 +1457,7 @@ app.put('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest, r
       }
     });
   } catch (error) {
-    console.error('Update user error:', error);
+    serverLogger.error('Update user error', { context: 'Users', error: error as Error });
     res.status(500).json({ error: 'Failed to update user' });
   }
 });
@@ -1510,7 +1507,7 @@ app.delete('/api/users/:id', authenticateToken, async (req: AuthenticatedRequest
       message: 'User deleted successfully'
     });
   } catch (error) {
-    console.error('Delete user error:', error);
+    serverLogger.error('Delete user error', { context: 'Users', error: error as Error });
     res.status(500).json({ error: 'Failed to delete user' });
   }
 });
@@ -1627,7 +1624,7 @@ app.post('/api/users/bulk-import', authenticateToken, validate(bulkImportUsersSc
       await usersSheet.addRows(usersToAdd);
     }
 
-    console.log(`Bulk imported ${results.created} users, skipped ${results.skipped}, errors: ${results.errors.length}`);
+    serverLogger.info(`Bulk imported ${results.created} users`, { context: 'Import', metadata: { created: results.created, skipped: results.skipped, errors: results.errors.length } });
     
     res.json({
       success: true,
@@ -1638,7 +1635,7 @@ app.post('/api/users/bulk-import', authenticateToken, validate(bulkImportUsersSc
     });
 
   } catch (error) {
-    console.error('Bulk import users error:', error);
+    serverLogger.error('Bulk import users error', { context: 'Import', error: error as Error });
     res.status(500).json({ error: 'Bulk import failed: ' + String(error) });
   }
 });
@@ -1843,7 +1840,7 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
       const id = init.id;
       if (!id || seenIds.has(id)) {
         if (id) {
-          console.warn(`[SERVER] Bulk import: Found duplicate initiative ID: ${id}, skipping duplicate`);
+          serverLogger.warn(`Bulk import: Found duplicate initiative ID: ${id}, skipping duplicate`, { context: 'Import' });
         }
         return false;
       }
@@ -1852,7 +1849,7 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
     });
 
     if (initiativesToAdd.length !== deduplicatedToAdd.length) {
-      console.log(`[SERVER] Bulk import: Deduplicated initiatives: ${initiativesToAdd.length} -> ${deduplicatedToAdd.length} (removed ${initiativesToAdd.length - deduplicatedToAdd.length} duplicates)`);
+      serverLogger.info('Bulk import: Deduplicated initiatives', { context: 'Import', metadata: { before: initiativesToAdd.length, after: deduplicatedToAdd.length } });
       results.imported = deduplicatedToAdd.length;
     }
 
@@ -1861,7 +1858,7 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
       await initiativesSheet.addRows(deduplicatedToAdd);
     }
 
-    console.log(`Bulk imported ${results.imported} initiatives, errors: ${results.errors.length}`);
+    serverLogger.info(`Bulk imported ${results.imported} initiatives`, { context: 'Import', metadata: { imported: results.imported, errors: results.errors.length } });
     
     res.json({
       success: true,
@@ -1872,7 +1869,7 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
     });
 
   } catch (error) {
-    console.error('Bulk import initiatives error:', error);
+    serverLogger.error('Bulk import initiatives error', { context: 'Import', error: error as Error });
     res.status(500).json({ error: 'Bulk import failed: ' + String(error) });
   }
 });
@@ -1968,7 +1965,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     const seenIds = new Set<string>();
     const deduplicated = initiatives.filter((init: { id: string }) => {
       if (seenIds.has(init.id)) {
-        console.warn(`[SERVER] Upsert: Found duplicate initiative ID in request: ${init.id}, skipping duplicate`);
+        serverLogger.warn(`Upsert: Found duplicate initiative ID in request: ${init.id}, skipping duplicate`, { context: 'Sync' });
         return false;
       }
       seenIds.add(init.id);
@@ -1976,7 +1973,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     });
 
     if (initiatives.length !== deduplicated.length) {
-      console.log(`[SERVER] Upsert: Deduplicated incoming initiatives: ${initiatives.length} -> ${deduplicated.length} (removed ${initiatives.length - deduplicated.length} duplicates)`);
+      serverLogger.info('Upsert: Deduplicated incoming initiatives', { context: 'Sync', metadata: { before: initiatives.length, after: deduplicated.length } });
     }
 
     const doc = await getDoc();
@@ -1996,7 +1993,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     } else {
       // Ensure headers are set if sheet exists but has no headers
       await sheet.loadHeaderRow().catch(async () => {
-        console.log('[SERVER] Initiatives sheet has no headers, setting them now');
+        serverLogger.info('Initiatives sheet has no headers, setting them now', { context: 'Sheets' });
         await sheet!.setHeaderRow(INITIATIVE_HEADERS);
       });
     }
@@ -2023,7 +2020,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     }
     
     if (duplicateIds.length > 0) {
-      console.warn(`[SERVER] Upsert: Detected ${duplicateIds.length} duplicate ID(s) in sheet: ${duplicateIds.slice(0, 5).join(', ')}${duplicateIds.length > 5 ? '...' : ''}. These will be handled by upsert logic (updating first occurrence).`);
+      serverLogger.warn(`Upsert: Detected ${duplicateIds.length} duplicate ID(s) in sheet`, { context: 'Sync', metadata: { duplicates: duplicateIds.slice(0, 5) } });
     }
 
     // Now process deduplicated initiatives
@@ -2047,7 +2044,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         
         // Compare timestamps - if server is newer, skip update and return server data
         if (serverLastUpdated && clientLastUpdated && serverLastUpdated > clientLastUpdated) {
-          console.log(`[SERVER] Server is newer for ${initiative.id}: server ${serverLastUpdated} > client ${clientLastUpdated}`);
+          serverLogger.debug(`Server is newer for ${initiative.id}`, { context: 'Sync', metadata: { serverLastUpdated, clientLastUpdated } });
           serverNewer.push({
             id: initiative.id,
             serverData: {
@@ -2063,7 +2060,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         }
         
         // Client is newer or same - update the row
-        console.log(`[SERVER] Updating ${initiative.id}: client ${clientLastUpdated} >= server ${serverLastUpdated}`);
+        serverLogger.debug(`Updating ${initiative.id}: client >= server`, { context: 'Sync' });
         const serverVersion = parseInt(existing.get('version') || '0', 10);
         const newVersion = serverVersion + 1;
         // Preserve createdAt and createdBy from server if not provided by client
@@ -2096,7 +2093,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         existingIds.add(initiative.id); // Track that we added it
         syncedCount++;
       } else {
-        console.warn(`[SERVER] Upsert: Initiative ${initiative.id} already exists, skipping add`);
+        serverLogger.warn(`Upsert: Initiative ${initiative.id} already exists, skipping add`, { context: 'Sync' });
       }
     }
 
@@ -2111,7 +2108,7 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     }
 
     if (serverNewer.length > 0) {
-      console.log(`Synced ${syncedCount} initiatives, ${serverNewer.length} had newer server data`);
+      serverLogger.info(`Synced ${syncedCount} initiatives, ${serverNewer.length} had newer server data`, { context: 'Sync' });
       res.json({ 
         success: true, 
         count: syncedCount, 
@@ -2119,11 +2116,11 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         message: `${serverNewer.length} initiative(s) were skipped - server has newer data`
       });
     } else {
-      console.log(`Synced ${syncedCount} initiatives`);
+      serverLogger.info(`Synced ${syncedCount} initiatives`, { context: 'Sync' });
       res.json({ success: true, count: syncedCount });
     }
   } catch (error) {
-    console.error('Error syncing initiatives:', error);
+    serverLogger.error('Error syncing initiatives', { context: 'Sync', error: error as Error });
     res.status(500).json({ error: String(error) });
   } finally {
     // CRITICAL: Always release mutex to prevent deadlock
@@ -2167,10 +2164,10 @@ app.delete('/api/sheets/initiatives/:id', authenticateToken, async (req: Authent
     // Log activity
     logActivity(req, ActivityType.DELETE_INITIATIVE, `Deleted initiative: ${initiativeTitle}`, { initiativeId: id, initiativeTitle });
     
-    console.log(`Soft deleted initiative ${id} at ${deletedAt}`);
+    serverLogger.info(`Soft deleted initiative ${id}`, { context: 'Delete', metadata: { deletedAt } });
     res.json({ success: true, id, deletedAt });
   } catch (error) {
-    console.error('Error soft deleting initiative:', error);
+    serverLogger.error('Error soft deleting initiative', { context: 'Delete', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2195,7 +2192,7 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
     // Load app config for permission checking
     const config = await loadAppConfig(doc);
     if (!config) {
-      console.warn('[DELETE /api/sheets/tasks/:id] Config not found, proceeding without authorization check');
+      serverLogger.warn('Config not found, proceeding without authorization check', { context: 'DeleteTask' });
       // In production, you might want to deny access if config is missing
       // For now, we'll proceed but log a warning
     }
@@ -2234,7 +2231,7 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
           }
         }
       } catch (error) {
-        console.error('[DELETE /api/sheets/tasks/:id] Error loading initiative:', error);
+        serverLogger.error('Error loading initiative for delete check', { context: 'DeleteTask', error: error as Error });
         // Continue without initiative owner check - will rely on task owner only
       }
     }
@@ -2251,12 +2248,9 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
       );
       
       if (!hasPermission) {
-        console.log(`[DELETE /api/sheets/tasks/:id] Permission denied for user ${currentUser.id} (role: ${currentUser.role}) to delete task ${id}`, {
-          taskOwnerId,
-          initiativeOwnerId,
-          currentUserId: currentUser.id,
-          currentUserEmail: currentUser.email,
-          deleteScope: config.rolePermissions?.[currentUser.role]?.deleteTasks
+        serverLogger.debug(`Permission denied for user ${currentUser.id} to delete task ${id}`, { 
+          context: 'DeleteTask', 
+          metadata: { role: currentUser.role, taskOwnerId, initiativeOwnerId }
         });
         res.status(403).json({ 
           error: 'You do not have permission to delete this task',
@@ -2271,7 +2265,7 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
       const ownsInitiative = matchesUserId(initiativeOwnerId, currentUser.id, currentUser.email);
       
       if (!ownsTask && !ownsInitiative && currentUser.role !== 'Admin') {
-        console.log(`[DELETE /api/sheets/tasks/:id] Fallback authorization denied for user ${currentUser.id} (role: ${currentUser.role}) to delete task ${id}`);
+        serverLogger.debug(`Fallback authorization denied for user ${currentUser.id} to delete task ${id}`, { context: 'DeleteTask' });
         res.status(403).json({ 
           error: 'You do not have permission to delete this task',
           details: 'You can only delete tasks that you own or tasks in initiatives you own'
@@ -2286,10 +2280,10 @@ app.delete('/api/sheets/tasks/:id', authenticateToken, async (req: Authenticated
     rowToUpdate.set('deletedAt', deletedAt);
     await rowToUpdate.save();
     
-    console.log(`[DELETE /api/sheets/tasks/:id] Soft deleted task ${id} at ${deletedAt} by user ${currentUser.id} (role: ${currentUser.role})`);
+    serverLogger.info(`Soft deleted task ${id}`, { context: 'DeleteTask', metadata: { deletedAt, userId: currentUser.id } });
     res.json({ success: true, id, deletedAt });
   } catch (error) {
-    console.error('[DELETE /api/sheets/tasks/:id] Error soft deleting task:', error);
+    serverLogger.error('Error soft deleting task', { context: 'DeleteTask', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2325,10 +2319,10 @@ app.post('/api/sheets/initiatives/:id/restore', authenticateToken, async (req: A
     rowToUpdate.set('deletedAt', '');
     await rowToUpdate.save();
     
-    console.log(`Restored initiative ${id}`);
+    serverLogger.info(`Restored initiative ${id}`, { context: 'Restore' });
     res.json({ success: true, id });
   } catch (error) {
-    console.error('Error restoring initiative:', error);
+    serverLogger.error('Error restoring initiative', { context: 'Restore', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2364,10 +2358,10 @@ app.post('/api/sheets/tasks/:id/restore', authenticateToken, async (req: Authent
     rowToUpdate.set('deletedAt', '');
     await rowToUpdate.save();
     
-    console.log(`Restored task ${id}`);
+    serverLogger.info(`Restored task ${id}`, { context: 'Restore' });
     res.json({ success: true, id });
   } catch (error) {
-    console.error('Error restoring task:', error);
+    serverLogger.error('Error restoring task', { context: 'Restore', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2393,7 +2387,7 @@ app.post('/api/sheets/changelog', authenticateToken, validate(changelogSchema), 
     } else {
       // Ensure headers are set if sheet exists but is empty
       await sheet.loadHeaderRow().catch(async () => {
-        console.log('[SERVER] ChangeLog sheet has no headers, setting them now');
+        serverLogger.info('ChangeLog sheet has no headers, setting them now', { context: 'Changelog' });
         await sheet!.setHeaderRow(CHANGELOG_HEADERS);
       });
     }
@@ -2412,10 +2406,10 @@ app.post('/api/sheets/changelog', authenticateToken, validate(changelogSchema), 
       timestamp: String(c.timestamp || '')
     })));
 
-    console.log(`Appended ${changes.length} change records`);
+    serverLogger.info(`Appended ${changes.length} change records`, { context: 'Changelog' });
     res.json({ success: true, count: changes.length });
   } catch (error) {
-    console.error('Error appending changelog:', error);
+    serverLogger.error('Error appending changelog', { context: 'Changelog', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2439,14 +2433,14 @@ app.post('/api/sheets/tasks', authenticateToken, async (req: AuthenticatedReques
     let sheet = doc.sheetsByTitle['Tasks'];
     
     if (!sheet) {
-      console.log('[SERVER] Creating Tasks sheet with headers');
+      serverLogger.info('Creating Tasks sheet with headers', { context: 'Tasks' });
       sheet = await doc.addSheet({
         title: 'Tasks',
         headerValues: TASK_HEADERS
       });
     } else {
       // Always set headers first to ensure they're correct
-      console.log('[SERVER] Setting/resetting Tasks sheet headers');
+      serverLogger.debug('Setting/resetting Tasks sheet headers', { context: 'Tasks' });
       await sheet.setHeaderRow(TASK_HEADERS);
     }
 
@@ -2489,10 +2483,10 @@ app.post('/api/sheets/tasks', authenticateToken, async (req: AuthenticatedReques
       }
     }
 
-    console.log(`Synced ${syncedCount} tasks`);
+    serverLogger.info(`Synced ${syncedCount} tasks`, { context: 'Tasks' });
     res.json({ success: true, count: syncedCount });
   } catch (error) {
-    console.error('Error syncing tasks:', error);
+    serverLogger.error('Error syncing tasks', { context: 'Tasks', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2502,34 +2496,27 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
   try {
     const { snapshot } = req.body;
 
-    console.log('[SERVER] Snapshot creation request received:', {
-      hasSnapshot: !!snapshot,
-      hasData: !!(snapshot && snapshot.data),
-      dataType: snapshot?.data ? typeof snapshot.data : 'undefined',
-      dataLength: Array.isArray(snapshot?.data) ? snapshot.data.length : 'not array',
-      snapshotId: snapshot?.id,
-      snapshotName: snapshot?.name
+    serverLogger.debug('Snapshot creation request received', { 
+      context: 'Snapshot', 
+      metadata: { hasSnapshot: !!snapshot, hasData: !!(snapshot && snapshot.data), snapshotId: snapshot?.id }
     });
 
     if (!snapshot || !snapshot.data) {
-      console.error('[SERVER] Snapshot creation failed: Missing snapshot or snapshot.data');
+      serverLogger.error('Snapshot creation failed: Missing snapshot or snapshot.data', { context: 'Snapshot' });
       res.status(400).json({ error: 'Invalid snapshot data: snapshot or data is missing' });
       return;
     }
 
     // Validate that data is an array and not empty
     if (!Array.isArray(snapshot.data)) {
-      console.error('[SERVER] Snapshot creation failed: snapshot.data is not an array', {
-        type: typeof snapshot.data,
-        value: snapshot.data
-      });
+      serverLogger.error('Snapshot creation failed: snapshot.data is not an array', { context: 'Snapshot' });
       res.status(400).json({ error: 'Invalid snapshot data: data must be an array' });
       return;
     }
 
     if (snapshot.data.length === 0) {
-      console.error('[SERVER] Snapshot creation failed: snapshot.data is empty');
-      console.log('[SERVER] Attempting to pull current initiatives from Sheets as fallback...');
+      serverLogger.error('Snapshot creation failed: snapshot.data is empty', { context: 'Snapshot' });
+      serverLogger.info('Attempting to pull current initiatives from Sheets as fallback...', { context: 'Snapshot' });
       
       // Fallback: Try to pull current initiatives from the Initiatives sheet
       const doc = await getDoc();
@@ -2552,7 +2539,7 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
           });
 
         if (initiatives.length > 0) {
-          console.log(`[SERVER] Using ${initiatives.length} initiatives from Initiatives sheet as snapshot data`);
+          serverLogger.info(`Using ${initiatives.length} initiatives from Initiatives sheet as snapshot data`, { context: 'Snapshot' });
           snapshot.data = initiatives;
         } else {
           res.status(400).json({ error: 'Invalid snapshot data: data array is empty and no initiatives found in Sheets. Cannot create snapshot without initiatives.' });
@@ -2564,7 +2551,7 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
       }
     }
 
-    console.log(`[SERVER] Creating snapshot with ${snapshot.data.length} initiatives`);
+    serverLogger.info(`Creating snapshot with ${snapshot.data.length} initiatives`, { context: 'Snapshot' });
 
     const doc = await getDoc();
     if (!doc) {
@@ -2580,7 +2567,7 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
       .slice(0, 50);
     const tabName = `Snap_${timestamp}_${safeName}`.slice(0, 100);
 
-    console.log(`[SERVER] Creating snapshot tab: ${tabName}`);
+    serverLogger.debug(`Creating snapshot tab: ${tabName}`, { context: 'Snapshot' });
 
     // Create sheet with enough columns for all headers (default is 26, we need at least 35)
     const newSheet = await doc.addSheet({
@@ -2602,48 +2589,37 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
     });
 
     // Map snapshot data to rows, ensuring all required fields are present
-    console.log(`[SERVER] Mapping ${snapshot.data.length} initiatives to rows...`);
-    const rowsToAdd = snapshot.data.map((item: Record<string, unknown>, index: number) => {
+    serverLogger.debug(`Mapping ${snapshot.data.length} initiatives to rows...`, { context: 'Snapshot' });
+    const rowsToAdd = snapshot.data.map((item: Record<string, unknown>) => {
       const rowData: Record<string, string> = {};
       INITIATIVE_HEADERS.forEach(header => {
         const value = item[header];
         rowData[header] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
       });
-      
-      // Log first few items for debugging
-      if (index < 3) {
-        console.log(`[SERVER] Mapped item ${index}:`, {
-          id: rowData.id,
-          title: rowData.title?.substring(0, 50),
-          hasAllHeaders: INITIATIVE_HEADERS.every(h => rowData.hasOwnProperty(h))
-        });
-      }
-      
       return rowData;
     });
 
     if (rowsToAdd.length > 0) {
-      console.log(`[SERVER] Adding ${rowsToAdd.length} rows to snapshot sheet...`);
+      serverLogger.debug(`Adding ${rowsToAdd.length} rows to snapshot sheet...`, { context: 'Snapshot' });
       await newSheet.addRows(rowsToAdd);
-      console.log(`[SERVER] Successfully created snapshot tab: ${tabName} with ${rowsToAdd.length} initiatives`);
+      serverLogger.success(`Successfully created snapshot tab: ${tabName} with ${rowsToAdd.length} initiatives`);
       
       // Verify rows were added
       const verifyRows = await newSheet.getRows();
       const dataRows = verifyRows.filter((r: GoogleSpreadsheetRow) => !r.get('id')?.startsWith('_meta_'));
-      console.log(`[SERVER] Verification: Snapshot contains ${dataRows.length} data rows (expected ${rowsToAdd.length})`);
       
       if (dataRows.length !== rowsToAdd.length) {
-        console.error(`[SERVER] WARNING: Row count mismatch. Expected ${rowsToAdd.length}, got ${dataRows.length}`);
+        serverLogger.warn(`Row count mismatch in snapshot`, { context: 'Snapshot', metadata: { expected: rowsToAdd.length, got: dataRows.length } });
       }
     } else {
-      console.error('[SERVER] No rows to add to snapshot after mapping');
+      serverLogger.error('No rows to add to snapshot after mapping', { context: 'Snapshot' });
       res.status(400).json({ error: 'Failed to map snapshot data to rows' });
       return;
     }
 
     res.json({ success: true, tabName, count: rowsToAdd.length });
   } catch (error) {
-    console.error('[SERVER] Error creating snapshot:', error);
+    serverLogger.error('Error creating snapshot', { context: 'Snapshot', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2717,7 +2693,7 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
     const seenIds = new Set<string>();
     const initiatives = allInitiatives.filter(init => {
       if (seenIds.has(init.id)) {
-        console.warn(`[SERVER] Found duplicate initiative ID: ${init.id}, skipping duplicate`);
+        serverLogger.warn(`Found duplicate initiative ID: ${init.id}, skipping duplicate`, { context: 'Pull' });
         return false;
       }
       seenIds.add(init.id);
@@ -2725,13 +2701,13 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
     });
 
     if (allInitiatives.length !== initiatives.length) {
-      console.log(`[SERVER] Deduplicated initiatives: ${allInitiatives.length} -> ${initiatives.length} (removed ${allInitiatives.length - initiatives.length} duplicates)`);
+      serverLogger.info('Deduplicated initiatives during pull', { context: 'Pull', metadata: { before: allInitiatives.length, after: initiatives.length } });
     }
 
-    console.log(`Pulled ${initiatives.length} initiatives from Sheets`);
+    serverLogger.info(`Pulled ${initiatives.length} initiatives from Sheets`, { context: 'Pull' });
     res.json({ initiatives, config: null, users: null });
   } catch (error) {
-    console.error('Error pulling from Sheets:', error);
+    serverLogger.error('Error pulling from Sheets', { context: 'Pull', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2750,7 +2726,7 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
     const seenIds = new Set<string>();
     const deduplicated = initiatives.filter((init: { id: string }) => {
       if (seenIds.has(init.id)) {
-        console.warn(`[SERVER] Push: Found duplicate initiative ID: ${init.id}, skipping duplicate`);
+        serverLogger.warn(`Push: Found duplicate initiative ID: ${init.id}, skipping`, { context: 'Push' });
         return false;
       }
       seenIds.add(init.id);
@@ -2758,7 +2734,7 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
     });
 
     if (initiatives.length !== deduplicated.length) {
-      console.log(`[SERVER] Push: Deduplicated initiatives: ${initiatives.length} -> ${deduplicated.length} (removed ${initiatives.length - deduplicated.length} duplicates)`);
+      serverLogger.info('Push: Deduplicated initiatives', { context: 'Push', metadata: { before: initiatives.length, after: deduplicated.length } });
     }
 
     const doc = await getDoc();
@@ -2789,10 +2765,10 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
       return rowData;
     }));
 
-    console.log(`Pushed ${deduplicated.length} initiatives to Sheets`);
+    serverLogger.info(`Pushed ${deduplicated.length} initiatives to Sheets`, { context: 'Push' });
     res.json({ success: true, count: deduplicated.length });
   } catch (error) {
-    console.error('Error pushing to Sheets:', error);
+    serverLogger.error('Error pushing to Sheets', { context: 'Push', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2818,11 +2794,7 @@ app.post('/api/slack/webhook', authenticateToken, validate(slackWebhookSchema), 
     const responseText = await slackResponse.text();
 
     if (!slackResponse.ok) {
-      console.error('Slack webhook failed:', {
-        status: slackResponse.status,
-        statusText: slackResponse.statusText,
-        error: responseText
-      });
+      serverLogger.error('Slack webhook failed', { context: 'Slack', metadata: { status: slackResponse.status, error: responseText } });
       res.status(slackResponse.status).json({ 
         error: 'Slack webhook failed',
         details: responseText 
@@ -2830,10 +2802,10 @@ app.post('/api/slack/webhook', authenticateToken, validate(slackWebhookSchema), 
       return;
     }
 
-    console.log('Slack webhook sent successfully');
+    serverLogger.info('Slack webhook sent successfully', { context: 'Slack' });
     res.json({ success: true, response: responseText });
   } catch (error) {
-    console.error('Error proxying Slack webhook:', error);
+    serverLogger.error('Error proxying Slack webhook', { context: 'Slack', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2853,7 +2825,7 @@ app.get('/api/sheets/snapshots', authenticateToken, async (req: AuthenticatedReq
 
     res.json({ snapshots });
   } catch (error) {
-    console.error('Error listing snapshots:', error);
+    serverLogger.error('Error listing snapshots', { context: 'Snapshot', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2865,13 +2837,13 @@ app.post('/api/sheets/scheduled-snapshot', async (req: Request, res: Response) =
   const expectedSecret = process.env.SCHEDULER_SECRET;
   
   if (!expectedSecret) {
-    console.error('SCHEDULER_SECRET environment variable not set');
+    serverLogger.error('SCHEDULER_SECRET environment variable not set', { context: 'Scheduler' });
     res.status(500).json({ error: 'Scheduler not configured' });
     return;
   }
   
   if (schedulerSecret !== expectedSecret) {
-    console.warn('Unauthorized scheduled snapshot attempt');
+    serverLogger.warn('Unauthorized scheduled snapshot attempt', { context: 'Scheduler' });
     res.status(403).json({ error: 'Unauthorized' });
     return;
   }
@@ -2909,7 +2881,7 @@ app.post('/api/sheets/scheduled-snapshot', async (req: Request, res: Response) =
 
     // Check if snapshot for today already exists
     if (doc.sheetsByTitle[tabName]) {
-      console.log(`Snapshot ${tabName} already exists, skipping`);
+      serverLogger.info(`Snapshot ${tabName} already exists, skipping`, { context: 'Scheduler' });
       res.json({ success: true, tabName, count: initiatives.length, message: 'Snapshot already exists' });
       return;
     }
@@ -2939,10 +2911,10 @@ app.post('/api/sheets/scheduled-snapshot', async (req: Request, res: Response) =
       await newSheet.addRows(initiatives);
     }
 
-    console.log(`Created scheduled snapshot: ${tabName} with ${initiatives.length} initiatives`);
+    serverLogger.success(`Created scheduled snapshot: ${tabName} with ${initiatives.length} initiatives`);
     res.json({ success: true, tabName, count: initiatives.length });
   } catch (error) {
-    console.error('Scheduled snapshot error:', error);
+    serverLogger.error('Scheduled snapshot error', { context: 'Scheduler', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -2965,33 +2937,30 @@ app.get('/api/notifications/:userId', authenticateToken, async (req: Authenticat
 
     const gcs = getGCSStorage();
     if (gcs) {
-      console.log('[NOTIFICATION GET] Fetching notifications for userId:', userId, 'req.user.id:', req.user?.id, 'req.user.email:', req.user?.email);
+      serverLogger.debug('Fetching notifications', { context: 'Notification', metadata: { userId, requesterId: req.user?.id } });
       
       // Try loading by userId first, then by email if userId is an email
       let notifications = await gcs.loadNotifications(userId);
-      console.log('[NOTIFICATION GET] Loaded', notifications.length, 'notifications by userId:', userId);
       
       // If no notifications found and userId looks like an email, try loading by user ID
       if (notifications.length === 0 && userId.includes('@') && req.user?.id) {
         notifications = await gcs.loadNotifications(req.user.id);
-        console.log('[NOTIFICATION GET] Loaded', notifications.length, 'notifications by user ID:', req.user.id);
       }
       
       // Also try loading by email if we have user email and userId is an ID
       if (notifications.length === 0 && !userId.includes('@') && req.user?.email) {
         notifications = await gcs.loadNotifications(req.user.email);
-        console.log('[NOTIFICATION GET] Loaded', notifications.length, 'notifications by email:', req.user.email);
       }
       
-      console.log('[NOTIFICATION GET] Returning', notifications.length, 'notifications');
+      serverLogger.debug(`Returning ${notifications.length} notifications`, { context: 'Notification' });
       res.json({ notifications });
     } else {
       // Fallback: return empty array if GCS not available
-      console.warn('[NOTIFICATION GET] GCS storage not available');
+      serverLogger.warn('GCS storage not available for notifications', { context: 'Notification' });
       res.json({ notifications: [] });
     }
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    serverLogger.error('Error fetching notifications', { context: 'Notification', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3022,7 +2991,7 @@ app.post('/api/notifications', authenticateToken, async (req: AuthenticatedReque
       res.json({ success: true, message: 'Notification sent via real-time only (no persistence)' });
     }
   } catch (error) {
-    console.error('Error creating notification:', error);
+    serverLogger.error('Error creating notification', { context: 'Notification', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3046,7 +3015,7 @@ app.patch('/api/notifications/:notificationId/read', authenticateToken, async (r
       res.json({ success: true, message: 'No persistence available' });
     }
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    serverLogger.error('Error marking notification as read', { context: 'Notification', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3069,7 +3038,7 @@ app.post('/api/notifications/mark-all-read', authenticateToken, async (req: Auth
       res.json({ success: true, message: 'No persistence available' });
     }
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    serverLogger.error('Error marking all notifications as read', { context: 'Notification', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3092,7 +3061,7 @@ app.delete('/api/notifications', authenticateToken, async (req: AuthenticatedReq
       res.json({ success: true, message: 'No persistence available' });
     }
   } catch (error) {
-    console.error('Error clearing notifications:', error);
+    serverLogger.error('Error clearing notifications', { context: 'Notification', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3127,7 +3096,7 @@ app.get('/api/admin/connected-users', authenticateToken, async (req: Authenticat
       timestamp: Date.now()
     });
   } catch (error) {
-    console.error('Error fetching connected users:', error);
+    serverLogger.error('Error fetching connected users', { context: 'Admin', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3158,7 +3127,7 @@ app.get('/api/admin/login-history', authenticateToken, async (req: Authenticated
     const currentHeaders = usersSheet.headerValues || [];
     const missingHeaders = USER_HEADERS.filter(h => !currentHeaders.includes(h));
     if (missingHeaders.length > 0) {
-      console.log('[SERVER] Adding missing Users columns:', missingHeaders);
+      serverLogger.info('Adding missing Users columns for login history', { context: 'Admin', metadata: { missingHeaders } });
       await usersSheet.setHeaderRow([...currentHeaders, ...missingHeaders]);
     }
 
@@ -3186,7 +3155,7 @@ app.get('/api/admin/login-history', authenticateToken, async (req: Authenticated
 
     res.json({ users });
   } catch (error) {
-    console.error('Get login history error:', error);
+    serverLogger.error('Get login history error', { context: 'Admin', error: error as Error });
     res.status(500).json({ error: 'Failed to get login history' });
   }
 });
@@ -3237,7 +3206,7 @@ app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req: A
             config = JSON.parse(configData);
           }
         } catch (e) {
-          console.error('Error parsing config:', e);
+          serverLogger.error('Error parsing config', { context: 'Validation', error: e as Error });
         }
       }
     }
@@ -3329,8 +3298,10 @@ app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req: A
     // Log validation results
     const flaggedResults = results.filter((r: any) => r.flagged);
     if (flaggedResults.length > 0) {
-      console.log(`[WEEKLY VALIDATION] ${flaggedResults.length} Team Lead(s) exceeded threshold:`, 
-        flaggedResults.map((r: any) => `${r.teamLeadId}: ${r.deviationPercent.toFixed(1)}%`).join(', '));
+      serverLogger.info(`${flaggedResults.length} Team Lead(s) exceeded threshold`, { 
+        context: 'Validation', 
+        metadata: { flagged: flaggedResults.map((r: any) => ({ id: r.teamLeadId, deviation: r.deviationPercent })) }
+      });
     }
 
     res.json({ 
@@ -3340,7 +3311,7 @@ app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req: A
       flaggedCount: flaggedResults.length
     });
   } catch (error) {
-    console.error('Error validating weekly effort:', error);
+    serverLogger.error('Error validating weekly effort', { context: 'Validation', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3456,13 +3427,13 @@ app.get('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
           return;
         }
       } catch (e) {
-        console.error('Error parsing config:', e);
+        serverLogger.error('Error parsing config', { context: 'Config', error: e as Error });
       }
     }
 
     res.json({ valueLists: null });
   } catch (error) {
-    console.error('Error getting value lists:', error);
+    serverLogger.error('Error getting value lists', { context: 'Config', error: error as Error });
     res.status(500).json({ error: 'Failed to get value lists' });
   }
 });
@@ -3533,7 +3504,7 @@ app.put('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
           config = JSON.parse(configData);
         }
       } catch (e) {
-        console.error('Error parsing existing config:', e);
+        serverLogger.error('Error parsing existing config', { context: 'Config', error: e as Error });
       }
     }
 
@@ -3608,7 +3579,7 @@ app.put('/api/config/value-lists', authenticateToken, async (req: AuthenticatedR
 
     res.json({ success: true, valueLists });
   } catch (error) {
-    console.error('Error updating value lists:', error);
+    serverLogger.error('Error updating value lists', { context: 'Config', error: error as Error });
     res.status(500).json({ error: 'Failed to update value lists' });
   }
 });
@@ -3659,7 +3630,7 @@ app.get('/api/backups', authenticateToken, async (req: AuthenticatedRequest, res
       res.json({ backups: snapshots, source: 'sheets', message: 'Using Sheets snapshots (GCS not configured)' });
     }
   } catch (error) {
-    console.error('Error listing backups:', error);
+    serverLogger.error('Error listing backups', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3725,7 +3696,7 @@ app.get('/api/backups/:date', authenticateToken, async (req: AuthenticatedReques
       });
     }
   } catch (error) {
-    console.error('Error getting backup details:', error);
+    serverLogger.error('Error getting backup details', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3749,7 +3720,7 @@ app.post('/api/backups/restore/:date', authenticateToken, async (req: Authentica
       return;
     }
 
-    console.log(`Admin ${req.user.email} initiating restore from backup ${date}`);
+    serverLogger.info(`Admin ${req.user.email} initiating restore from backup ${date}`, { context: 'Backup' });
 
     const backupService = getBackupService();
     if (backupService) {
@@ -3818,7 +3789,7 @@ app.post('/api/backups/restore/:date', authenticateToken, async (req: Authentica
       // Restore initiatives
       await sheet.addRows(initiativesToRestore);
 
-      console.log(`Restored ${initiativesToRestore.length} initiatives from snapshot ${matchingTab}`);
+      serverLogger.success(`Restored ${initiativesToRestore.length} initiatives from snapshot ${matchingTab}`);
 
       io.emit('data:restored', { 
         date, 
@@ -3837,7 +3808,7 @@ app.post('/api/backups/restore/:date', authenticateToken, async (req: Authentica
       });
     }
   } catch (error) {
-    console.error('Error restoring from backup:', error);
+    serverLogger.error('Error restoring from backup', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3861,7 +3832,7 @@ app.get('/api/backups/versions/:file', authenticateToken, async (req: Authentica
     const versions = await backupService.listObjectVersions(file);
     res.json({ versions, file });
   } catch (error) {
-    console.error('Error listing object versions:', error);
+    serverLogger.error('Error listing object versions', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3895,7 +3866,7 @@ app.post('/api/backups/restore-version', authenticateToken, async (req: Authenti
       return;
     }
 
-    console.log(`Admin ${req.user.email} restoring ${file} to version ${versionId}`);
+    serverLogger.info(`Admin ${req.user.email} restoring ${file} to version ${versionId}`, { context: 'Backup' });
     
     const result = await backupService.restoreObjectVersion(file, versionId);
     
@@ -3910,7 +3881,7 @@ app.post('/api/backups/restore-version', authenticateToken, async (req: Authenti
 
     res.json(result);
   } catch (error) {
-    console.error('Error restoring object version:', error);
+    serverLogger.error('Error restoring object version', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -3925,7 +3896,7 @@ app.post('/api/backups/create', authenticateToken, async (req: AuthenticatedRequ
 
     const { label } = req.body;
 
-    console.log(`Admin ${req.user.email} creating manual backup`);
+    serverLogger.info(`Admin ${req.user.email} creating manual backup`, { context: 'Backup' });
 
     const backupService = getBackupService();
     if (backupService) {
@@ -3996,7 +3967,7 @@ const newSheet = await doc.addSheet({
         await newSheet.addRows(initiatives);
       }
 
-      console.log(`Created Sheets snapshot: ${tabName} with ${initiatives.length} initiatives`);
+      serverLogger.success(`Created Sheets snapshot: ${tabName} with ${initiatives.length} initiatives`);
       
       res.json({ 
         success: true,
@@ -4014,7 +3985,7 @@ const newSheet = await doc.addSheet({
       });
     }
   } catch (error) {
-    console.error('Error creating manual backup:', error);
+    serverLogger.error('Error creating manual backup', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4038,7 +4009,7 @@ app.get('/api/backups/:date/verify', authenticateToken, async (req: Authenticate
     const result = await backupService.verifyBackup(date);
     res.json(result);
   } catch (error) {
-    console.error('Error verifying backup:', error);
+    serverLogger.error('Error verifying backup', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4062,7 +4033,7 @@ app.get('/api/backups/:date/download', authenticateToken, async (req: Authentica
     const result = await backupService.getBackupDownloadUrls(date);
     res.json(result);
   } catch (error) {
-    console.error('Error getting download URLs:', error);
+    serverLogger.error('Error getting download URLs', { context: 'Backup', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4133,7 +4104,7 @@ app.post('/api/export/csv', authenticateToken, async (req: AuthenticatedRequest,
     res.send(csvContent);
 
   } catch (error) {
-    console.error('CSV export error:', error);
+    serverLogger.error('CSV export error', { context: 'Export', error: error as Error });
     res.status(500).json({ error: 'Export failed' });
   }
 });
@@ -4195,7 +4166,7 @@ app.post('/api/export/excel', authenticateToken, async (req: AuthenticatedReques
     res.send(buffer);
 
   } catch (error) {
-    console.error('Excel export error:', error);
+    serverLogger.error('Excel export error', { context: 'Export', error: error as Error });
     res.status(500).json({ error: 'Export failed' });
   }
 });
@@ -4218,8 +4189,8 @@ app.post('/api/logs/errors', authenticateToken, async (req: AuthenticatedRequest
 
     const logStorage = getLogStorage();
     if (!logStorage || !logStorage.isInitialized()) {
-      // Fallback: just log to console
-      console.error('[ERROR LOG]', { message, stack, severity, userId, userEmail, context, metadata });
+      // Fallback: just log using serverLogger
+      serverLogger.error(message, { context: context || 'ErrorLog', metadata: { stack, severity, userId, userEmail, ...metadata } });
       res.json({ success: true, stored: false, message: 'Log storage not available, logged to console' });
       return;
     }
@@ -4244,7 +4215,7 @@ app.post('/api/logs/errors', authenticateToken, async (req: AuthenticatedRequest
     const success = await logStorage.storeErrorLog(errorLog);
     res.json({ success, id: errorLog.id });
   } catch (error) {
-    console.error('Error storing error log:', error);
+    serverLogger.error('Error storing error log', { context: 'Logs', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4274,7 +4245,7 @@ app.get('/api/logs/errors', authenticateToken, async (req: AuthenticatedRequest,
     const logs = await logStorage.getErrorLogs(start, end, sev as any, uid);
     res.json({ logs, count: logs.length });
   } catch (error) {
-    console.error('Error getting error logs:', error);
+    serverLogger.error('Error getting error logs', { context: 'Logs', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4293,8 +4264,8 @@ app.post('/api/logs/activity', authenticateToken, async (req: AuthenticatedReque
 
     const logStorage = getLogStorage();
     if (!logStorage || !logStorage.isInitialized()) {
-      // Fallback: just log to console
-      console.log('[ACTIVITY LOG]', { type, description, userId, userEmail, metadata });
+      // Fallback: just log using serverLogger
+      serverLogger.info(description, { context: 'ActivityLog', metadata: { type, userId, userEmail, ...metadata } });
       res.json({ success: true, stored: false, message: 'Log storage not available, logged to console' });
       return;
     }
@@ -4318,7 +4289,7 @@ app.post('/api/logs/activity', authenticateToken, async (req: AuthenticatedReque
     const success = await logStorage.storeActivityLog(activityLog);
     res.json({ success, id: activityLog.id });
   } catch (error) {
-    console.error('Error storing activity log:', error);
+    serverLogger.error('Error storing activity log', { context: 'Logs', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4348,7 +4319,7 @@ app.get('/api/logs/activity', authenticateToken, async (req: AuthenticatedReques
     const logs = await logStorage.getActivityLogs(start, end, activityType as any, uid);
     res.json({ logs, count: logs.length });
   } catch (error) {
-    console.error('Error getting activity logs:', error);
+    serverLogger.error('Error getting activity logs', { context: 'Logs', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4401,7 +4372,7 @@ app.get('/api/logs/search', authenticateToken, async (req: AuthenticatedRequest,
 
     res.json({ logs, count: logs.length });
   } catch (error) {
-    console.error('Error searching logs:', error);
+    serverLogger.error('Error searching logs', { context: 'Logs', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4425,7 +4396,7 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
     const supportStorage = getSupportStorage();
     if (!supportStorage || !supportStorage.isInitialized()) {
       // Fallback: store in memory or log
-      console.log('[SUPPORT] Ticket created (storage not available):', { title, description, userId, userEmail });
+      serverLogger.info('Ticket created (storage not available)', { context: 'Support', metadata: { title, userId, userEmail } });
       res.json({ success: true, stored: false, message: 'Support storage not available' });
       return;
     }
@@ -4456,7 +4427,7 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
     const gcs = getGCSStorage();
     let adminUserId: string | null = null;
     
-    console.log('[NOTIFICATION] Looking up admin user ID for ticket notification, ticket:', ticket.id, 'title:', title);
+    serverLogger.debug('Looking up admin user ID for ticket notification', { context: 'Notification', metadata: { ticketId: ticket.id } });
     
     if (gcs) {
       // Find admin user ID by email
@@ -4468,18 +4439,18 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
           const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
           if (adminRow) {
             adminUserId = adminRow.get('id');
-            console.log('[NOTIFICATION] Found admin user ID:', adminUserId, 'for email:', ADMIN_EMAIL);
+            serverLogger.debug('Found admin user ID', { context: 'Notification', metadata: { adminUserId, email: ADMIN_EMAIL } });
           } else {
-            console.warn('[NOTIFICATION] Admin row not found in Users sheet for email:', ADMIN_EMAIL);
+            serverLogger.warn('Admin row not found in Users sheet', { context: 'Notification', metadata: { email: ADMIN_EMAIL } });
           }
         } else {
-          console.warn('[NOTIFICATION] Users sheet not found');
+          serverLogger.warn('Users sheet not found', { context: 'Notification' });
         }
       } else {
-        console.warn('[NOTIFICATION] Could not get Google Sheets doc');
+        serverLogger.warn('Could not get Google Sheets doc', { context: 'Notification' });
       }
     } else {
-      console.warn('[NOTIFICATION] GCS storage not available');
+      serverLogger.warn('GCS storage not available for notifications', { context: 'Notification' });
     }
     
     // Use actual admin user ID if found, otherwise fall back to email
@@ -4505,19 +4476,18 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
 
     // Store and emit notification to admin
     if (gcs) {
-      const stored = await gcs.addNotification(targetUserId, adminNotification);
-      console.log('[NOTIFICATION] Stored notification for admin:', stored, 'notification ID:', adminNotification.id, 'targetUserId:', targetUserId);
+      await gcs.addNotification(targetUserId, adminNotification);
       io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
-      console.log('[NOTIFICATION] Emitted Socket.IO notification to userId:', targetUserId);
+      serverLogger.debug('Stored and emitted notification for admin', { context: 'Notification', metadata: { targetUserId } });
     } else {
       // Emit via Socket.IO even without GCS persistence
       io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
-      console.log('[NOTIFICATION] Emitted Socket.IO notification to userId:', targetUserId, '(no GCS persistence)');
+      serverLogger.debug('Emitted Socket.IO notification (no GCS persistence)', { context: 'Notification', metadata: { targetUserId } });
     }
 
     res.json({ success, ticket });
   } catch (error) {
-    console.error('Error creating support ticket:', error);
+    serverLogger.error('Error creating support ticket', { context: 'Support', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4525,11 +4495,10 @@ app.post('/api/support/tickets', authenticateToken, async (req: AuthenticatedReq
 // GET /api/support/tickets - Get support tickets (admin only, returns empty if not admin)
 app.get('/api/support/tickets', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log('[TICKETS GET] User:', req.user?.email, 'Role:', req.user?.role);
+    serverLogger.debug('Getting tickets', { context: 'Support', metadata: { user: req.user?.email, role: req.user?.role } });
     
     // Only admins can view all tickets - return empty for non-admins (no error)
     if (req.user?.role !== 'Admin') {
-      console.log('[TICKETS GET] Not admin, returning empty');
       res.json({ tickets: [], message: 'Admin access required to view tickets' });
       return;
     }
@@ -4540,16 +4509,14 @@ app.get('/api/support/tickets', optionalAuthenticateToken, async (req: Authentic
 
     if (supportStorage && supportStorage.isInitialized()) {
       tickets = await supportStorage.getTickets(status as SupportTicketStatus | undefined);
-      console.log('[TICKETS GET] From GCS:', tickets.length, 'items');
     } else {
       // Use memory fallback
       tickets = memoryStorage.getTickets(status as SupportTicketStatus | undefined);
-      console.log('[TICKETS GET] From memory:', tickets.length, 'items');
     }
     
     res.json({ tickets, count: tickets.length });
   } catch (error) {
-    console.error('Error getting support tickets:', error);
+    serverLogger.error('Error getting support tickets', { context: 'Support', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4579,7 +4546,7 @@ app.get('/api/support/my-tickets', authenticateToken, async (req: AuthenticatedR
 
     res.json({ tickets: userTickets, count: userTickets.length });
   } catch (error) {
-    console.error('Error getting user tickets:', error);
+    serverLogger.error('Error getting user tickets', { context: 'Support', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4645,7 +4612,7 @@ app.patch('/api/support/tickets/:id', authenticateToken, async (req: Authenticat
 
     res.json({ success });
   } catch (error) {
-    console.error('Error updating support ticket:', error);
+    serverLogger.error('Error updating support ticket', { context: 'Support', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4675,7 +4642,7 @@ app.get('/api/support/tickets/:id', authenticateToken, async (req: Authenticated
 
     res.json({ ticket });
   } catch (error) {
-    console.error('Error getting support ticket:', error);
+    serverLogger.error('Error getting support ticket', { context: 'Support', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4760,7 +4727,7 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
       } else {
         // User commented - notify admin
         // Find admin user ID BEFORE creating notification object
-        console.log('[NOTIFICATION] Looking up admin user ID for comment notification, ticket:', id, 'title:', ticket.title);
+        serverLogger.debug('Looking up admin user ID for comment notification', { context: 'Notification', metadata: { ticketId: id } });
         const gcs = getGCSStorage();
         let adminUserId: string | null = null;
         
@@ -4773,18 +4740,9 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
               const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
               if (adminRow) {
                 adminUserId = adminRow.get('id');
-                console.log('[NOTIFICATION] Found admin user ID for comment:', adminUserId, 'for email:', ADMIN_EMAIL);
-              } else {
-                console.warn('[NOTIFICATION] Admin row not found for comment notification');
               }
-            } else {
-              console.warn('[NOTIFICATION] Users sheet not found for comment notification');
             }
-          } else {
-            console.warn('[NOTIFICATION] Could not get Google Sheets doc for comment notification');
           }
-        } else {
-          console.warn('[NOTIFICATION] GCS storage not available for comment notification');
         }
         
         // Use actual admin user ID if found, otherwise fall back to email
@@ -4810,21 +4768,18 @@ app.post('/api/support/tickets/:id/comments', authenticateToken, async (req: Aut
 
         // Store and emit notification
         if (gcs) {
-          const stored = await gcs.addNotification(targetUserId, adminNotification);
-          console.log('[NOTIFICATION] Stored comment notification for admin:', stored, 'notification ID:', adminNotification.id, 'targetUserId:', targetUserId);
+          await gcs.addNotification(targetUserId, adminNotification);
           io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
-          console.log('[NOTIFICATION] Emitted Socket.IO comment notification to userId:', targetUserId);
         } else {
           // Emit via Socket.IO even without GCS persistence
           io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
-          console.log('[NOTIFICATION] Emitted Socket.IO comment notification to userId:', targetUserId, '(no GCS persistence)');
         }
       }
     }
 
     res.json({ success, comment });
   } catch (error) {
-    console.error('Error adding comment:', error);
+    serverLogger.error('Error adding comment', { context: 'Support', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4845,7 +4800,7 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
         }
       } catch (err) {
         // Token invalid/expired, but that's okay - proceed as anonymous
-        console.log('[FEEDBACK] Token verification failed, proceeding as anonymous');
+        serverLogger.debug('Token verification failed, proceeding as anonymous', { context: 'Feedback' });
       }
     }
 
@@ -4875,10 +4830,8 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
     if (supportStorage && supportStorage.isInitialized()) {
       // Use GCS storage
       stored = await supportStorage.createFeedback(feedback);
-      if (stored) {
-        console.log('[SUPPORT] Feedback stored in GCS:', feedback.id);
-      } else {
-        console.error('[SUPPORT] Failed to store feedback in GCS, using memory fallback');
+      if (!stored) {
+        serverLogger.error('Failed to store feedback in GCS, using memory fallback', { context: 'Feedback' });
         stored = memoryStorage.createFeedback(feedback);
       }
     } else {
@@ -4896,7 +4849,7 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
     const gcs = getGCSStorage();
     let adminUserId: string | null = null;
     
-    console.log('[NOTIFICATION] Looking up admin user ID for feedback notification, feedback:', feedback.id, 'title:', feedback.title);
+    serverLogger.debug('Looking up admin user ID for feedback notification', { context: 'Notification', metadata: { feedbackId: feedback.id } });
     
     if (gcs) {
       // Find admin user ID by email
@@ -4908,18 +4861,9 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
           const adminRow = rows.find((r: GoogleSpreadsheetRow) => r.get('email') === ADMIN_EMAIL);
           if (adminRow) {
             adminUserId = adminRow.get('id');
-            console.log('[NOTIFICATION] Found admin user ID for feedback:', adminUserId, 'for email:', ADMIN_EMAIL);
-          } else {
-            console.warn('[NOTIFICATION] Admin row not found in Users sheet for email:', ADMIN_EMAIL);
           }
-        } else {
-          console.warn('[NOTIFICATION] Users sheet not found for feedback notification');
         }
-      } else {
-        console.warn('[NOTIFICATION] Could not get Google Sheets doc for feedback notification');
       }
-    } else {
-      console.warn('[NOTIFICATION] GCS storage not available for feedback notification');
     }
     
     // Use actual admin user ID if found, otherwise fall back to email
@@ -4945,19 +4889,16 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
 
     // Store and emit notification to admin
     if (gcs) {
-      const stored = await gcs.addNotification(targetUserId, adminNotification);
-      console.log('[NOTIFICATION] Stored feedback notification for admin:', stored, 'notification ID:', adminNotification.id, 'targetUserId:', targetUserId);
+      await gcs.addNotification(targetUserId, adminNotification);
       io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
-      console.log('[NOTIFICATION] Emitted Socket.IO feedback notification to userId:', targetUserId);
     } else {
       // Emit via Socket.IO even without GCS persistence
       io.emit('notification:received', { userId: targetUserId, notification: adminNotification });
-      console.log('[NOTIFICATION] Emitted Socket.IO feedback notification to userId:', targetUserId, '(no GCS persistence)');
     }
     
     res.json({ success: true, stored, feedback });
   } catch (error) {
-    console.error('Error submitting feedback:', error);
+    serverLogger.error('Error submitting feedback', { context: 'Feedback', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -4965,30 +4906,21 @@ app.post('/api/support/feedback', async (req: Request, res: Response) => {
 // GET /api/support/feedback - Get feedback (admins see all, users see their own)
 app.get('/api/support/feedback', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log('[FEEDBACK GET] User:', req.user?.email, 'Role:', req.user?.role);
+    serverLogger.debug('Getting feedback', { context: 'Feedback', metadata: { user: req.user?.email, role: req.user?.role } });
     
     const supportStorage = getSupportStorage();
     let feedback: any[] = [];
     
-    console.log('[FEEDBACK GET] Storage check:', {
-      hasSupportStorage: !!supportStorage,
-      isInitialized: supportStorage?.isInitialized() || false
-    });
-    
     if (supportStorage && supportStorage.isInitialized()) {
       feedback = await supportStorage.getFeedback();
-      console.log('[FEEDBACK GET] From GCS:', feedback.length, 'items');
     } else {
       // Use memory fallback
-      console.warn('[FEEDBACK GET] GCS not initialized, using memory fallback (data will be lost on restart)');
       feedback = memoryStorage.getFeedback();
-      console.log('[FEEDBACK GET] From memory:', feedback.length, 'items');
     }
     
     // Filter feedback based on user role
     if (req.user?.role === 'Admin') {
       // Admins see all feedback
-      console.log('[FEEDBACK GET] Admin access - returning all feedback');
     } else if (req.user?.id || req.user?.email) {
       // Non-admins can only see their own feedback
       const userId = req.user.id;
@@ -4997,16 +4929,14 @@ app.get('/api/support/feedback', optionalAuthenticateToken, async (req: Authenti
         f.submittedBy === userId || 
         f.submittedByEmail === userEmail
       );
-      console.log('[FEEDBACK GET] User access - returning', feedback.length, 'items for', userEmail);
     } else {
       // No user info - return empty
-      console.log('[FEEDBACK GET] No user info - returning empty');
       feedback = [];
     }
     
     res.json({ feedback, count: feedback.length });
   } catch (error) {
-    console.error('Error getting feedback:', error);
+    serverLogger.error('Error getting feedback', { context: 'Feedback', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -5077,7 +5007,7 @@ app.patch('/api/support/feedback/:id', optionalAuthenticateToken, async (req: Au
 
     res.json({ success: true, feedback: { ...feedback, ...updates } });
   } catch (error) {
-    console.error('Error updating feedback:', error);
+    serverLogger.error('Error updating feedback', { context: 'Feedback', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -5145,7 +5075,7 @@ app.post('/api/support/feedback/:id/comments', optionalAuthenticateToken, async 
 
     res.json({ success: true, comment });
   } catch (error) {
-    console.error('Error adding comment to feedback:', error);
+    serverLogger.error('Error adding comment to feedback', { context: 'Feedback', error: error as Error });
     res.status(500).json({ error: String(error) });
   }
 });
@@ -5190,7 +5120,7 @@ async function jiraFetch(endpoint: string, options: RequestInit = {}) {
 // GET /api/jira/test - Test Jira connection and fetch sample issues
 app.get('/api/jira/test', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log('[JIRA] Testing connection...');
+    serverLogger.debug('Testing Jira connection...', { context: 'Jira' });
     
     if (!isJiraConfigured()) {
       res.status(400).json({ 
@@ -5219,7 +5149,7 @@ app.get('/api/jira/test', authenticateToken, async (req: AuthenticatedRequest, r
       })
     }) as { issues?: any[]; total?: number };
     
-    console.log(`[JIRA] Successfully fetched ${result.issues?.length || 0} issues`);
+    serverLogger.debug(`Successfully fetched ${result.issues?.length || 0} issues from Jira`, { context: 'Jira' });
     
     // Map to simplified format
     const issues = (result.issues || []).map((issue: any) => ({
@@ -5244,7 +5174,7 @@ app.get('/api/jira/test', authenticateToken, async (req: AuthenticatedRequest, r
       }
     });
   } catch (error) {
-    console.error('[JIRA] Test failed:', error);
+    serverLogger.error('Jira test failed', { context: 'Jira', error: error as Error });
     res.status(500).json({ 
       success: false, 
       error: String(error),
@@ -5282,7 +5212,7 @@ app.get('/api/jira/fields', authenticateToken, async (req: AuthenticatedRequest,
       hint: 'Look for a field named "asset class(pol)" or similar. Use its ID (e.g., customfield_12345) in the configuration.'
     });
   } catch (error) {
-    console.error('[JIRA] Failed to fetch fields:', error);
+    serverLogger.error('Failed to fetch Jira fields', { context: 'Jira', error: error as Error });
     res.status(500).json({ success: false, error: String(error) });
   }
 });
@@ -5320,82 +5250,29 @@ if (NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
 
 // Handle server errors
 httpServer.on('error', (error: NodeJS.ErrnoException) => {
-  console.error('Server error:', error);
+  serverLogger.critical('Server error', { error });
   if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use`);
+    serverLogger.critical(`Port ${PORT} is already in use`);
   }
   process.exit(1);
 });
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  serverLogger.critical('Uncaught Exception', { error });
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  serverLogger.critical('Unhandled Rejection', { metadata: { reason: String(reason) } });
 });
 
 // Log endpoints after a short delay to keep logs clean during startup
 setTimeout(() => {
-  console.log(`\nAuth Endpoints:`);
-  console.log(`  POST /api/auth/login          - Authenticate user`);
-  console.log(`  POST /api/auth/register       - Register new user (admin only)`);
-  console.log(`  GET  /api/auth/me             - Get current user`);
-  console.log(`  POST /api/auth/change-password - Change password`);
-  console.log(`  GET  /api/auth/users          - List all users`);
-  console.log(`\nBulk Import Endpoints (Admin only):`);
-  console.log(`  POST /api/users/bulk-import   - Bulk import users from Excel/CSV`);
-  console.log(`  POST /api/sheets/bulk-import  - Bulk import initiatives from Excel/CSV`);
-  console.log(`\nSheets Endpoints (Protected):`);
-  console.log(`  GET  /api/sheets/health       - Check connection`);
-  console.log(`  POST /api/sheets/initiatives  - Upsert initiatives`);
-  console.log(`  POST /api/sheets/changelog    - Append change records`);
-  console.log(`  POST /api/sheets/snapshot     - Create snapshot tab`);
-  console.log(`  GET  /api/sheets/pull         - Pull all data`);
-  console.log(`  POST /api/sheets/push         - Push all data`);
-  console.log(`  GET  /api/sheets/snapshots    - List snapshot tabs`);
-  console.log(`  POST /api/sheets/scheduled-snapshot - Automated weekly snapshot (Cloud Scheduler)`);
-  console.log(`\nNotification Endpoints (Protected):`);
-  console.log(`  GET  /api/notifications/:userId  - Get user notifications`);
-  console.log(`  POST /api/notifications          - Create notification`);
-  console.log(`  PATCH /api/notifications/:id/read - Mark as read`);
-  console.log(`  POST /api/notifications/mark-all-read - Mark all as read`);
-  console.log(`  DELETE /api/notifications        - Clear all notifications`);
-  console.log(`\nBackup & Restore Endpoints (Admin only):`);
-  console.log(`  GET  /api/backups                - List all backups`);
-  console.log(`  GET  /api/backups/:date          - Get backup details`);
-  console.log(`  POST /api/backups/create         - Create manual backup`);
-  console.log(`  POST /api/backups/restore/:date  - Restore from backup`);
-  console.log(`  GET  /api/backups/versions/:file - List object versions`);
-  console.log(`  POST /api/backups/restore-version - Restore specific version`);
-  console.log(`  GET  /api/backups/:date/verify   - Verify backup integrity`);
-  console.log(`  GET  /api/backups/:date/download - Get backup download URLs`);
-  console.log(`\nLogging Endpoints (Admin only):`);
-  console.log(`  POST /api/logs/errors           - Store error log`);
-  console.log(`  GET  /api/logs/errors            - Get error logs`);
-  console.log(`  POST /api/logs/activity          - Store activity log`);
-  console.log(`  GET  /api/logs/activity          - Get activity logs`);
-  console.log(`  GET  /api/logs/search            - Search logs`);
-  console.log(`\nConfig Endpoints (Admin only):`);
-  console.log(`  GET  /api/config/value-lists     - Get value lists`);
-  console.log(`  PUT  /api/config/value-lists     - Update value lists`);
-  console.log(`\nSupport Endpoints:`);
-  console.log(`  POST /api/support/tickets        - Create support ticket`);
-  console.log(`  GET  /api/support/tickets        - Get support tickets (admin)`);
-  console.log(`  PATCH /api/support/tickets/:id  - Update support ticket (admin)`);
-  console.log(`  POST /api/support/feedback       - Submit feedback`);
-  console.log(`  GET  /api/support/feedback       - Get feedback (admin)`);
-  console.log(`\nJira Integration Endpoints:`);
-  console.log(`  GET  /api/jira/test           - Test Jira connection`);
-  console.log(`  GET  /api/jira/fields         - List custom fields`);
-  console.log(`  Jira configured: ${isJiraConfigured() ? 'YES' : 'NO'}`);
-  console.log(`\nReal-time Collaboration (Socket.IO):`);
-  console.log(`  - User presence tracking`);
-  console.log(`  - Live initiative updates`);
-  console.log(`  - Collaborative editing indicators`);
-  console.log(`  - Real-time notification push`);
-  console.log(`\nDefault admin credentials:`);
-  console.log(`  Email: adar.sobol@pagaya.com`);
-  console.log(`  Password: admin123`);
+  serverLogger.info('API endpoints available', { 
+    context: 'Startup',
+    metadata: { 
+      endpoints: 'Auth, Bulk Import, Sheets, Notifications, Backup, Logging, Config, Support, Jira',
+      jiraConfigured: isJiraConfigured()
+    }
+  });
 }, 1000);

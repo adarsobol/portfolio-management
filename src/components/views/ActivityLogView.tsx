@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Search, Calendar, User, ChevronDown, ChevronUp, RefreshCw, Download } from 'lucide-react';
 import { ActivityLog, ActivityType, User as UserType } from '../../types';
 import { logService } from '../../services/logService';
+import { logger } from '../../utils/logger';
 
 interface ActivityLogViewProps {
   currentUser: UserType;
@@ -25,17 +26,17 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({ users }) => {
   const loadActivityLogs = async () => {
     setLoading(true);
     try {
-      console.log('[ACTIVITY LOG VIEW] Loading logs with filters:', { startDate, endDate, selectedType, selectedUserId });
+      logger.debug('Loading activity logs with filters', { context: 'ActivityLogView.loadLogs', metadata: { startDate, endDate, selectedType, selectedUserId } });
       const logs = await logService.getActivityLogs({
         startDate,
         endDate,
         type: selectedType === 'all' ? undefined : selectedType,
         userId: selectedUserId === 'all' ? undefined : selectedUserId,
       });
-      console.log('[ACTIVITY LOG VIEW] Loaded logs:', logs.length, logs);
+      logger.debug('Loaded activity logs', { context: 'ActivityLogView.loadLogs', metadata: { count: logs.length } });
       setActivityLogs(logs);
     } catch (error) {
-      console.error('[ACTIVITY LOG VIEW] Failed to load activity logs:', error);
+      logger.error('Failed to load activity logs', { context: 'ActivityLogView.loadLogs', error: error instanceof Error ? error : undefined });
     } finally {
       setLoading(false);
     }

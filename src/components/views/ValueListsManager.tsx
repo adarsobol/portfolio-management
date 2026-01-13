@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Plus, Trash2, Edit2, Check, X, AlertCircle, GripVertical, Download, Upload, RotateCcw, Loader2 } from 'lucide-react';
 import { AppConfig, Initiative } from '../../types';
 import { getValueUsageCount, validateValueList, getDefaultValueLists, getPriorities, getUnplannedTags, getInitiativeTypes, getQuarters, getAssetClasses, getStatuses, getDependencyTeams, getWorkTypes, ensureRequiredValuesInConfig } from '../../utils/valueLists';
+import { logger } from '../../utils/logger';
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
@@ -183,7 +184,7 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
 
       setSaveError(null);
     } catch (error) {
-      console.error('Error saving value lists to backend:', error);
+      logger.error('Error saving value lists to backend', { context: 'ValueListsManager.handleSave', error: error instanceof Error ? error : undefined });
       setSaveError(error instanceof Error ? error.message : 'Failed to save to backend');
       // Note: Local state is already updated, so UI reflects changes
       // User can retry saving if needed
@@ -391,7 +392,7 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
 
       alert('Required values have been ensured in all value lists.');
     } catch (error) {
-      console.error('Error ensuring required values:', error);
+      logger.error('Error ensuring required values', { context: 'ValueListsManager.ensureRequiredValues', error: error instanceof Error ? error : undefined });
       setSaveError(error instanceof Error ? error.message : 'Failed to ensure required values');
     } finally {
       setIsSaving(false);

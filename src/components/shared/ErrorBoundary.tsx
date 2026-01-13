@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
     }).catch(err => {
       // If critical logging fails, fall back to console
-      console.error('Failed to send critical error to backend:', err);
+      logger.error('Failed to send critical error to backend', { context: 'ErrorBoundary.componentDidCatch', error: err instanceof Error ? err : undefined });
     });
 
     // Call custom error handler if provided

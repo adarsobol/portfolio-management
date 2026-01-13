@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { logger } from '../utils/logger';
 
 const BUILD_HASH_KEY = 'portfolio-app-build-hash';
 
@@ -36,7 +37,7 @@ export function useVersionCheck() {
         return localStorage.getItem(BUILD_HASH_KEY);
       } catch (error) {
         // localStorage unavailable (private mode, disabled, etc.)
-        console.warn('[VERSION CHECK] localStorage unavailable, skipping version check');
+        logger.warn('localStorage unavailable, skipping version check', { context: 'useVersionCheck.getStoredHash' });
         return null;
       }
     };
@@ -47,7 +48,7 @@ export function useVersionCheck() {
         localStorage.setItem(BUILD_HASH_KEY, hash);
       } catch (error) {
         // localStorage unavailable - skip silently
-        console.warn('[VERSION CHECK] Failed to store build hash');
+        logger.warn('Failed to store build hash', { context: 'useVersionCheck.storeHash' });
       }
     };
 
@@ -69,7 +70,7 @@ export function useVersionCheck() {
 
     if (currentHash !== storedHash) {
       // New version detected!
-      console.log('[VERSION CHECK] New version detected. Refreshing...');
+      logger.info('New version detected. Refreshing...', { context: 'useVersionCheck' });
       
       // Store new hash before refresh
       storeBuildHash(currentHash);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Send, Bug, TrendingUp } from 'lucide-react';
 import { supportService } from '../../services/supportService';
 import { useToast } from '../../contexts';
+import { logger } from '../../utils/logger';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -53,7 +54,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, t
         showError('Failed to submit feedback. Please try again.');
       }
     } catch (error) {
-      console.error('Error submitting feedback:', error);
+      logger.error('Error submitting feedback', { context: 'FeedbackModal.handleSubmit', error: error instanceof Error ? error : undefined });
       showError('An error occurred. Please try again.');
     } finally {
       setSubmitting(false);

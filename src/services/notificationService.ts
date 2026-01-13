@@ -16,9 +16,8 @@ class NotificationService {
    */
   async fetchNotifications(userId: string): Promise<Notification[]> {
     try {
-      console.log('[NOTIFICATION SERVICE] Fetching notifications for userId:', userId);
+      logger.debug('Fetching notifications', { context: 'NotificationService.fetchNotifications', metadata: { userId } });
       const url = `${API_ENDPOINT}/api/notifications/${userId}`;
-      console.log('[NOTIFICATION SERVICE] URL:', url);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -28,24 +27,22 @@ class NotificationService {
         }
       });
 
-      console.log('[NOTIFICATION SERVICE] Response status:', response.status, response.statusText);
+      logger.debug('Response received', { context: 'NotificationService.fetchNotifications', metadata: { status: response.status, statusText: response.statusText } });
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('[NOTIFICATION SERVICE] Error response:', error);
         logger.error('Failed to fetch notifications', { 
           context: 'NotificationService.fetchNotifications', 
-          error: new Error(error.error || 'Unknown error') 
+          error: new Error(error.error || 'Unknown error'),
+          metadata: { errorResponse: error }
         });
         return [];
       }
 
       const data = await response.json();
-      console.log('[NOTIFICATION SERVICE] Received data:', data);
-      console.log('[NOTIFICATION SERVICE] Notifications count:', data.notifications?.length || 0);
+      logger.debug('Notifications fetched', { context: 'NotificationService.fetchNotifications', metadata: { count: data.notifications?.length || 0 } });
       return data.notifications || [];
     } catch (error) {
-      console.error('[NOTIFICATION SERVICE] Exception:', error);
       logger.error('Error fetching notifications', { 
         context: 'NotificationService.fetchNotifications', 
         error: error instanceof Error ? error : new Error(String(error)) 

@@ -1,4 +1,5 @@
 import { Comment, Initiative, User, ChangeRecord, AppConfig } from '../types';
+import { logger } from '../utils/logger';
 
 interface SlackConfig {
   webhookUrl: string;
@@ -14,14 +15,10 @@ class SlackService {
    * Initialize Slack service with configuration
    */
   initialize(config: Partial<SlackConfig> | undefined): void {
-    console.log('SlackService.initialize called with:', {
-      hasConfig: !!config,
-      enabled: config?.enabled,
-      webhookUrl: config?.webhookUrl ? 'present' : 'missing'
-    });
+    logger.debug('SlackService.initialize called', { context: 'Slack', metadata: { hasConfig: !!config, enabled: config?.enabled } });
     
     if (!config || !config.enabled || !config.webhookUrl) {
-      console.log('SlackService.initialize: Disabling service (missing config, enabled, or webhookUrl)');
+      logger.debug('SlackService.initialize: Disabling service', { context: 'Slack' });
       this.config = null;
       return;
     }
@@ -31,49 +28,34 @@ class SlackService {
       enabled: true,
     };
     
-    console.log('SlackService.initialize: Service enabled with webhook URL');
+    logger.debug('SlackService.initialize: Service enabled', { context: 'Slack' });
   }
 
   /**
    * Initialize from AppConfig
    */
   initializeFromConfig(appConfig: AppConfig): void {
-    console.log('initializeFromConfig called with:', {
-      hasSlack: !!appConfig.slack,
-      slackEnabled: appConfig.slack?.enabled,
-      slackWebhookUrl: appConfig.slack?.webhookUrl ? 'present' : 'missing',
-      fullSlackConfig: appConfig.slack,
-      currentConfigExists: !!this.config
-    });
+    logger.debug('initializeFromConfig called', { context: 'Slack', metadata: { hasSlack: !!appConfig.slack, slackEnabled: appConfig.slack?.enabled } });
     
     // Only update if Slack config is provided and valid
     // Don't reset if config is missing - keep existing config
     if (appConfig.slack) {
       if (appConfig.slack.enabled && appConfig.slack.webhookUrl) {
         this.initialize(appConfig.slack);
-        console.log('✅ Slack service initialized successfully:', {
-          enabled: this.config?.enabled,
-          webhookUrl: this.config?.webhookUrl ? 'configured' : 'missing'
-        });
+        logger.info('Slack service initialized successfully', { context: 'Slack' });
       } else {
         // Only disable if explicitly disabled, don't reset if config is just missing
         if (appConfig.slack.enabled === false) {
           this.config = null;
-          console.log('⚠️ Slack service disabled (enabled flag is false)');
+          logger.warn('Slack service disabled (enabled flag is false)', { context: 'Slack' });
         } else {
-          console.log('⚠️ Slack service config incomplete, keeping existing config:', {
-            enabled: appConfig.slack.enabled,
-            hasWebhook: !!appConfig.slack.webhookUrl,
-            currentConfig: this.config ? 'exists' : 'none'
-          });
+          logger.debug('Slack service config incomplete, keeping existing config', { context: 'Slack' });
         }
       }
     } else {
       // No Slack config in AppConfig - keep existing config if it exists
       if (!this.config) {
-        console.log('⚠️ No Slack config provided and no existing config');
-      } else {
-        console.log('ℹ️ No Slack config in AppConfig, keeping existing service config');
+        logger.debug('No Slack config provided and no existing config', { context: 'Slack' });
       }
     }
   }
@@ -93,19 +75,9 @@ class SlackService {
     initiative: Initiative,
     users: User[]
   ): Promise<void> {
-    console.log('notifyEtaChange called:', {
-      isEnabled: this.isEnabled(),
-      changeField: change.field,
-      hasConfig: !!this.config,
-      webhookUrl: this.config?.webhookUrl
-    });
+    logger.debug('notifyEtaChange called', { context: 'Slack', metadata: { isEnabled: this.isEnabled(), changeField: change.field } });
     
     if (!this.isEnabled() || change.field !== 'ETA') {
-      console.log('Slack notification skipped:', {
-        isEnabled: this.isEnabled(),
-        changeField: change.field,
-        expectedField: 'ETA'
-      });
       return;
     }
 
@@ -116,10 +88,7 @@ class SlackService {
     
     // Check if this notification is already pending (being sent)
     if (this.pendingNotifications.has(notificationKey)) {
-      console.log('🚫 Slack notification skipped (already pending):', {
-        key: notificationKey,
-        initiative: initiative.title
-      });
+      logger.debug('Slack notification skipped (already pending)', { context: 'Slack' });
       return;
     }
     
@@ -128,13 +97,7 @@ class SlackService {
     if (lastSent) {
       const timeSinceLastSent = now - lastSent;
       if (timeSinceLastSent < 30000) { // 30 seconds
-        console.log('🚫 Slack notification skipped (duplicate within 30 seconds):', {
-          key: notificationKey,
-          lastSent: new Date(lastSent).toISOString(),
-          now: new Date(now).toISOString(),
-          diffMs: timeSinceLastSent,
-          initiative: initiative.title
-        });
+        logger.debug('Slack notification skipped (duplicate)', { context: 'Slack' });
         return;
       }
     }
@@ -143,13 +106,7 @@ class SlackService {
     this.pendingNotifications.add(notificationKey);
     this.recentNotifications.set(notificationKey, now);
     
-    console.log('✅ Slack notification recorded (will send):', {
-      key: notificationKey,
-      timestamp: new Date(now).toISOString(),
-      initiative: initiative.title,
-      oldValue: change.oldValue,
-      newValue: change.newValue
-    });
+    logger.debug('Slack notification will send', { context: 'Slack', metadata: { initiative: initiative.title } });
     
     // Clean up old entries (older than 2 minutes) periodically
     if (this.recentNotifications.size > 100) {
@@ -244,7 +201,7 @@ class SlackService {
       // Remove from pending after successful send
       this.pendingNotifications.delete(notificationKey);
     } catch (error) {
-      console.error('Error sending ETA change notification to Slack:', error);
+      logger.error('Error sending ETA change notification to Slack', { context: 'Slack', error: error as Error });
       // Remove from pending even on error
       this.pendingNotifications.delete(notificationKey);
     }
@@ -328,7 +285,7 @@ class SlackService {
 
       await this.sendToSlack(message);
     } catch (error) {
-      console.error('Error sending tagging notification to Slack:', error);
+      logger.error('Error sending tagging notification to Slack', { context: 'Slack', error: error as Error });
     }
   }
 
@@ -338,16 +295,12 @@ class SlackService {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async sendToSlack(payload: any, _notificationKey?: string): Promise<void> {
     if (!this.config?.webhookUrl) {
-      console.warn('Slack webhook URL not configured');
+      logger.warn('Slack webhook URL not configured', { context: 'Slack' });
       return;
     }
 
     try {
-      console.log('Sending Slack notification:', {
-        webhookUrl: this.config.webhookUrl,
-        text: payload.text,
-        hasBlocks: !!payload.blocks
-      });
+      logger.debug('Sending Slack notification', { context: 'Slack' });
 
       // Use backend proxy to avoid CORS issues
       const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
@@ -368,25 +321,12 @@ class SlackService {
       const responseData = await response.json();
       
       if (!response.ok) {
-        console.error('❌ Slack notification failed:', {
-          status: response.status,
-          error: responseData.error || responseData,
-          details: responseData.details
-        });
+        logger.error('Slack notification failed', { context: 'Slack', metadata: { status: response.status, error: responseData.error } });
       } else {
-        console.log('✅ Slack notification sent successfully!', {
-          status: response.status,
-          response: responseData
-        });
+        logger.info('Slack notification sent successfully', { context: 'Slack' });
       }
     } catch (error) {
-      console.error('❌ Error sending Slack notification:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack
-        });
-      }
+      logger.error('Error sending Slack notification', { context: 'Slack', error: error as Error });
       // Don't throw - we don't want Slack failures to break the app
     }
   }
@@ -397,7 +337,7 @@ export const slackService = new SlackService();
 // Expose test function for debugging
 if (typeof window !== 'undefined') {
   (window as any).testSlackWebhook = async () => {
-    console.log('Testing Slack webhook...');
+    logger.debug('Testing Slack webhook...', { context: 'Slack' });
     const testMessage = {
       text: '🧪 Test message from Portfolio Management App',
       blocks: [
@@ -412,7 +352,7 @@ if (typeof window !== 'undefined') {
     };
     
     if (!slackService.isEnabled()) {
-      console.error('❌ Slack service is not enabled or configured');
+      logger.error('Slack service is not enabled or configured', { context: 'Slack' });
       return false;
     }
     
@@ -434,10 +374,10 @@ if (typeof window !== 'undefined') {
       });
       
       const result = await response.json();
-      console.log('Test response:', response.status, result);
+      logger.debug('Test response', { context: 'Slack', metadata: { status: response.status, result } });
       return response.ok;
     } catch (error) {
-      console.error('Test error:', error);
+      logger.error('Test error', { context: 'Slack', error: error as Error });
       return false;
     }
   };
