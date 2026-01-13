@@ -1688,9 +1688,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     }
   }, [totalCompletedCount]);
 
-  React.useEffect(() => {
-    if (isStrategicWorkloadVisible) setShowStrategicWorkload(true);
-  }, [isStrategicWorkloadVisible]);
 
   // Invalidate cache when initiatives change significantly
   React.useEffect(() => {
@@ -1897,12 +1894,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
     };
   }, [scheduleMetrics, effortMetrics, changeMetrics, riskMetrics, completionMetrics, obsoleteEffortMetrics, delayDistribution, completionTimeDistribution, strategicWorkload, filteredInitiatives.length]);
 
-  // Auto-show strategic workload section if there's data
-  React.useEffect(() => {
-    if (healthMetrics.strategicWorkload.byPillar.length > 0 || healthMetrics.strategicWorkload.byResponsibility.length > 0) {
-      setShowStrategicWorkload(true);
-    }
-  }, [healthMetrics.strategicWorkload]);
 
   // Health Score History data (from config or mock)
   // Note: Preserved for future use in health trend visualization
