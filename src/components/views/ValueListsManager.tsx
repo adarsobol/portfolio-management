@@ -67,6 +67,7 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
   onUpdate,
   initiatives
 }) => {
+  const [selectedListType, setSelectedListType] = useState<ListType>('assetClasses');
   const [editingIndex, setEditingIndex] = useState<{ listType: ListType; index: number } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [newValue, setNewValue] = useState<Record<ListType, string>>({
@@ -397,6 +398,11 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
     }
   }, [config, onUpdate]);
 
+  // Get the selected list config
+  const selectedListConfig = LIST_CONFIGS.find(config => config.field === selectedListType);
+  const list = getRawList(selectedListType);
+  const fieldKey = selectedListType;
+
   return (
     <div className="space-y-6">
       {/* One-time ensure required values button */}
@@ -404,8 +410,8 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
         <div className="flex items-start gap-3">
           <AlertCircle size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h4 className="font-semibold text-blue-900 mb-1">Ensure Required Values</h4>
-            <p className="text-sm text-blue-700 mb-3">
+            <h4 className="text-xs font-semibold text-blue-900 mb-1">Ensure Required Values</h4>
+            <p className="text-xs text-blue-700 mb-3">
               Ensure all required enum values are present in the value lists:
               <br />• Priorities: P0, P1, P2
               <br />• Initiative Types: WP, BAU
@@ -456,181 +462,194 @@ export const ValueListsManager: React.FC<ValueListsManagerProps> = ({
         </div>
       )}
 
-      {LIST_CONFIGS.map(({ label, field, description }) => {
-        // Use raw list for display in the editor (without required values merged)
-        const list = getRawList(field);
-        const fieldKey = field as ListType;
+      {/* List Selection Dropdown */}
+      <div className="bg-white rounded-lg border border-slate-200 p-4">
+        <label className="block text-sm font-medium text-slate-700 mb-2">
+          Select Value List
+        </label>
+        <select
+          value={selectedListType}
+          onChange={(e) => setSelectedListType(e.target.value as ListType)}
+          className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+        >
+          {LIST_CONFIGS.map(({ label, field }) => (
+            <option key={field} value={field}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        return (
-          <div key={field} className="bg-white rounded-lg border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">{label}</h3>
-                <p className="text-sm text-slate-500 mt-1">{description}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleExport(fieldKey)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-md border border-slate-200 transition-colors"
-                  title="Export list"
-                >
-                  <Download size={14} />
-                  Export
-                </button>
-                <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-md border border-slate-200 transition-colors cursor-pointer">
-                  <Upload size={14} />
-                  Import
-                  <input
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={(e) => handleImport(fieldKey, e)}
-                  />
-                </label>
-                <button
-                  onClick={() => handleReset(fieldKey)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
-                  title="Reset to defaults"
-                >
-                  <RotateCcw size={14} />
-                  Reset
-                </button>
-              </div>
+      {/* Selected List Content */}
+      {selectedListConfig && (
+        <div className="bg-white rounded-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">{selectedListConfig.label}</h3>
+              <p className="text-xs text-slate-500 mt-1">{selectedListConfig.description}</p>
             </div>
-
-            {/* Add new value */}
-            <div className="flex items-center gap-2 mb-4">
-              <input
-                type="text"
-                value={newValue[fieldKey]}
-                onChange={(e) => {
-                  setNewValue(prev => ({ ...prev, [fieldKey]: e.target.value }));
-                  setErrors(prev => {
-                    const newErrors = { ...prev };
-                    delete newErrors[`${fieldKey}-new`];
-                    return newErrors;
-                  });
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAdd(fieldKey);
-                  }
-                }}
-                placeholder={`Add new ${label.toLowerCase()}...`}
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => handleAdd(fieldKey)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+                onClick={() => handleExport(fieldKey)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-md border border-slate-200 transition-colors"
+                title="Export list"
               >
-                <Plus size={16} />
-                Add
+                <Download size={14} />
+                Export
+              </button>
+              <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-md border border-slate-200 transition-colors cursor-pointer">
+                <Upload size={14} />
+                Import
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => handleImport(fieldKey, e)}
+                />
+              </label>
+              <button
+                onClick={() => handleReset(fieldKey)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
+                title="Reset to defaults"
+              >
+                <RotateCcw size={14} />
+                Reset
               </button>
             </div>
-            {errors[`${fieldKey}-new`] && (
-              <div className="mb-2 text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle size={14} />
-                {errors[`${fieldKey}-new`]}
-              </div>
-            )}
-
-            {/* List of values */}
-            <div className="space-y-2">
-              {list.length === 0 ? (
-                <div className="text-sm text-slate-400 italic py-4 text-center">
-                  No values yet. Add one above.
-                </div>
-              ) : (
-                list.map((value, index) => {
-                  const isEditing = editingIndex?.listType === fieldKey && editingIndex.index === index;
-                  const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam' | 'priority' | 'workType' | 'unplannedTag' | 'initiativeType' | 'quarter'> = {
-                    assetClasses: 'assetClass',
-                    statuses: 'status',
-                    dependencyTeams: 'dependencyTeam',
-                    priorities: 'priority',
-                    workTypes: 'workType',
-                    unplannedTags: 'unplannedTag',
-                    initiativeTypes: 'initiativeType',
-                    quarters: 'quarter'
-                  };
-                  const usageCount = getValueUsageCount(value, initiatives, fieldMap[fieldKey]);
-
-                  return (
-                    <div
-                      key={`${fieldKey}-${index}`}
-                      className="flex items-center gap-2 p-3 bg-slate-50 rounded-md border border-slate-200 hover:border-slate-300 transition-colors group"
-                    >
-                      <GripVertical className="text-slate-400 cursor-move" size={16} />
-                      
-                      {isEditing ? (
-                        <>
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleEditSave();
-                              } else if (e.key === 'Escape') {
-                                handleEditCancel();
-                              }
-                            }}
-                            className="flex-1 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            autoFocus
-                          />
-                          <button
-                            onClick={handleEditSave}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                            title="Save"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            onClick={handleEditCancel}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Cancel"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <span className="flex-1 text-slate-900 font-medium">{value}</span>
-                          {usageCount > 0 && (
-                            <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
-                              Used {usageCount}x
-                            </span>
-                          )}
-                          <button
-                            onClick={() => handleEditStart(fieldKey, index)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                            title="Edit"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(fieldKey, index)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                            title={usageCount > 0 ? `Delete (used ${usageCount}x)` : 'Delete'}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
-                      )}
-                      {errors[`${fieldKey}-${index}`] && (
-                        <div className="text-xs text-red-600 flex items-center gap-1">
-                          <AlertCircle size={12} />
-                          {errors[`${fieldKey}-${index}`]}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
           </div>
-        );
-      })}
+
+          {/* Add new value */}
+          <div className="flex items-center gap-2 mb-4">
+            <input
+              type="text"
+              value={newValue[fieldKey]}
+              onChange={(e) => {
+                setNewValue(prev => ({ ...prev, [fieldKey]: e.target.value }));
+                setErrors(prev => {
+                  const newErrors = { ...prev };
+                  delete newErrors[`${fieldKey}-new`];
+                  return newErrors;
+                });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAdd(fieldKey);
+                }
+              }}
+              placeholder={`Add new ${selectedListConfig.label.toLowerCase()}...`}
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              onClick={() => handleAdd(fieldKey)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5"
+            >
+              <Plus size={16} />
+              Add
+            </button>
+          </div>
+          {errors[`${fieldKey}-new`] && (
+            <div className="mb-2 text-sm text-red-600 flex items-center gap-1">
+              <AlertCircle size={14} />
+              {errors[`${fieldKey}-new`]}
+            </div>
+          )}
+
+          {/* List of values */}
+          <div className="space-y-2">
+            {list.length === 0 ? (
+              <div className="text-sm text-slate-400 italic py-4 text-center">
+                No values yet. Add one above.
+              </div>
+            ) : (
+              list.map((value, index) => {
+                const isEditing = editingIndex?.listType === fieldKey && editingIndex.index === index;
+                const fieldMap: Record<ListType, 'assetClass' | 'status' | 'dependencyTeam' | 'priority' | 'workType' | 'unplannedTag' | 'initiativeType' | 'quarter'> = {
+                  assetClasses: 'assetClass',
+                  statuses: 'status',
+                  dependencyTeams: 'dependencyTeam',
+                  priorities: 'priority',
+                  workTypes: 'workType',
+                  unplannedTags: 'unplannedTag',
+                  initiativeTypes: 'initiativeType',
+                  quarters: 'quarter'
+                };
+                const usageCount = getValueUsageCount(value, initiatives, fieldMap[fieldKey]);
+
+                return (
+                  <div
+                    key={`${fieldKey}-${index}`}
+                    className="flex items-center gap-2 p-3 bg-slate-50 rounded-md border border-slate-200 hover:border-slate-300 transition-colors group"
+                  >
+                    <GripVertical className="text-slate-400 cursor-move" size={16} />
+                    
+                    {isEditing ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleEditSave();
+                            } else if (e.key === 'Escape') {
+                              handleEditCancel();
+                            }
+                          }}
+                          className="flex-1 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleEditSave}
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                          title="Save"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={handleEditCancel}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Cancel"
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-slate-900 font-medium">{value}</span>
+                        {usageCount > 0 && (
+                          <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
+                            Used {usageCount}x
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleEditStart(fieldKey, index)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                          title="Edit"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(fieldKey, index)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                          title={usageCount > 0 ? `Delete (used ${usageCount}x)` : 'Delete'}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                    {errors[`${fieldKey}-${index}`] && (
+                      <div className="text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors[`${fieldKey}-${index}`]}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -100,9 +100,9 @@ export const ErrorLogView: React.FC<ErrorLogViewProps> = ({ users }) => {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <AlertTriangle className="w-6 h-6 text-red-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Error Logs</h1>
-          <span className="text-sm text-slate-500">({filteredLogs.length} errors)</span>
+          <AlertTriangle className="w-5 h-5 text-red-600" />
+          <h1 className="text-sm font-bold text-slate-900">Error Logs</h1>
+          <span className="text-xs text-slate-500">({filteredLogs.length} errors)</span>
         </div>
         <div className="flex items-center gap-2">
           <button

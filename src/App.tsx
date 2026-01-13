@@ -2334,27 +2334,76 @@ export default function App() {
 
       <Routes>
         <Route path="/item/:id" element={
-          <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
-            <div className="flex flex-col md:flex-row justify-end items-start md:items-center mb-8 gap-4">
+          <main ref={mainContainerRef} className={`flex-1 overflow-y-auto bg-[#F9FAFB] ${currentView === 'all' ? 'p-4 md:p-8' : 'p-2 md:p-4'}`}>
+            <div className={`flex flex-col md:flex-row justify-end items-start md:items-center gap-4 ${currentView === 'all' ? 'mb-8' : 'mb-2'}`}>
           <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" placeholder="Search..." 
-                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
-              />
-            </div>
+            {currentView === 'all' && (
+              <>
+                <div className="relative flex-1 md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" placeholder="Search..." 
+                    value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
+                  />
+                </div>
+                <ExportDropdown 
+                  initiatives={filteredInitiatives} 
+                  users={users}
+                  filters={{
+                    assetClass: filterAssetClass,
+                    owners: filterOwners,
+                    workType: filterWorkType?.[0] || undefined
+                  }}
+                />
+                {canCreate && (
+                  <div className="relative" ref={newButtonRef}>
+                    <button 
+                      onClick={() => setNewButtonDropdownOpen(!newButtonDropdownOpen)} 
+                      className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                    >
+                      <Plus size={16} /><span>New</span>
+                      <ChevronDown size={14} className={`transition-transform ${newButtonDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {newButtonDropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
+                        <button
+                          onClick={() => {
+                            setInitialModalMode('single');
+                            setEditingItem(null);
+                            setIsModalOpen(true);
+                            setNewButtonDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        >
+                          <Plus size={16} className="text-blue-600" />
+                          <div>
+                            <p className="font-medium">New Item</p>
+                            <p className="text-xs text-slate-400">Single initiative</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setInitialModalMode('bulk');
+                            setEditingItem(null);
+                            setIsModalOpen(true);
+                            setNewButtonDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
+                        >
+                          <Plus size={16} className="text-indigo-600" />
+                          <div>
+                            <p className="font-medium">Plan Mode</p>
+                            <p className="text-xs text-slate-400">Spreadsheet view</p>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
             <PresenceIndicator currentUserId={currentUser.id} />
-            <ExportDropdown 
-              initiatives={filteredInitiatives} 
-              users={users}
-              filters={{
-                assetClass: filterAssetClass,
-                owners: filterOwners,
-                workType: filterWorkType?.[0] || undefined
-              }}
-            />
             <NotificationMenu
               notifications={notifications}
               onMarkAsRead={handleMarkAsRead}
@@ -2365,51 +2414,6 @@ export default function App() {
               currentUserEmail={currentUser.email}
               validInitiativeIds={validInitiativeIds}
             />
-            {canCreate && (
-              <div className="relative" ref={newButtonRef}>
-                <button 
-                  onClick={() => setNewButtonDropdownOpen(!newButtonDropdownOpen)} 
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                >
-                  <Plus size={16} /><span>New</span>
-                  <ChevronDown size={14} className={`transition-transform ${newButtonDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {newButtonDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
-                    <button
-                      onClick={() => {
-                        setInitialModalMode('single');
-                        setEditingItem(null);
-                        setIsModalOpen(true);
-                        setNewButtonDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                    >
-                      <Plus size={16} className="text-blue-600" />
-                      <div>
-                        <p className="font-medium">New Item</p>
-                        <p className="text-xs text-slate-400">Single initiative</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setInitialModalMode('bulk');
-                        setEditingItem(null);
-                        setIsModalOpen(true);
-                        setNewButtonDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
-                    >
-                      <Plus size={16} className="text-indigo-600" />
-                      <div>
-                        <p className="font-medium">Plan Mode</p>
-                        <p className="text-xs text-slate-400">Spreadsheet view</p>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -2434,19 +2438,21 @@ export default function App() {
                 />
              )}
              
-<FilterBar 
-              filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
-              filterOwners={filterOwners} setFilterOwners={setFilterOwners}
-              filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
-              filterQuarter={filterQuarter} setFilterQuarter={setFilterQuarter}
-              filterPriority={filterPriority} setFilterPriority={setFilterPriority}
-              filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-              searchQuery={searchQuery} resetFilters={resetFilters}
-              currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
-              users={users}
-              initiatives={initiatives}
-              config={config}
-           />
+             {currentView !== 'workflows' && (
+               <FilterBar 
+                 filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+                 filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+                 filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+                 filterQuarter={filterQuarter} setFilterQuarter={setFilterQuarter}
+                 filterPriority={filterPriority} setFilterPriority={setFilterPriority}
+                 filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                 searchQuery={searchQuery} resetFilters={resetFilters}
+                 currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+                 users={users}
+                 initiatives={initiatives}
+                 config={config}
+               />
+             )}
 
              {currentView === 'resources' ? (
                canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (
@@ -2529,27 +2535,76 @@ export default function App() {
       </main>
         } />
         <Route path="*" element={
-          <main ref={mainContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F9FAFB]">
-            <div className="flex flex-col md:flex-row justify-end items-start md:items-center mb-8 gap-4">
+          <main ref={mainContainerRef} className={`flex-1 overflow-y-auto bg-[#F9FAFB] ${currentView === 'all' ? 'p-4 md:p-8' : 'p-2 md:p-4'}`}>
+            <div className={`flex flex-col md:flex-row justify-end items-start md:items-center gap-4 ${currentView === 'all' ? 'mb-8' : 'mb-2'}`}>
           <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text" placeholder="Search..." 
-                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
-              />
-            </div>
+            {currentView === 'all' && (
+              <>
+                <div className="relative flex-1 md:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" placeholder="Search..." 
+                    value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm"
+                  />
+                </div>
+                <ExportDropdown 
+                  initiatives={filteredInitiatives} 
+                  users={users}
+                  filters={{
+                    assetClass: filterAssetClass,
+                    owners: filterOwners,
+                    workType: filterWorkType?.[0] || undefined
+                  }}
+                />
+                {canCreate && (
+                  <div className="relative" ref={newButtonRef}>
+                    <button 
+                      onClick={() => setNewButtonDropdownOpen(!newButtonDropdownOpen)} 
+                      className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                    >
+                      <Plus size={16} /><span>New</span>
+                      <ChevronDown size={14} className={`transition-transform ${newButtonDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {newButtonDropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
+                        <button
+                          onClick={() => {
+                            setInitialModalMode('single');
+                            setEditingItem(null);
+                            setIsModalOpen(true);
+                            setNewButtonDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        >
+                          <Plus size={16} className="text-blue-600" />
+                          <div>
+                            <p className="font-medium">New Item</p>
+                            <p className="text-xs text-slate-400">Single initiative</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setInitialModalMode('bulk');
+                            setEditingItem(null);
+                            setIsModalOpen(true);
+                            setNewButtonDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
+                        >
+                          <Plus size={16} className="text-indigo-600" />
+                          <div>
+                            <p className="font-medium">Plan Mode</p>
+                            <p className="text-xs text-slate-400">Spreadsheet view</p>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
             <PresenceIndicator currentUserId={currentUser.id} />
-            <ExportDropdown 
-              initiatives={filteredInitiatives} 
-              users={users}
-              filters={{
-                assetClass: filterAssetClass,
-                owners: filterOwners,
-                workType: filterWorkType?.[0] || undefined
-              }}
-            />
             <NotificationMenu
               notifications={notifications}
               onMarkAsRead={handleMarkAsRead}
@@ -2560,51 +2615,6 @@ export default function App() {
               currentUserEmail={currentUser.email}
               validInitiativeIds={validInitiativeIds}
             />
-            {canCreate && (
-              <div className="relative" ref={newButtonRef}>
-                <button 
-                  onClick={() => setNewButtonDropdownOpen(!newButtonDropdownOpen)} 
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                >
-                  <Plus size={16} /><span>New</span>
-                  <ChevronDown size={14} className={`transition-transform ${newButtonDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {newButtonDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
-                    <button
-                      onClick={() => {
-                        setInitialModalMode('single');
-                        setEditingItem(null);
-                        setIsModalOpen(true);
-                        setNewButtonDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-                    >
-                      <Plus size={16} className="text-blue-600" />
-                      <div>
-                        <p className="font-medium">New Item</p>
-                        <p className="text-xs text-slate-400">Single initiative</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setInitialModalMode('bulk');
-                        setEditingItem(null);
-                        setIsModalOpen(true);
-                        setNewButtonDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
-                    >
-                      <Plus size={16} className="text-indigo-600" />
-                      <div>
-                        <p className="font-medium">Plan Mode</p>
-                        <p className="text-xs text-slate-400">Spreadsheet view</p>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -2629,19 +2639,21 @@ export default function App() {
                 />
              )}
              
-<FilterBar 
-              filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
-              filterOwners={filterOwners} setFilterOwners={setFilterOwners}
-              filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
-              filterQuarter={filterQuarter} setFilterQuarter={setFilterQuarter}
-              filterPriority={filterPriority} setFilterPriority={setFilterPriority}
-              filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-              searchQuery={searchQuery} resetFilters={resetFilters}
-              currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
-              users={users}
-              initiatives={initiatives}
-              config={config}
-           />
+             {currentView !== 'workflows' && (
+               <FilterBar 
+                 filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+                 filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+                 filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+                 filterQuarter={filterQuarter} setFilterQuarter={setFilterQuarter}
+                 filterPriority={filterPriority} setFilterPriority={setFilterPriority}
+                 filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+                 searchQuery={searchQuery} resetFilters={resetFilters}
+                 currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+                 users={users}
+                 initiatives={initiatives}
+                 config={config}
+               />
+             )}
 
              {currentView === 'resources' ? (
                canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (
