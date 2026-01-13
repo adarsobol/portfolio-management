@@ -605,7 +605,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                          {/* Title + Asset Class - single line */}
                          <div className="truncate pr-2.5 pl-3.5 leading-tight">
                            {highlightSearchMatch(item.title, searchQuery)}
-                           {item.assetClass && <span className="text-[8px] opacity-60 ml-1">• {item.assetClass}</span>}
+                           {item.l1_assetClass && <span className="text-[8px] opacity-60 ml-1">• {item.l1_assetClass}</span>}
                          </div>
                        </div>
                      );
