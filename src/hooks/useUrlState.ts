@@ -27,6 +27,9 @@ export function useUrlState() {
     assetClass?: string;
     owners?: string[];
     workType?: string[];
+    quarter?: string[];
+    priority?: string[];
+    status?: string[];
     searchQuery?: string;
   }) => {
     const newParams = new URLSearchParams(searchParams);
@@ -52,6 +55,30 @@ export function useUrlState() {
         newParams.set('workType', filters.workType.join(','));
       } else {
         newParams.delete('workType');
+      }
+    }
+    
+    if (filters.quarter !== undefined) {
+      if (filters.quarter.length > 0) {
+        newParams.set('quarter', filters.quarter.join(','));
+      } else {
+        newParams.delete('quarter');
+      }
+    }
+    
+    if (filters.priority !== undefined) {
+      if (filters.priority.length > 0) {
+        newParams.set('priority', filters.priority.join(','));
+      } else {
+        newParams.delete('priority');
+      }
+    }
+    
+    if (filters.status !== undefined) {
+      if (filters.status.length > 0) {
+        newParams.set('status', filters.status.join(','));
+      } else {
+        newParams.delete('status');
       }
     }
     

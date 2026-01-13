@@ -535,6 +535,9 @@ export default function App() {
   const [filterAssetClass, setFilterAssetClass] = useState<string>('');
   const [filterOwners, setFilterOwners] = useState<string[]>([]);
   const [filterWorkType, setFilterWorkType] = useState<string[]>([]);
+  const [filterQuarter, setFilterQuarter] = useState<string[]>([]);
+  const [filterPriority, setFilterPriority] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
   
   // URL State Management
   const { getFilterFromUrl, getSingleFilterFromUrl, updateUrlFilters } = useUrlState();
@@ -544,11 +547,17 @@ export default function App() {
     const urlAssetClass = getSingleFilterFromUrl('assetClass');
     const urlOwners = getFilterFromUrl('owners');
     const urlWorkType = getFilterFromUrl('workType');
+    const urlQuarter = getFilterFromUrl('quarter');
+    const urlPriority = getFilterFromUrl('priority');
+    const urlStatus = getFilterFromUrl('status');
     const urlSearch = getSingleFilterFromUrl('search');
     
     if (urlAssetClass) setFilterAssetClass(urlAssetClass);
     if (urlOwners.length > 0) setFilterOwners(urlOwners);
     if (urlWorkType.length > 0) setFilterWorkType(urlWorkType);
+    if (urlQuarter.length > 0) setFilterQuarter(urlQuarter);
+    if (urlPriority.length > 0) setFilterPriority(urlPriority);
+    if (urlStatus.length > 0) setFilterStatus(urlStatus);
     if (urlSearch) setSearchQuery(urlSearch);
   }, []); // Only on mount
   
@@ -558,9 +567,12 @@ export default function App() {
       assetClass: filterAssetClass,
       owners: filterOwners,
       workType: filterWorkType,
+      quarter: filterQuarter,
+      priority: filterPriority,
+      status: filterStatus,
       searchQuery: searchQuery
     });
-  }, [filterAssetClass, filterOwners, filterWorkType, searchQuery, updateUrlFilters]);
+  }, [filterAssetClass, filterOwners, filterWorkType, filterQuarter, filterPriority, filterStatus, searchQuery, updateUrlFilters]);
 
   // Sort State
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -818,6 +830,21 @@ export default function App() {
       });
     }
 
+    // Filter by Quarter
+    if (filterQuarter.length > 0) {
+      data = data.filter(i => filterQuarter.includes(i.quarter));
+    }
+
+    // Filter by Priority
+    if (filterPriority.length > 0) {
+      data = data.filter(i => filterPriority.includes(i.priority));
+    }
+
+    // Filter by Status
+    if (filterStatus.length > 0) {
+      data = data.filter(i => filterStatus.includes(i.status));
+    }
+
     // Search filter
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -856,7 +883,7 @@ export default function App() {
     }
 
     return data;
-  }, [initiatives, searchQuery, filterAssetClass, filterOwners, filterWorkType, sortConfig, users, currentView]);
+  }, [initiatives, searchQuery, filterAssetClass, filterOwners, filterWorkType, filterQuarter, filterPriority, filterStatus, sortConfig, users, currentView]);
 
   const metrics = useMemo(() => {
     const totalEst = filteredInitiatives.reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
@@ -2145,6 +2172,9 @@ export default function App() {
     setFilterAssetClass('');
     setFilterOwners([]);
     setFilterWorkType([]);
+    setFilterQuarter([]);
+    setFilterPriority([]);
+    setFilterStatus([]);
     setSearchQuery('');
   };
 
@@ -2400,15 +2430,18 @@ export default function App() {
              )}
              
 <FilterBar 
-               filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
-               filterOwners={filterOwners} setFilterOwners={setFilterOwners}
-               filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
-               searchQuery={searchQuery} resetFilters={resetFilters}
-               currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
-               users={users}
-               initiatives={initiatives}
-               config={config}
-            />
+              filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+              filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+              filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+              filterQuarter={filterQuarter} setFilterQuarter={setFilterQuarter}
+              filterPriority={filterPriority} setFilterPriority={setFilterPriority}
+              filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+              searchQuery={searchQuery} resetFilters={resetFilters}
+              currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+              users={users}
+              initiatives={initiatives}
+              config={config}
+           />
 
              {currentView === 'resources' ? (
                canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (
@@ -2592,15 +2625,18 @@ export default function App() {
              )}
              
 <FilterBar 
-               filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
-               filterOwners={filterOwners} setFilterOwners={setFilterOwners}
-               filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
-               searchQuery={searchQuery} resetFilters={resetFilters}
-               currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
-               users={users}
-               initiatives={initiatives}
-               config={config}
-            />
+              filterAssetClass={filterAssetClass} setFilterAssetClass={setFilterAssetClass}
+              filterOwners={filterOwners} setFilterOwners={setFilterOwners}
+              filterWorkType={filterWorkType} setFilterWorkType={setFilterWorkType}
+              filterQuarter={filterQuarter} setFilterQuarter={setFilterQuarter}
+              filterPriority={filterPriority} setFilterPriority={setFilterPriority}
+              filterStatus={filterStatus} setFilterStatus={setFilterStatus}
+              searchQuery={searchQuery} resetFilters={resetFilters}
+              currentView={currentView} viewLayout={viewLayout} setViewLayout={setViewLayout}
+              users={users}
+              initiatives={initiatives}
+              config={config}
+           />
 
              {currentView === 'resources' ? (
                canViewTab(config, currentUser.role, 'accessWorkplanHealth') ? (

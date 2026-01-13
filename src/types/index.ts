@@ -614,6 +614,24 @@ export interface BugReport extends Feedback {
 }
 
 // ============================================
+// FILTER VIEW TYPES
+// ============================================
+
+export interface SavedFilterView {
+  id: string;
+  name: string;
+  createdAt: string;
+  filters: {
+    assetClass: string;
+    owners: string[];
+    workType: string[];
+    quarter: string[];
+    priority: string[];
+    status: string[];
+  };
+}
+
+// ============================================
 // MONITORING & ANALYTICS TYPES
 // ============================================
 
