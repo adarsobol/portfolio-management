@@ -1688,7 +1688,8 @@ app.post('/api/sheets/bulk-import', authenticateToken, async (req: Authenticated
     if (!initiativesSheet) {
       initiativesSheet = await doc.addSheet({
         title: 'Initiatives',
-        headerValues: INITIATIVE_HEADERS
+        headerValues: INITIATIVE_HEADERS,
+        gridProperties: { rowCount: 1000, columnCount: 50 }
       });
     }
 
@@ -1931,8 +1932,35 @@ app.get('/api/sheets/health', async (req, res) => {
   });
 });
 
+// Mutex to prevent concurrent sync operations that could cause race conditions
+let syncMutex = false;
+const syncMutexQueue: Array<() => void> = [];
+
+async function acquireSyncMutex(): Promise<void> {
+  return new Promise((resolve) => {
+    if (!syncMutex) {
+      syncMutex = true;
+      resolve();
+    } else {
+      syncMutexQueue.push(resolve);
+    }
+  });
+}
+
+function releaseSyncMutex(): void {
+  syncMutex = false;
+  const next = syncMutexQueue.shift();
+  if (next) {
+    syncMutex = true;
+    next();
+  }
+}
+
 // POST /api/sheets/initiatives - Upsert initiatives (Protected)
 app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArraySchema), async (req: AuthenticatedRequest, res: Response) => {
+  // Acquire mutex to prevent concurrent sync operations
+  await acquireSyncMutex();
+  
   try {
     const { initiatives } = req.body;
 
@@ -1962,7 +1990,8 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     if (!sheet) {
       sheet = await doc.addSheet({
         title: 'Initiatives',
-        headerValues: INITIATIVE_HEADERS
+        headerValues: INITIATIVE_HEADERS,
+        gridProperties: { rowCount: 1000, columnCount: 50 }
       });
     } else {
       // Ensure headers are set if sheet exists but has no headers
@@ -1972,33 +2001,29 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
       });
     }
 
-    // Get all rows and remove duplicates from sheet first
+    // Get all rows from sheet
+    // NOTE: We no longer delete "duplicate" rows here because:
+    // 1. With concurrent requests, legitimate items can be incorrectly identified as duplicates
+    // 2. The upsert logic below already handles duplicates by updating existing rows
+    // 3. If true duplicates exist, they should be handled manually or via a separate cleanup process
     const rows = await sheet.getRows();
-    const seenSheetIds = new Set<string>();
-    const rowsToDelete: GoogleSpreadsheetRow[] = [];
     
-    // Identify duplicate rows in the sheet (keep first occurrence, mark others for deletion)
+    // Log if duplicates are detected (for monitoring) but don't delete them
+    const seenSheetIds = new Set<string>();
+    const duplicateIds: string[] = [];
     for (const row of rows) {
       const id = row.get('id');
       if (!id || id.startsWith('_meta_')) continue;
       
       if (seenSheetIds.has(id)) {
-        rowsToDelete.push(row);
+        duplicateIds.push(id);
       } else {
         seenSheetIds.add(id);
       }
     }
-
-    // Delete duplicate rows from sheet
-    if (rowsToDelete.length > 0) {
-      console.log(`[SERVER] Upsert: Removing ${rowsToDelete.length} duplicate rows from sheet`);
-      for (const row of rowsToDelete) {
-        await row.delete();
-      }
-      // Reload rows after deletion
-      const updatedRows = await sheet.getRows();
-      rows.length = 0;
-      rows.push(...updatedRows);
+    
+    if (duplicateIds.length > 0) {
+      console.warn(`[SERVER] Upsert: Detected ${duplicateIds.length} duplicate ID(s) in sheet: ${duplicateIds.slice(0, 5).join(', ')}${duplicateIds.length > 5 ? '...' : ''}. These will be handled by upsert logic (updating first occurrence).`);
     }
 
     // Now process deduplicated initiatives
@@ -2100,6 +2125,9 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
   } catch (error) {
     console.error('Error syncing initiatives:', error);
     res.status(500).json({ error: String(error) });
+  } finally {
+    // CRITICAL: Always release mutex to prevent deadlock
+    releaseSyncMutex();
   }
 });
 
@@ -2554,9 +2582,14 @@ app.post('/api/sheets/snapshot', authenticateToken, async (req: AuthenticatedReq
 
     console.log(`[SERVER] Creating snapshot tab: ${tabName}`);
 
+    // Create sheet with enough columns for all headers (default is 26, we need at least 35)
     const newSheet = await doc.addSheet({
       title: tabName,
-      headerValues: INITIATIVE_HEADERS
+      headerValues: INITIATIVE_HEADERS,
+      gridProperties: {
+        rowCount: 1000,  // Start with 1000 rows for snapshots
+        columnCount: Math.max(INITIATIVE_HEADERS.length + 5, 40)  // Add buffer columns
+      }
     });
 
     await newSheet.addRow({
@@ -2648,9 +2681,9 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
           id: row.get('id') || '',
           initiativeType: row.get('initiativeType') || 'WP',
           l1_assetClass: row.get('l1_assetClass') || '',
-          l2_pillar: row.get('l2_pillar') || '',
-          l3_responsibility: row.get('l3_responsibility') || '',
-          l4_target: row.get('l4_target') || '',
+          l2_pillar: row.get('l2_pillar') || row.get('Pillar') || row.get('pillar') || '',
+          l3_responsibility: row.get('l3_responsibility') || row.get('Responsibility') || row.get('responsibility') || row.get('L3 Responsibility') || '',
+          l4_target: row.get('l4_target') || row.get('Target') || row.get('target') || '',
           title: row.get('title') || '',
           ownerId: row.get('ownerId') || '',
           secondaryOwner: row.get('secondaryOwner') || undefined,
@@ -2742,7 +2775,8 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
     } else {
       sheet = await doc.addSheet({
         title: 'Initiatives',
-        headerValues: INITIATIVE_HEADERS
+        headerValues: INITIATIVE_HEADERS,
+        gridProperties: { rowCount: 1000, columnCount: 50 }
       });
     }
 
@@ -2880,9 +2914,14 @@ app.post('/api/sheets/scheduled-snapshot', async (req: Request, res: Response) =
       return;
     }
 
+    // Create sheet with enough columns for all headers (default is 26, we need 35+)
     const newSheet = await doc.addSheet({
       title: tabName,
-      headerValues: INITIATIVE_HEADERS
+      headerValues: INITIATIVE_HEADERS,
+      gridProperties: {
+        rowCount: 1000,
+        columnCount: Math.max(INITIATIVE_HEADERS.length + 5, 40)
+      }
     });
 
     // Add metadata row
@@ -3771,7 +3810,8 @@ app.post('/api/backups/restore/:date', authenticateToken, async (req: Authentica
       } else {
         sheet = await doc.addSheet({
           title: 'Initiatives',
-          headerValues: INITIATIVE_HEADERS
+          headerValues: INITIATIVE_HEADERS,
+          gridProperties: { rowCount: 1000, columnCount: 50 }
         });
       }
 
@@ -3932,10 +3972,14 @@ app.post('/api/backups/create', authenticateToken, async (req: AuthenticatedRequ
       const safeName = (label || 'Manual').replace(/[^a-zA-Z0-9\s-]/g, '').slice(0, 30);
       const tabName = `Snap_${timestamp}_${safeName}`.slice(0, 100);
 
-      const newSheet = await doc.addSheet({
-        title: tabName,
-        headerValues: INITIATIVE_HEADERS
-      });
+const newSheet = await doc.addSheet({
+      title: tabName,
+      headerValues: INITIATIVE_HEADERS,
+      gridProperties: {
+        rowCount: 1000,
+        columnCount: 50
+      }
+    });
 
       // Add metadata row
       await newSheet.addRow({
