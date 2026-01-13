@@ -1654,7 +1654,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [bufferRef, isBufferVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [delayRef, isDelayVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [completionTimeRef, isCompletionTimeVisible] = useIntersectionObserver({ threshold: 0.1 });
-  const [strategicWorkloadRef, isStrategicWorkloadVisible] = useIntersectionObserver({ threshold: 0.1 });
+  const [strategicWorkloadRef] = useIntersectionObserver({ threshold: 0.1 });
 
   // Calculate total completed count independently (always runs, not lazy-loaded)
   // This is needed to determine if the chart section should render
