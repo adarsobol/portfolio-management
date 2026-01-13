@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Gauge,
   Info,
   X,
@@ -269,12 +271,58 @@ function calculateRiskMetrics(initiatives: Initiative[]) {
       // Calculate combined variance score for sorting (weighted)
       const varianceScore = (effortPercentChange * 0.6) + (etaDaysDiff * 0.4);
       
+      // Identify trade-off context from history
+      // Collect ALL trade-offs that contributed to the variance (not just the most recent)
+      const history = i.history || [];
+      const hasEtaVariance = i.eta !== i.originalEta;
+      const hasEffortVariance = i.estimatedEffort !== i.originalEstimatedEffort;
+      
+      const tradeOffSources: string[] = [];
+      const seenTradeOffs = new Set<string>(); // Deduplicate by title
+      
+      // Collect ETA trade-offs
+      if (hasEtaVariance && i.eta && i.originalEta) {
+        const etaChanges = history
+          .filter(c => c.field === 'ETA' && c.tradeOffSourceTitle)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        
+        etaChanges.forEach(change => {
+          if (change.tradeOffSourceTitle && !seenTradeOffs.has(change.tradeOffSourceTitle)) {
+            tradeOffSources.push(change.tradeOffSourceTitle);
+            seenTradeOffs.add(change.tradeOffSourceTitle);
+          }
+        });
+      }
+      
+      // Collect Effort trade-offs
+      if (hasEffortVariance && i.estimatedEffort !== undefined && i.originalEstimatedEffort !== undefined) {
+        const effortChanges = history
+          .filter(c => c.field === 'Effort' && c.tradeOffSourceTitle)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        
+        effortChanges.forEach(change => {
+          if (change.tradeOffSourceTitle && !seenTradeOffs.has(change.tradeOffSourceTitle)) {
+            tradeOffSources.push(change.tradeOffSourceTitle);
+            seenTradeOffs.add(change.tradeOffSourceTitle);
+          }
+        });
+      }
+      
+      // Format trade-offs: if multiple, show count and list in tooltip
+      const tradeOffSourceTitle = tradeOffSources.length > 0 
+        ? tradeOffSources.length === 1 
+          ? tradeOffSources[0] 
+          : `${tradeOffSources.length} trade-offs`
+        : undefined;
+      
       return {
         ...i,
         effortDiff,
         effortPercentChange,
         etaDaysDiff,
-        varianceScore
+        varianceScore,
+        tradeOffSourceTitle,
+        tradeOffSources: tradeOffSources.length > 0 ? tradeOffSources : undefined
       };
     })
     .sort((a, b) => b.varianceScore - a.varianceScore); // Sort by largest variance first
@@ -782,7 +830,7 @@ const OverlookedItemRow = memo<{ item: Initiative; getOwnerName: (id: string) =>
 );
 OverlookedItemRow.displayName = 'OverlookedItemRow';
 
-const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortPercentChange?: number; etaDaysDiff?: number } }>(
+const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortPercentChange?: number; etaDaysDiff?: number; tradeOffSourceTitle?: string; tradeOffSources?: string[] } }>(
   ({ item }) => {
     const effortDiff = item.effortDiff ?? ((item.estimatedEffort || 0) - (item.originalEstimatedEffort || 0));
     const effortPercentChange = item.effortPercentChange ?? (item.originalEstimatedEffort && item.originalEstimatedEffort > 0
@@ -793,6 +841,19 @@ const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortP
     // Determine variance severity
     const isSignificantEffort = effortPercentChange > 10;
     const isSignificantEta = etaDaysDiff > 7;
+    
+    // Format trade-off display
+    const tradeOffSources = item.tradeOffSources || (item.tradeOffSourceTitle ? [item.tradeOffSourceTitle] : []);
+    const tradeOffDisplay = tradeOffSources.length > 0 
+      ? tradeOffSources.length === 1
+        ? `Trade-off: ${tradeOffSources[0]}`
+        : `${tradeOffSources.length} trade-offs`
+      : null;
+    const tradeOffTooltip = tradeOffSources.length > 1
+      ? `Trade-offs:\n${tradeOffSources.map((title, idx) => `${idx + 1}. ${title}`).join('\n')}`
+      : tradeOffSources.length === 1
+        ? `Trade-off: ${tradeOffSources[0]}`
+        : undefined;
     
     return (
       <tr className="hover:bg-blue-50/30 transition-colors">
@@ -832,6 +893,18 @@ const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortP
           {item.eta || 'N/A'}
           {isSignificantEta && item.eta && item.originalEta && (
             <span className="ml-1 text-[9px] text-red-600">({etaDaysDiff > 0 ? '+' : ''}{etaDaysDiff}d)</span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-xs">
+          {tradeOffDisplay ? (
+            <span 
+              className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-medium cursor-help" 
+              title={tradeOffTooltip}
+            >
+              {tradeOffDisplay}
+            </span>
+          ) : (
+            <span className="text-slate-400 italic">—</span>
           )}
         </td>
       </tr>
@@ -1572,6 +1645,9 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   // Strategic Workload grouping toggle
   const [workloadGroupBy, setWorkloadGroupBy] = useState<'pillar' | 'responsibility'>('pillar');
   
+  // Insights section collapsed state
+  const [insightsCollapsed, setInsightsCollapsed] = useState(false);
+  
   // Pagination state for tables
   const [delayedPage, setDelayedPage] = useState(1);
   const [overlookedPage, setOverlookedPage] = useState(1);
@@ -1974,35 +2050,45 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
           {/* Automated Insights Summary */}
           {healthMetrics.strategicWorkload.insights.length > 0 && (
             <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 px-4 py-3 rounded-2xl border border-indigo-200 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={() => setInsightsCollapsed(!insightsCollapsed)}
+                className="flex items-center gap-2 w-full mb-3 hover:opacity-80 transition-opacity"
+              >
                 <Gauge className="w-4 h-4 text-indigo-600" />
                 <h3 className="text-sm font-bold text-slate-800">Automated Insights</h3>
                 <HelpCircle className="w-3 h-3 text-slate-400" />
                 <span className="text-[10px] text-slate-500 ml-auto">Based on Active Portfolio (In Progress, At Risk, Done)</span>
-              </div>
-              <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                {healthMetrics.strategicWorkload.insights.map((insight, idx) => {
-                const severityColors = {
-                  critical: 'bg-red-50 border-red-200 text-red-800',
-                  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-                  positive: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-                };
-                const severityIcons = {
-                  critical: '🔴',
-                  warning: '🟡',
-                  positive: '🟢',
-                };
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-start gap-2 p-2 rounded-lg border ${severityColors[insight.severity]}`}
-                  >
-                    <span className="text-sm flex-shrink-0">{severityIcons[insight.severity]}</span>
-                    <p className="text-xs font-medium flex-1 leading-relaxed">{insight.message}</p>
-                  </div>
-                );
-              })}
-              </div>
+                {insightsCollapsed ? (
+                  <ChevronDown className="w-4 h-4 text-slate-600" />
+                ) : (
+                  <ChevronUp className="w-4 h-4 text-slate-600" />
+                )}
+              </button>
+              {!insightsCollapsed && (
+                <div className="space-y-1.5 max-h-96 overflow-y-auto">
+                  {healthMetrics.strategicWorkload.insights.map((insight, idx) => {
+                  const severityColors = {
+                    critical: 'bg-red-50 border-red-200 text-red-800',
+                    warning: 'bg-amber-50 border-amber-200 text-amber-800',
+                    positive: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+                  };
+                  const severityIcons = {
+                    critical: '🔴',
+                    warning: '🟡',
+                    positive: '🟢',
+                  };
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-2 p-2 rounded-lg border ${severityColors[insight.severity]}`}
+                    >
+                      <span className="text-sm flex-shrink-0">{severityIcons[insight.severity]}</span>
+                      <p className="text-xs font-medium flex-1 leading-relaxed">{insight.message}</p>
+                    </div>
+                  );
+                })}
+                </div>
+              )}
             </div>
           )}
 
@@ -2856,6 +2942,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
                   <th className="px-3 py-2 text-xs font-bold text-slate-600 tracking-wider">Variance</th>
                   <th className="px-3 py-2 text-xs font-bold text-slate-600 tracking-wider">Original ETA</th>
                   <th className="px-3 py-2 text-xs font-bold text-slate-600 tracking-wider">Current ETA</th>
+                  <th className="px-3 py-2 text-xs font-bold text-slate-600 tracking-wider">Reason</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

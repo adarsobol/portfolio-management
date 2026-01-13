@@ -188,7 +188,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     // Handle trade-off if specified
     if (newTaskForm.tradeOffInitiativeId && newTaskForm.tradeOffEta) {
       const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
-      if (tradeOffInitiative) {
+      const sourceInitiative = allInitiativesList.find(i => i.id === targetInitiativeId);
+      if (tradeOffInitiative && sourceInitiative) {
         // If task ID is provided, update task ETA
         if (newTaskForm.tradeOffTaskId) {
           if (tradeOffInitiative.tasks && tradeOffInitiative.tasks.length > 0) {
@@ -199,7 +200,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   ? { ...task, eta: newTaskForm.tradeOffEta! }
                   : task
               );
-              handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'tasks', updatedTradeOffTasks);
+              handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'tasks', updatedTradeOffTasks, false, sourceInitiative.id, sourceInitiative.title);
             } else {
               console.warn('Trade-off task not found:', newTaskForm.tradeOffTaskId);
             }
@@ -208,7 +209,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           }
         } else {
           // No task ID provided, update initiative ETA
-          handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'eta', newTaskForm.tradeOffEta);
+          handleInlineUpdate(newTaskForm.tradeOffInitiativeId, 'eta', newTaskForm.tradeOffEta, false, sourceInitiative.id, sourceInitiative.title);
         }
       } else {
         console.warn('Trade-off initiative not found:', newTaskForm.tradeOffInitiativeId);

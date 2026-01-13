@@ -1206,7 +1206,7 @@ export default function App() {
   }, [initiatives, config, currentUser, addNotification, createNotification]);
 
   // Actions
-  const recordChange = (initiative: Initiative, field: string, oldValue: any, newValue: any, taskId?: string): ChangeRecord => {
+  const recordChange = (initiative: Initiative, field: string, oldValue: any, newValue: any, taskId?: string, tradeOffSourceId?: string, tradeOffSourceTitle?: string): ChangeRecord => {
     const change: ChangeRecord = {
       id: generateId(),
       issueType: taskId ? 'Task' : 'Initiative',
@@ -1218,7 +1218,9 @@ export default function App() {
       oldValue,
       newValue,
       changedBy: currentUser.name,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      tradeOffSourceId,
+      tradeOffSourceTitle
     };
     
     // Create notification for field changes - only notify the initiative owner
@@ -1694,7 +1696,8 @@ export default function App() {
             lastUpdated: today
           };
 
-          const changeRecord = recordChange(target, fieldLabel, oldValue, tradeOffAction.newValue);
+          // Pass trade-off context: the initiative being saved is the source of the trade-off
+          const changeRecord = recordChange(target, fieldLabel, oldValue, tradeOffAction.newValue, undefined, item.id, item.title);
           updatedTarget.history = [...(target.history || []), changeRecord];
           setChangeLog(prevLog => [changeRecord, ...prevLog]);
           // Sync trade-off change record to Google Sheets
@@ -1775,7 +1778,7 @@ export default function App() {
     }
   };
 
-  const handleInlineUpdate = (id: string, field: keyof Initiative, value: any, suppressNotification?: boolean) => {
+  const handleInlineUpdate = (id: string, field: keyof Initiative, value: any, suppressNotification?: boolean, tradeOffSourceId?: string, tradeOffSourceTitle?: string) => {
     // Intercept status changes to At Risk - show modal first
     if (field === 'status' && value === Status.AtRisk) {
       const initiative = initiatives.find(i => i.id === id);
@@ -1815,7 +1818,7 @@ export default function App() {
         
         let updatedHistory = i.history || [];
         if (oldValue !== value && (field === 'estimatedEffort' || field === 'eta' || field === 'status' || field === 'priority')) {
-           const change = recordChange(i, fieldName, oldValue, value);
+           const change = recordChange(i, fieldName, oldValue, value, undefined, tradeOffSourceId, tradeOffSourceTitle);
            setChangeLog(prevLog => [change, ...prevLog]);
            updatedHistory = [...updatedHistory, change];
            // Sync change record to Google Sheets

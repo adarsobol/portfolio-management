@@ -118,6 +118,8 @@ export interface ChangeRecord {
   newValue: InitiativeFieldValue;
   changedBy: string; // User Name
   timestamp: string; // ISO String
+  tradeOffSourceId?: string; // ID of the initiative causing the trade-off
+  tradeOffSourceTitle?: string; // Title of the initiative causing the trade-off for easier display
 }
 
 // Interface for the Trade Off action from the modal
