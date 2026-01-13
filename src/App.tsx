@@ -6,7 +6,7 @@ import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAsse
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope, syncCapacitiesWithUsers } from './utils';
 import { formatError } from './utils/errorUtils';
-import { useLocalStorage, useVersionCheck } from './hooks';
+import { useLocalStorage, useVersionCheck, useUsers as useUsersHook, useInitiatives as useInitiativesHook, useAppNotifications as useAppNotificationsHook } from './hooks';
 import { useUrlState } from './hooks/useUrlState';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService, logService } from './services';
 import { getVersionService } from './services/versionService';
@@ -199,6 +199,55 @@ export default function App() {
     });
   }, [users, usersLoaded, setConfig]); // setConfig is stable from useLocalStorage
 
+  // =============================================================================
+  // SHADOW MODE: useUsers hook validation
+  // This runs the new hook alongside legacy code to validate behavior parity
+  // After validation period, we'll switch to using the hook directly
+  // =============================================================================
+  const { 
+    users: hookUsers, 
+    usersLoaded: hookUsersLoaded 
+  } = useUsersHook({ isAuthenticated, setConfig });
+  
+  // Shadow mode comparison - log any differences between legacy and hook
+  useEffect(() => {
+    if (!usersLoaded || !hookUsersLoaded) return;
+    
+    // Compare user counts
+    if (users.length !== hookUsers.length) {
+      logger.warn('SHADOW MODE: useUsers count mismatch', {
+        context: 'App.shadowMode.useUsers',
+        metadata: { 
+          legacyCount: users.length, 
+          hookCount: hookUsers.length,
+          difference: Math.abs(users.length - hookUsers.length)
+        }
+      });
+    }
+    
+    // Compare user IDs
+    const legacyIds = new Set(users.map(u => u.id));
+    const hookIds = new Set(hookUsers.map(u => u.id));
+    const missingInHook = users.filter(u => !hookIds.has(u.id));
+    const extraInHook = hookUsers.filter(u => !legacyIds.has(u.id));
+    
+    if (missingInHook.length > 0 || extraInHook.length > 0) {
+      logger.warn('SHADOW MODE: useUsers ID mismatch', {
+        context: 'App.shadowMode.useUsers',
+        metadata: { 
+          missingInHook: missingInHook.map(u => u.id),
+          extraInHook: extraInHook.map(u => u.id)
+        }
+      });
+    } else if (users.length === hookUsers.length) {
+      logger.debug('SHADOW MODE: useUsers validation passed', {
+        context: 'App.shadowMode.useUsers',
+        metadata: { userCount: users.length }
+      });
+    }
+  }, [users, hookUsers, usersLoaded, hookUsersLoaded]);
+  // =============================================================================
+
   // Load notifications from server
   useEffect(() => {
     logger.debug('Notification useEffect triggered', {
@@ -351,6 +400,113 @@ export default function App() {
     }
   }, [isAuthenticated, currentUser]);
 
+  // =============================================================================
+  // SHADOW MODE: useInitiatives hook validation
+  // This runs the new hook alongside legacy code to validate behavior parity
+  // After validation period, we'll switch to using the hook directly
+  // =============================================================================
+  const { 
+    initiatives: hookInitiatives, 
+    isLoading: hookInitiativesLoading,
+    initiativesRef: hookInitiativesRef
+  } = useInitiativesHook({ isAuthenticated, currentUser });
+  
+  // Shadow mode comparison - log any differences between legacy and hook
+  useEffect(() => {
+    // Wait until both are loaded
+    if (isDataLoading || hookInitiativesLoading) return;
+    
+    // Compare initiative counts
+    if (initiatives.length !== hookInitiatives.length) {
+      logger.warn('SHADOW MODE: useInitiatives count mismatch', {
+        context: 'App.shadowMode.useInitiatives',
+        metadata: { 
+          legacyCount: initiatives.length, 
+          hookCount: hookInitiatives.length,
+          difference: Math.abs(initiatives.length - hookInitiatives.length)
+        }
+      });
+    }
+    
+    // Compare initiative IDs
+    const legacyIds = new Set(initiatives.map(i => i.id));
+    const hookIds = new Set(hookInitiatives.map(i => i.id));
+    const missingInHook = initiatives.filter(i => !hookIds.has(i.id));
+    const extraInHook = hookInitiatives.filter(i => !legacyIds.has(i.id));
+    
+    if (missingInHook.length > 0 || extraInHook.length > 0) {
+      logger.warn('SHADOW MODE: useInitiatives ID mismatch', {
+        context: 'App.shadowMode.useInitiatives',
+        metadata: { 
+          missingInHook: missingInHook.map(i => i.id).slice(0, 5),
+          extraInHook: extraInHook.map(i => i.id).slice(0, 5)
+        }
+      });
+    } else if (initiatives.length === hookInitiatives.length && initiatives.length > 0) {
+      logger.debug('SHADOW MODE: useInitiatives validation passed', {
+        context: 'App.shadowMode.useInitiatives',
+        metadata: { initiativeCount: initiatives.length }
+      });
+    }
+  }, [initiatives, hookInitiatives, isDataLoading, hookInitiativesLoading]);
+  
+  // Suppress unused variable warning - hookInitiativesRef will be used when we switch over
+  void hookInitiativesRef;
+  // =============================================================================
+
+  // =============================================================================
+  // SHADOW MODE: useAppNotifications hook validation
+  // This runs the new hook alongside legacy code to validate behavior parity
+  // After validation period, we'll switch to using the hook directly
+  // =============================================================================
+  const { 
+    notifications: hookNotifications, 
+    notificationsLoaded: hookNotificationsLoaded,
+    createNotification: hookCreateNotification
+  } = useAppNotificationsHook({ isAuthenticated, currentUser, initiatives });
+  
+  // Shadow mode comparison - log any differences between legacy and hook
+  useEffect(() => {
+    // Wait until both are loaded
+    if (!notificationsLoaded || !hookNotificationsLoaded) return;
+    
+    // Compare notification counts
+    if (notifications.length !== hookNotifications.length) {
+      logger.warn('SHADOW MODE: useAppNotifications count mismatch', {
+        context: 'App.shadowMode.useAppNotifications',
+        metadata: { 
+          legacyCount: notifications.length, 
+          hookCount: hookNotifications.length,
+          difference: Math.abs(notifications.length - hookNotifications.length)
+        }
+      });
+    }
+    
+    // Compare notification IDs
+    const legacyIds = new Set(notifications.map(n => n.id));
+    const hookIds = new Set(hookNotifications.map(n => n.id));
+    const missingInHook = notifications.filter(n => !hookIds.has(n.id));
+    const extraInHook = hookNotifications.filter(n => !legacyIds.has(n.id));
+    
+    if (missingInHook.length > 0 || extraInHook.length > 0) {
+      logger.warn('SHADOW MODE: useAppNotifications ID mismatch', {
+        context: 'App.shadowMode.useAppNotifications',
+        metadata: { 
+          missingInHook: missingInHook.map(n => n.id).slice(0, 5),
+          extraInHook: extraInHook.map(n => n.id).slice(0, 5)
+        }
+      });
+    } else if (notifications.length === hookNotifications.length) {
+      logger.debug('SHADOW MODE: useAppNotifications validation passed', {
+        context: 'App.shadowMode.useAppNotifications',
+        metadata: { notificationCount: notifications.length }
+      });
+    }
+  }, [notifications, hookNotifications, notificationsLoaded, hookNotificationsLoaded]);
+  
+  // Suppress unused variable warning - will be used when we switch over
+  void hookCreateNotification;
+  // =============================================================================
 
   // Migrate config to ensure all new permissions and fields are present
   useEffect(() => {
