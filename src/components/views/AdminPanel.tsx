@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
 import { flattenInitiative } from '../../services/googleSheetsSync';
-import authService from '../../services/authService';
+import { authService } from '../../services/authService';
 
 // BadgePermission Component for visual permission display
 interface BadgePermissionProps {
