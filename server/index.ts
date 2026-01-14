@@ -2042,6 +2042,9 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     }> = [];
     let syncedCount = 0;
     
+    // Collect all new initiatives to add in batch (like changelog does)
+    const newInitiativesToAdd: Array<Record<string, string>> = [];
+    
     for (const initiative of deduplicated) {
       serverLogger.debug(`Processing initiative ${initiative.id}`, { context: 'Sync', metadata: { title: initiative.title?.substring(0, 50) } });
       const existing = rows.find((r: GoogleSpreadsheetRow) => {
@@ -2102,8 +2105,8 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         await existing.save();
         syncedCount++;
       } else if (!existingIds.has(initiative.id)) {
-        // Only add if it doesn't exist (double-check to prevent duplicates)
-        serverLogger.info(`Adding NEW initiative: ${initiative.id} - ${initiative.title}`, { context: 'Sync' });
+        // Collect new initiatives to add in batch (more reliable than addRow)
+        serverLogger.info(`Queueing NEW initiative for batch add: ${initiative.id} - ${initiative.title}`, { context: 'Sync' });
         const rowData: Record<string, string> = {};
         // Use INITIATIVE_HEADERS to ensure we only include columns that exist in the sheet
         INITIATIVE_HEADERS.forEach(header => {
@@ -2112,28 +2115,43 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         });
         // Set initial version for new initiatives
         rowData['version'] = String((parseInt(initiative.version || '0', 10) || 0) + 1);
-        try {
-          serverLogger.debug(`Attempting to addRow for ${initiative.id}`, { context: 'Sync', metadata: { rowDataKeys: Object.keys(rowData) } });
-          const newRow = await sheet.addRow(rowData);
-          serverLogger.debug(`addRow returned for ${initiative.id}`, { context: 'Sync', metadata: { rowIndex: newRow.rowNumber } });
-          
-          // Verify the row was actually added by checking if it exists
-          const verifyRows = await sheet.getRows();
-          const verifyRow = verifyRows.find((r: GoogleSpreadsheetRow) => r.get('id') === initiative.id);
-          if (verifyRow) {
-            serverLogger.info(`Successfully added and verified initiative: ${initiative.id}`, { context: 'Sync' });
-            existingIds.add(initiative.id); // Track that we added it
-            syncedCount++;
-          } else {
-            serverLogger.error(`addRow succeeded but row not found in sheet for ${initiative.id}`, { context: 'Sync' });
-            throw new Error(`Row was not added to sheet for initiative ${initiative.id}`);
-          }
-        } catch (addRowError) {
-          serverLogger.error(`Failed to add initiative ${initiative.id}`, { context: 'Sync', error: addRowError as Error, metadata: { rowData } });
-          throw addRowError; // Re-throw to be caught by outer catch
-        }
+        newInitiativesToAdd.push(rowData);
+        existingIds.add(initiative.id); // Track that we're adding it
       } else {
         serverLogger.warn(`Upsert: Initiative ${initiative.id} already exists, skipping add`, { context: 'Sync' });
+      }
+    }
+    
+    // Batch add all new initiatives (like changelog does - more reliable)
+    if (newInitiativesToAdd.length > 0) {
+      try {
+        serverLogger.info(`Batch adding ${newInitiativesToAdd.length} new initiative(s) using addRows`, { context: 'Sync' });
+        await sheet.addRows(newInitiativesToAdd);
+        serverLogger.info(`Successfully batch-added ${newInitiativesToAdd.length} initiative(s)`, { context: 'Sync' });
+        syncedCount += newInitiativesToAdd.length;
+        
+        // Verify all rows were added
+        const verifyRows = await sheet.getRows();
+        const addedIds = newInitiativesToAdd.map(r => r.id).filter(Boolean);
+        const missingIds: string[] = [];
+        for (const id of addedIds) {
+          const found = verifyRows.find((r: GoogleSpreadsheetRow) => r.get('id') === id);
+          if (!found) {
+            missingIds.push(id);
+          }
+        }
+        if (missingIds.length > 0) {
+          serverLogger.error(`Batch add succeeded but ${missingIds.length} row(s) not found in sheet`, { 
+            context: 'Sync', 
+            metadata: { missingIds: missingIds.slice(0, 5) } 
+          });
+          throw new Error(`Failed to verify ${missingIds.length} initiative(s) were added to sheet`);
+        } else {
+          serverLogger.info(`Verified all ${newInitiativesToAdd.length} initiative(s) were added to sheet`, { context: 'Sync' });
+        }
+      } catch (batchAddError) {
+        serverLogger.error(`Failed to batch-add initiatives`, { context: 'Sync', error: batchAddError as Error, metadata: { count: newInitiativesToAdd.length } });
+        throw batchAddError; // Re-throw to be caught by outer catch
       }
     }
 
