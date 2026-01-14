@@ -27,6 +27,7 @@ interface TaskTableProps {
   onAddComment?: (initiativeId: string, comment: Comment) => void;
   onMarkCommentRead?: (initiativeId: string) => void;
   onDeleteInitiative?: (id: string) => void;
+  onBulkDeleteInitiatives?: (ids: string[]) => Promise<void>;
   // At Risk reason modal props
   onOpenAtRiskModal?: (initiative: Initiative) => void;
   effortDisplayUnit?: 'weeks' | 'days';
@@ -56,6 +57,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onAddComment,
   onMarkCommentRead,
   onDeleteInitiative: _onDeleteInitiative,
+  onBulkDeleteInitiatives,
   onOpenAtRiskModal,
   effortDisplayUnit: _effortDisplayUnit = 'weeks',
   setEffortDisplayUnit: _setEffortDisplayUnit,
@@ -63,6 +65,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 }) => {
   const navigate = useNavigate();
   void _onDeleteInitiative; // Reserved for delete functionality
+  
+  // Bulk selection state (Admin only)
+  const isAdmin = currentUser.role === Role.Admin;
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
   // Per-initiative effort display unit state
   const [effortDisplayUnits, setEffortDisplayUnits] = useState<Map<string, 'weeks' | 'days'>>(new Map());
@@ -142,6 +148,56 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       }
       return newSet;
     });
+  };
+  
+  // Bulk selection handlers (Admin only)
+  const handleSelectItem = (id: string) => {
+    if (!isAdmin) return;
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+  
+  const handleSelectAll = () => {
+    if (!isAdmin) return;
+    if (selectedItems.size === filteredInitiatives.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(filteredInitiatives.map(i => i.id)));
+    }
+  };
+  
+  const handleClearSelection = () => {
+    setSelectedItems(new Set());
+  };
+  
+  const handleBulkDelete = async () => {
+    if (!isAdmin || !onBulkDeleteInitiatives || selectedItems.size === 0) return;
+    
+    const count = selectedItems.size;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${count} ${count === 1 ? 'initiative' : 'initiatives'}?\n\nYou can restore them from the Trash later.`
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    try {
+      await onBulkDeleteInitiatives(Array.from(selectedItems));
+      setSelectedItems(new Set());
+    } catch (error) {
+      logger.error('Failed to bulk delete initiatives', { 
+        context: 'TaskTable.handleBulkDelete', 
+        error: error instanceof Error ? error : new Error(String(error)) 
+      });
+    }
   };
   
   const handleAddTask = (defaultInitiativeId?: string) => {
@@ -506,9 +562,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     // Zebra striping: even rows get subtle background
     const zebraStripe = index % 2 === 0 ? '' : 'bg-slate-50/50';
 
+    const isSelected = isAdmin && selectedItems.has(item.id);
+    
     return (
       <>
-        <tr key={item.id} className={`group hover:bg-slate-50 transition-colors border-b border-slate-200 ${zebraStripe} ${isUpdating ? 'bg-blue-50/30' : ''}`}>
+        <tr key={item.id} className={`group hover:bg-slate-50 transition-colors border-b border-slate-200 ${zebraStripe} ${isUpdating ? 'bg-blue-50/30' : ''} ${isSelected ? 'bg-blue-100/50' : ''}`}>
+          {isAdmin && (
+            <td className="px-2 py-1.5 border-r border-slate-200 text-center bg-slate-50/50">
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => handleSelectItem(item.id)}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </td>
+          )}
           <td className="px-2 py-1.5 border-r border-slate-200 text-center text-xs text-slate-400 font-mono select-none bg-slate-50/50">
             {item.id}
           </td>
@@ -1016,7 +1085,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       {/* Tasks dropdown row for all initiatives with tasks */}
       {tasksExpanded && (
         <tr className="bg-purple-50/30">
-          <td colSpan={8} className="px-3 py-1.5 border-b border-slate-200">
+          <td colSpan={isAdmin ? 9 : 8} className="px-3 py-1.5 border-b border-slate-200">
             <div className="space-y-1.5">
               {/* Tasks List */}
               {tasks.filter(t => t.status !== Status.Deleted).length > 0 && (
@@ -1821,12 +1890,30 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   };
 
   // Render table view (flat)
+  const colSpan = isAdmin ? 9 : 8;
+  const allSelected = isAdmin && filteredInitiatives.length > 0 && selectedItems.size === filteredInitiatives.length;
+  const someSelected = isAdmin && selectedItems.size > 0 && selectedItems.size < filteredInitiatives.length;
+  
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px]">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px] relative">
       <div ref={scrollContainerRef} className="overflow-auto custom-scrollbar flex-1">
         <table className="w-full text-left border-collapse">
           <thead className="sticky top-0 z-20 shadow-md">
             <tr className="bg-gradient-to-b from-slate-100 to-slate-50 border-b-2 border-slate-300">
+              {isAdmin && (
+                <th className="w-12 px-2 py-2.5 text-center border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(input) => {
+                      if (input) input.indeterminate = someSelected;
+                    }}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    title={allSelected ? 'Deselect all' : 'Select all'}
+                  />
+                </th>
+              )}
               <th className="w-12 px-3 py-2.5 text-center font-bold text-slate-500 text-xs border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
                 ID
               </th>
@@ -1843,11 +1930,32 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           </thead>
           <tbody className="bg-white divide-y divide-slate-100">
             {filteredInitiatives.length === 0 ? (
-               <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-500 text-sm">No initiatives found matching your filters.</td></tr>
+               <tr><td colSpan={colSpan} className="px-4 py-12 text-center text-slate-500 text-sm">No initiatives found matching your filters.</td></tr>
             ) : renderFlatView()}
           </tbody>
         </table>
       </div>
+      {isAdmin && selectedItems.size > 0 && (
+        <div className="sticky bottom-0 left-0 right-0 bg-white border-t-2 border-red-300 shadow-lg z-30 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-slate-700">
+              {selectedItems.size} {selectedItems.size === 1 ? 'item' : 'items'} selected
+            </span>
+            <button
+              onClick={handleClearSelection}
+              className="text-xs text-slate-500 hover:text-slate-700 underline"
+            >
+              Clear selection
+            </button>
+          </div>
+          <button
+            onClick={handleBulkDelete}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+          >
+            Delete Selected
+          </button>
+        </div>
+      )}
     </div>
   );
 };

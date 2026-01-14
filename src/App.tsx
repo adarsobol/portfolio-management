@@ -1525,6 +1525,102 @@ export default function App() {
     }
   };
 
+  const handleBulkDeleteInitiatives = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    
+    // Permission check: Only Admin can bulk delete
+    if (currentUser.role !== Role.Admin) {
+      showError('Only administrators can perform bulk delete operations.');
+      return;
+    }
+    
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${ids.length} ${ids.length === 1 ? 'initiative' : 'initiatives'}?\n\nYou can restore them from the Trash later.`
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    try {
+      setIsDataLoading(true);
+      const results: { success: boolean; id: string }[] = [];
+      
+      // Delete each initiative sequentially
+      for (const id of ids) {
+        const initiative = initiatives.find(i => i.id === id);
+        if (!initiative) {
+          results.push({ success: false, id });
+          continue;
+        }
+        
+        // Check permission for each initiative
+        const canDelete = canDeleteInitiative(config, currentUser.role, initiative.ownerId, currentUser.id, currentUser.email);
+        if (!canDelete) {
+          logger.warn('Skipping initiative due to permission check', { 
+            context: 'App.handleBulkDeleteInitiatives', 
+            metadata: { id, title: initiative.title } 
+          });
+          results.push({ success: false, id });
+          continue;
+        }
+        
+        try {
+          const result = await sheetsSync.deleteInitiative(id);
+          if (result.success) {
+            // Update local state to mark as deleted
+            setInitiatives(prev => prev.map(i => 
+              i.id === id 
+                ? { ...i, status: Status.Deleted, deletedAt: result.deletedAt } 
+                : i
+            ));
+            
+            // Update localStorage cache
+            const cached = localStorage.getItem('portfolio-initiatives-cache');
+            if (cached) {
+              const cachedInitiatives: Initiative[] = JSON.parse(cached);
+              const updated = cachedInitiatives.map(i => 
+                i.id === id 
+                  ? { ...i, status: Status.Deleted, deletedAt: result.deletedAt } 
+                  : i
+              );
+              localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(updated));
+            }
+            
+            results.push({ success: true, id });
+          } else {
+            results.push({ success: false, id });
+          }
+        } catch (error) {
+          logger.error('Failed to delete initiative in bulk operation', { 
+            context: 'App.handleBulkDeleteInitiatives', 
+            error: error instanceof Error ? error : new Error(String(error)),
+            metadata: { id, title: initiative.title } 
+          });
+          results.push({ success: false, id });
+        }
+      }
+      
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
+      
+      if (successCount > 0) {
+        showSuccess(`${successCount} ${successCount === 1 ? 'initiative has' : 'initiatives have'} been moved to Trash${failCount > 0 ? ` (${failCount} failed)` : ''}`);
+      } else {
+        showError('Failed to delete initiatives. Please try again.');
+      }
+    } catch (error) {
+      logger.error('Failed to bulk delete initiatives', { 
+        context: 'App.handleBulkDeleteInitiatives', 
+        error: error instanceof Error ? error : new Error(String(error)) 
+      });
+      showError('An error occurred during bulk delete. Please try again.');
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
   const handleRestoreInitiative = async (id: string) => {
     const initiative = initiatives.find(i => i.id === id);
     if (!initiative) {
@@ -2691,6 +2787,7 @@ export default function App() {
                 onAddComment={handleAddComment}
                 onMarkCommentRead={handleMarkCommentRead}
                 onDeleteInitiative={handleDeleteInitiative}
+                onBulkDeleteInitiatives={handleBulkDeleteInitiatives}
                 onOpenAtRiskModal={(initiative) => {
                   setPendingAtRiskInitiative({ id: initiative.id, oldStatus: initiative.status });
                   setIsAtRiskModalOpen(true);
@@ -2892,6 +2989,7 @@ export default function App() {
                 onAddComment={handleAddComment}
                 onMarkCommentRead={handleMarkCommentRead}
                 onDeleteInitiative={handleDeleteInitiative}
+                onBulkDeleteInitiatives={handleBulkDeleteInitiatives}
                 onOpenAtRiskModal={(initiative) => {
                   setPendingAtRiskInitiative({ id: initiative.id, oldStatus: initiative.status });
                   setIsAtRiskModalOpen(true);
