@@ -519,13 +519,24 @@ class SheetsSyncManager {
 
   /** Queue initiative for sync (debounced, deduped) */
   queueInitiativeSync(initiative: Initiative): void {
+    console.log('[DEBUG] queueInitiativeSync called', { 
+      id: initiative.id, 
+      title: initiative.title, 
+      enabled: this.enabled,
+      isOnline: this.status.isOnline,
+      isAuthenticated: authService.isAuthenticated()
+    });
+    
     if (!this.enabled) {
       logger.warn('Sync is disabled, skipping queue', { context: 'Sync' });
+      console.warn('[DEBUG] SYNC DISABLED - initiative will NOT be synced:', initiative.id);
       return;
     }
 
     const taskCount = initiative.tasks?.length || 0;
     logger.debug(`Queuing initiative for sync: ${initiative.id}`, { context: 'Sync', metadata: { title: initiative.title, taskCount } });
+    console.log('[DEBUG] Queuing initiative:', initiative.id, 'Total in queue:', this.queue.initiatives.size + 1);
+    
     this.queue.initiatives.set(initiative.id, initiative);
     this.updatePendingCount();
     this.persistQueue();
@@ -964,20 +975,31 @@ class SheetsSyncManager {
   }
 
   private async flushSync(): Promise<void> {
+    console.log('[DEBUG] flushSync called', {
+      enabled: this.enabled,
+      isOnline: this.status.isOnline,
+      isAuthenticated: authService.isAuthenticated(),
+      queueSize: this.queue.initiatives.size
+    });
+    
     if (!this.enabled) {
       logger.warn('flushSync: Sync is disabled', { context: 'Sync' });
+      console.warn('[DEBUG] FLUSH SKIPPED: Sync disabled');
       return;
     }
     if (!this.status.isOnline) {
       logger.warn('flushSync: Offline, cannot sync', { context: 'Sync' });
+      console.warn('[DEBUG] FLUSH SKIPPED: Offline');
       return;
     }
     if (!authService.isAuthenticated()) {
       logger.warn('flushSync: Not authenticated, cannot sync', { context: 'Sync' });
+      console.warn('[DEBUG] FLUSH SKIPPED: Not authenticated');
       return;
     }
 
     logger.debug('flushSync: Starting sync...', { context: 'Sync' });
+    console.log('[DEBUG] FLUSH PROCEEDING: Syncing', this.queue.initiatives.size, 'initiatives');
 
     // Take snapshot of current queue
     const toSync = {
@@ -1064,14 +1086,18 @@ class SheetsSyncManager {
 
   private async syncInitiatives(initiatives: Initiative[]): Promise<boolean> {
     try {
+      console.log('[DEBUG] syncInitiatives called with', initiatives.length, 'initiatives');
+      
       // Filter out any undefined/null initiatives to prevent errors
       const validInitiatives = initiatives.filter(i => {
         if (!i) {
           logger.warn('Found undefined initiative in sync queue, skipping', { context: 'Sync' });
+          console.warn('[DEBUG] Filtered out undefined initiative');
           return false;
         }
         if (!i.id) {
           logger.warn('Found initiative without ID in sync queue, skipping', { context: 'Sync' });
+          console.warn('[DEBUG] Filtered out initiative without ID:', i.title);
           return false;
         }
         return true;
@@ -1079,30 +1105,63 @@ class SheetsSyncManager {
       
       if (validInitiatives.length === 0) {
         logger.warn('No valid initiatives to sync after filtering', { context: 'Sync' });
+        console.warn('[DEBUG] No valid initiatives after filtering');
         return true; // Nothing to sync, but not an error
       }
       
       if (validInitiatives.length !== initiatives.length) {
         logger.warn(`Filtered out ${initiatives.length - validInitiatives.length} invalid initiative(s)`, { context: 'Sync' });
+        console.warn('[DEBUG] Filtered out', initiatives.length - validInitiatives.length, 'invalid initiatives');
       }
       
-      logger.debug(`POST ${API_ENDPOINT}/api/sheets/initiatives with ${validInitiatives.length} initiative(s)`, { context: 'Sync' });
-      const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives`, {
+      const url = `${API_ENDPOINT}/api/sheets/initiatives`;
+      const headers = this.getHeaders();
+      const body = JSON.stringify({ initiatives: validInitiatives.map(flattenInitiative) });
+      
+      console.log('[DEBUG] Making API call:', {
+        url,
         method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ initiatives: validInitiatives.map(flattenInitiative) })
+        hasAuth: !!headers.Authorization,
+        initiativeCount: validInitiatives.length,
+        initiativeIds: validInitiatives.map(i => i.id)
+      });
+      
+      logger.debug(`POST ${API_ENDPOINT}/api/sheets/initiatives with ${validInitiatives.length} initiative(s)`, { context: 'Sync' });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body
+      });
+      
+      console.log('[DEBUG] API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
       });
       
       logger.debug(`Response status: ${response.status}`, { context: 'Sync' });
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('[DEBUG] API CALL FAILED:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 200)
+        });
         logger.error('Sync initiatives failed', { context: 'SheetsSyncManager.syncInitiatives', metadata: { status: response.status, errorText: errorText.substring(0, 100) } });
         const errorMsg = errorText.length > 0 ? errorText.substring(0, 100) : response.statusText;
         this.status.error = `Sync failed (${response.status}): ${errorMsg}`;
         this.notify();
         return false;
       }
+      
+      const result = await response.json();
+      console.log('[DEBUG] API SUCCESS:', {
+        synced: result.synced,
+        updated: result.updated,
+        added: result.added,
+        serverNewer: result.serverNewer?.length || 0
+      });
       
       // Parse response and check for server-newer items (last-write-wins)
       const result = await response.json();
