@@ -222,8 +222,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   const createEmptyBulkRow = useCallback((): BulkEntryRow => {
     const hierarchy = getHierarchy(config);
-    const defaultPillar = hierarchy[bulkSharedSettings.l1_assetClass][0]?.name || '';
-    const defaultResp = hierarchy[bulkSharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
+    const hierarchyNodes = hierarchy[bulkSharedSettings.l1_assetClass] || [];
+    const defaultPillar = hierarchyNodes[0]?.name || '';
+    const defaultResp = hierarchyNodes[0]?.responsibilities[0] || '';
     
     return {
       id: generateId(),
@@ -829,8 +830,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // Update bulk rows when shared asset class changes
   useEffect(() => {
     const hierarchy = getHierarchy(config);
-    const defaultPillar = hierarchy[bulkSharedSettings.l1_assetClass][0]?.name || '';
-    const defaultResp = hierarchy[bulkSharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
+    const hierarchyNodes = hierarchy[bulkSharedSettings.l1_assetClass] || [];
+    const defaultPillar = hierarchyNodes[0]?.name || '';
+    const defaultResp = hierarchyNodes[0]?.responsibilities[0] || '';
     
     setBulkRows(prev => prev.map(row => ({
       ...row,

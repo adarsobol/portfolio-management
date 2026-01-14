@@ -177,8 +177,9 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
         }
 
         const hierarchy = getHierarchy(config);
-        const defaultPillar = hierarchy[sharedSettings.l1_assetClass][0]?.name || '';
-        const defaultResp = hierarchy[sharedSettings.l1_assetClass][0]?.responsibilities[0] || '';
+        const hierarchyNodes = hierarchy[sharedSettings.l1_assetClass] || [];
+        const defaultPillar = hierarchyNodes[0]?.name || '';
+        const defaultResp = hierarchyNodes[0]?.responsibilities[0] || '';
 
         const parsedRows: BulkEntryRow[] = jsonData.map((row) => {
           // Map columns to BulkEntryRow fields with robust name matching
@@ -439,7 +440,8 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                         onChange={(e) => {
                           const newPillar = e.target.value;
                           const hierarchy = getHierarchy(config);
-                          const pillarNode = hierarchy[sharedSettings.l1_assetClass].find(p => p.name === newPillar);
+                          const hierarchyNodes = hierarchy[sharedSettings.l1_assetClass] || [];
+                          const pillarNode = hierarchyNodes.find(p => p.name === newPillar);
                           onRowChange(row.id, 'l2_pillar', newPillar);
                           if (pillarNode) {
                             onRowChange(row.id, 'l3_responsibility', pillarNode.responsibilities[0] || '');
@@ -449,7 +451,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                           rowErrors.l2_pillar ? 'border-red-500 bg-red-50' : 'border-slate-200'
                         }`}
                       >
-                        {getHierarchy(config)[sharedSettings.l1_assetClass].map(p => (
+                        {(getHierarchy(config)[sharedSettings.l1_assetClass] || []).map(p => (
                           <option key={p.name} value={p.name}>{p.name}</option>
                         ))}
                       </select>
@@ -464,7 +466,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
                           rowErrors.l3_responsibility ? 'border-red-500 bg-red-50' : 'border-slate-200'
                         }`}
                       >
-                        {(getHierarchy(config)[sharedSettings.l1_assetClass].find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
+                        {((getHierarchy(config)[sharedSettings.l1_assetClass] || []).find(p => p.name === row.l2_pillar)?.responsibilities || []).map(r => (
                           <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
