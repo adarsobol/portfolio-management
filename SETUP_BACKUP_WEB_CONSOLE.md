@@ -94,9 +94,9 @@ Since you already have the bucket open in Google Cloud Console, here's how to se
 1. Go to Cloud Scheduler: https://console.cloud.google.com/cloudscheduler?project=research-modeling-vertex-ai
 2. Click **"Create Job"**
 3. Configure:
-   - **Name**: `backup-daily-job`
+   - **Name**: `backup-weekly-job`
    - **Region**: `us-central1`
-   - **Frequency**: `0 2 * * *` (daily at 2 AM)
+   - **Frequency**: `0 18 * * 4` (weekly on Thursday at 6 PM - end of day)
    - **Timezone**: `America/New_York`
    - **Target type**: **HTTP**
    - **URL**: (get this from your Cloud Function - it's the trigger URL)
@@ -109,7 +109,7 @@ Since you already have the bucket open in Google Cloud Console, here's how to se
 
 1. **Check versioning**: Go to bucket → Configuration → Object versioning should show "Enabled"
 2. **Check lifecycle**: Go to bucket → Configuration → Lifecycle should show 3 rules
-3. **Test backup**: Go to Cloud Scheduler → Click "Run now" on `backup-daily-job`
+3. **Test backup**: Go to Cloud Scheduler → Click "Run now" on `backup-weekly-job`
 4. **Check backup**: Go back to bucket → `backups/` folder → Should see a new folder with today's date
 
 ## 🎉 Done!
@@ -118,7 +118,7 @@ Your backup system is now set up:
 - ✅ Object versioning enabled
 - ✅ Lifecycle policies configured
 - ✅ Cloud Function deployed
-- ✅ Daily backups scheduled
+- ✅ Weekly backups scheduled (Thursday at 6 PM)
 
 ---
 

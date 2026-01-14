@@ -242,17 +242,17 @@ async function main() {
     log('   Get function URL first:', 'yellow');
     log(`   FUNCTION_URL=$(gcloud functions describe backup-daily --gen2 --region=${REGION} --format="value(serviceConfig.uri)")`, 'yellow');
     console.log('');
-    log('   Then create scheduler:', 'yellow');
-    log(`   gcloud scheduler jobs create http backup-daily-job \\`, 'yellow');
+    log('   Then create scheduler (weekly on Thursday at 6 PM):', 'yellow');
+    log(`   gcloud scheduler jobs create http backup-weekly-job \\`, 'yellow');
     log(`     --location=${REGION} \\`, 'yellow');
-    log(`     --schedule="0 2 * * *" \\`, 'yellow');
+    log(`     --schedule="0 18 * * 4" \\`, 'yellow');
     log(`     --uri="\${FUNCTION_URL}" \\`, 'yellow');
     log(`     --http-method=POST \\`, 'yellow');
     log(`     --oidc-service-account-email="${PROJECT_ID}@appspot.gserviceaccount.com" \\`, 'yellow');
     log(`     --time-zone="America/New_York"`, 'yellow');
     console.log('');
     log('3. Test the backup:', 'yellow');
-    log(`   gcloud scheduler jobs run backup-daily-job --location=${REGION}`, 'yellow');
+    log(`   gcloud scheduler jobs run backup-weekly-job --location=${REGION}`, 'yellow');
     console.log('');
     log('🎉 Your backup infrastructure is ready!', 'green');
 

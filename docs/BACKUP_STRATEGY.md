@@ -87,9 +87,9 @@ gcloud functions deploy backup-daily \
 ### 3. Set Up Cloud Scheduler
 
 ```bash
-# Create a scheduler job for daily backups at 2 AM
-gcloud scheduler jobs create http backup-daily-job \
-  --schedule="0 2 * * *" \
+# Create a scheduler job for weekly backups on Thursday at 6 PM (end of day)
+gcloud scheduler jobs create http backup-weekly-job \
+  --schedule="0 18 * * 4" \
   --uri="https://us-central1-YOUR_PROJECT.cloudfunctions.net/backup-daily" \
   --http-method=POST \
   --oidc-service-account-email=YOUR_SERVICE_ACCOUNT@YOUR_PROJECT.iam.gserviceaccount.com \
@@ -109,9 +109,9 @@ The lifecycle policy automatically manages storage costs:
 
 ## Backup Types
 
-### Automated Daily Backups
+### Automated Weekly Backups
 
-- **Frequency**: Daily at 2 AM (configurable)
+- **Frequency**: Weekly on Thursday at 6 PM (end of day)
 - **Location**: `backups/YYYY-MM-DD/`
 - **Contents**: All files from `data/` directory
 - **Manifest**: `backups/YYYY-MM-DD/manifest.json`

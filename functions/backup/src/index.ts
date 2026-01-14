@@ -1,8 +1,8 @@
 /**
- * Portfolio Manager - Daily Backup Cloud Function
+ * Portfolio Manager - Weekly Backup Cloud Function
  * 
- * This function creates daily snapshots of all portfolio data stored in GCS.
- * It's designed to be triggered by Cloud Scheduler at a regular interval (e.g., daily at 2 AM).
+ * This function creates weekly snapshots of all portfolio data stored in GCS.
+ * It's designed to be triggered by Cloud Scheduler weekly on Thursday at 6 PM (end of day).
  * 
  * Features:
  * - Creates timestamped backup folders

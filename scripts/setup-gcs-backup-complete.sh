@@ -214,11 +214,11 @@ echo -e "${YELLOW}Step 6: Setting up Cloud Scheduler...${NC}"
 SERVICE_ACCOUNT="${PROJECT_ID}@appspot.gserviceaccount.com"
 
 # Check if scheduler job already exists
-if gcloud scheduler jobs describe backup-daily-job --location="$REGION" &> /dev/null; then
+if gcloud scheduler jobs describe backup-weekly-job --location="$REGION" &> /dev/null; then
     echo "Scheduler job already exists, updating..."
-    gcloud scheduler jobs update http backup-daily-job \
+    gcloud scheduler jobs update http backup-weekly-job \
         --location="$REGION" \
-        --schedule="0 2 * * *" \
+        --schedule="0 18 * * 4" \
         --uri="$FUNCTION_URL" \
         --http-method=POST \
         --oidc-service-account-email="$SERVICE_ACCOUNT" \
@@ -227,9 +227,9 @@ if gcloud scheduler jobs describe backup-daily-job --location="$REGION" &> /dev/
     echo -e "${GREEN}✓ Scheduler job updated${NC}"
 else
     echo "Creating scheduler job..."
-    gcloud scheduler jobs create http backup-daily-job \
+    gcloud scheduler jobs create http backup-weekly-job \
         --location="$REGION" \
-        --schedule="0 2 * * *" \
+        --schedule="0 18 * * 4" \
         --uri="$FUNCTION_URL" \
         --http-method=POST \
         --oidc-service-account-email="$SERVICE_ACCOUNT" \
@@ -261,16 +261,16 @@ echo "  • Bucket: gs://${BUCKET_NAME}"
 echo "  • Object versioning: ENABLED"
 echo "  • Lifecycle policy: 365-day retention"
 echo "  • Cloud Function: Deployed"
-echo "  • Cloud Scheduler: Daily at 2 AM"
+echo "  • Cloud Scheduler: Weekly on Thursday at 6 PM"
 echo ""
 echo "📋 Backup Features:"
-echo "  • Automatic daily backups at 2 AM"
+echo "  • Automatic weekly backups on Thursday at 6 PM (end of day)"
 echo "  • Manual backups via Admin Panel"
 echo "  • Object versioning (365-day retention)"
 echo "  • Storage class optimization (cost savings)"
 echo ""
 echo "🧪 Test the backup:"
-echo "  gcloud scheduler jobs run backup-daily-job --location=$REGION"
+echo "  gcloud scheduler jobs run backup-weekly-job --location=$REGION"
 echo ""
 echo "📊 View backups:"
 echo "  gsutil ls -r gs://${BUCKET_NAME}/backups/"

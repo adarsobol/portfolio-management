@@ -15,7 +15,7 @@ The script will:
 2. ✅ Enable object versioning
 3. ✅ Apply lifecycle policies (365-day retention)
 4. ✅ Deploy backup Cloud Function
-5. ✅ Set up Cloud Scheduler (daily at 2 AM)
+5. ✅ Set up Cloud Scheduler (weekly on Thursday at 6 PM)
 6. ✅ Configure permissions
 
 ## 📋 Prerequisites
@@ -71,9 +71,9 @@ gcloud functions deploy backup-daily \
 FUNCTION_URL=$(gcloud functions describe backup-daily --gen2 --region=us-central1 --format="value(serviceConfig.uri)")
 
 # Create scheduler job
-gcloud scheduler jobs create http backup-daily-job \
+gcloud scheduler jobs create http backup-weekly-job \
   --location=us-central1 \
-  --schedule="0 2 * * *" \
+  --schedule="0 18 * * 4" \
   --uri="${FUNCTION_URL}" \
   --http-method=POST \
   --oidc-service-account-email="${PROJECT_ID}@appspot.gserviceaccount.com" \
@@ -95,14 +95,14 @@ gcloud functions list --gen2
 gcloud scheduler jobs list --location=us-central1
 
 # Test backup manually
-gcloud scheduler jobs run backup-daily-job --location=us-central1
+gcloud scheduler jobs run backup-weekly-job --location=us-central1
 ```
 
 ## 🎯 What You Get
 
 After setup, you'll have:
 
-1. **Automatic Daily Backups** - Runs every day at 2 AM
+1. **Automatic Weekly Backups** - Runs every Thursday at 6 PM (end of day)
 2. **Object Versioning** - Every file save creates a version (365-day retention)
 3. **Manual Backups** - Create backups via Admin Panel anytime
 4. **Cost Optimization** - Automatic storage class transitions
@@ -139,7 +139,7 @@ gsutil cat gs://portfolio-manager-data/backups/2025-12-25/manifest.json | jq .
 ## 🎉 Next Steps
 
 Once setup is complete:
-1. Your backups will run automatically every night
+1. Your backups will run automatically every Thursday at 6 PM
 2. You can create manual backups via Admin Panel
 3. View backups in Google Cloud Console Storage browser
 4. Restore from backups via Admin Panel or API

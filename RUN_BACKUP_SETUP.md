@@ -24,7 +24,7 @@ The script will automatically:
 2. ✅ **Enable object versioning** (365-day retention)
 3. ✅ **Apply lifecycle policies** (cost optimization)
 4. ✅ **Deploy backup Cloud Function** (runs backups)
-5. ✅ **Set up Cloud Scheduler** (daily at 2 AM)
+5. ✅ **Set up Cloud Scheduler** (weekly on Thursday at 6 PM)
 6. ✅ **Configure permissions** (so everything works)
 
 ## Expected Output
@@ -68,7 +68,7 @@ Setup Complete!
 ## After Setup
 
 Your backup system will:
-- ✅ Run automatic daily backups at 2 AM
+- ✅ Run automatic weekly backups on Thursday at 6 PM (end of day)
 - ✅ Keep 365 days of version history
 - ✅ Allow manual backups via Admin Panel
 - ✅ Optimize storage costs automatically
@@ -79,7 +79,7 @@ After setup, test the backup:
 
 ```bash
 # Run backup manually
-gcloud scheduler jobs run backup-daily-job --location=us-central1
+gcloud scheduler jobs run backup-weekly-job --location=us-central1
 
 # Check backup was created
 gsutil ls -r gs://portfolio-manager-data/backups/

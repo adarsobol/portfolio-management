@@ -32,8 +32,8 @@ If you switch to GCS storage, you'll get:
 - Automatic protection against accidental overwrites
 - 365-day retention
 
-### 2. **Daily Automated Backups** (Cloud Function)
-- Runs daily at 2 AM (configurable)
+### 2. **Weekly Automated Backups** (Cloud Function)
+- Runs weekly on Thursday at 6 PM (end of day)
 - Creates timestamped backups: `backups/YYYY-MM-DD/`
 - Includes manifest with file metadata
 - Requires Cloud Scheduler setup
@@ -79,7 +79,7 @@ Or check your Cloud Run environment variables:
 2. Set environment variables in Cloud Run
 3. Enable object versioning
 4. Deploy the backup Cloud Function
-5. Set up Cloud Scheduler for daily backups
+5. Set up Cloud Scheduler for weekly backups (Thursday at 6 PM)
 
 ## Summary
 
@@ -88,7 +88,7 @@ Or check your Cloud Run environment variables:
 | **Google Sheets Version History** | ✅ Active | Built into Google Sheets |
 | **Manual Sheet Snapshots** | ✅ Available | New tabs in spreadsheet |
 | **GCS Object Versioning** | ❌ Not Active | Requires GCS setup |
-| **Daily GCS Backups** | ❌ Not Active | Requires GCS + Cloud Function |
+| **Weekly GCS Backups** | ❌ Not Active | Requires GCS + Cloud Function (Thursdays 6 PM) |
 | **Manual GCS Backups** | ❌ Not Active | Requires GCS setup |
 
 **Bottom Line:** Your data IS backed up via Google Sheets version history. The advanced GCS backup system exists but isn't active because you're using Sheets, not GCS.

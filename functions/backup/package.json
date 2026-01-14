@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "deploy": "npm run build && gcloud functions deploy backup-daily --gen2 --runtime=nodejs20 --trigger-http --allow-unauthenticated=false --entry-point=backupDaily --source=. --region=us-central1",
-    "deploy-scheduler": "gcloud scheduler jobs create http backup-daily-job --schedule='0 2 * * *' --uri='https://us-central1-${PROJECT_ID}.cloudfunctions.net/backup-daily' --http-method=POST --oidc-service-account-email=${SERVICE_ACCOUNT}"
+    "deploy-scheduler": "gcloud scheduler jobs create http backup-weekly-job --schedule='0 18 * * 4' --uri='https://us-central1-${PROJECT_ID}.cloudfunctions.net/backup-daily' --http-method=POST --oidc-service-account-email=${SERVICE_ACCOUNT}"
   },
   "dependencies": {
     "@google-cloud/functions-framework": "^3.3.0",
