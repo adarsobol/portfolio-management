@@ -180,6 +180,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   void _showShareMenu; // Reserved for future share menu UI
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<'slack' | 'notion' | null>(null);
+  
+  // Save Confirmation State
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
 
   // Task Management State (for all initiative types)
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -273,6 +276,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       setShowShareMenu(false);
       setShowActionsMenu(false);
       setCopyFeedback(null);
+      setShowSaveConfirmation(false);
       setEnableTradeOff(false);
       setTradeOffData({ field: 'eta' });
       setExpandedSections({ core: true, hierarchy: false, dependencies: false, effort: false, risk: false, tradeoff: false, tasks: false });
@@ -298,6 +302,32 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       };
     }
   }, [showActionsMenu]);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        // If mention dropdown is open, close it first (handled by handleCommentKeyDown)
+        if (showMentionDropdown) {
+          return; // Let handleCommentKeyDown handle it
+        }
+        // If save confirmation is open, close it
+        if (showSaveConfirmation) {
+          setShowSaveConfirmation(false);
+          return;
+        }
+        // Otherwise, close the entire modal
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [isOpen, showMentionDropdown, showSaveConfirmation, onClose]);
 
   // Real-time asset class assignment based on selected owner's team
   useEffect(() => {
@@ -586,35 +616,41 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      const now = new Date().toISOString().split('T')[0];
-      const isNew = !formData.id;
-      
-      const payload = {
-        ...formData,
-        lastUpdated: now,
-        id: formData.id || generateInitiativeId(formData.quarter, allInitiatives),
-        // Set originalEstimatedEffort only when creating new or when it changes
-        originalEstimatedEffort: isNew ? (formData.estimatedEffort || 0) : formData.originalEstimatedEffort,
-        originalEta: isNew ? (formData.eta || '') : formData.originalEta,
-        // Set createdAt and createdBy for new initiatives
-        createdAt: isNew ? new Date().toISOString() : formData.createdAt,
-        createdBy: isNew ? currentUser.id : formData.createdBy,
-        // Include tasks for all initiative types
-        tasks: tasks && tasks.length > 0 ? tasks : undefined,
-        // Ensure initiativeType is set (required field)
-        initiativeType: formData.initiativeType || InitiativeType.WP,
-        // Ensure effort fields have defaults
-        estimatedEffort: formData.estimatedEffort || 0,
-        actualEffort: formData.actualEffort || 0,
-      } as Initiative;
-      
-      const tradeOffAction = enableTradeOff && tradeOffData.targetInitiativeId && tradeOffData.newValue
-        ? tradeOffData as TradeOffAction
-        : undefined;
-
-      onSave(payload, tradeOffAction);
-      onClose();
+      // Show confirmation dialog instead of saving immediately
+      setShowSaveConfirmation(true);
     }
+  };
+
+  const confirmSave = () => {
+    const now = new Date().toISOString().split('T')[0];
+    const isNew = !formData.id;
+    
+    const payload = {
+      ...formData,
+      lastUpdated: now,
+      id: formData.id || generateInitiativeId(formData.quarter, allInitiatives),
+      // Set originalEstimatedEffort only when creating new or when it changes
+      originalEstimatedEffort: isNew ? (formData.estimatedEffort || 0) : formData.originalEstimatedEffort,
+      originalEta: isNew ? (formData.eta || '') : formData.originalEta,
+      // Set createdAt and createdBy for new initiatives
+      createdAt: isNew ? new Date().toISOString() : formData.createdAt,
+      createdBy: isNew ? currentUser.id : formData.createdBy,
+      // Include tasks for all initiative types
+      tasks: tasks && tasks.length > 0 ? tasks : undefined,
+      // Ensure initiativeType is set (required field)
+      initiativeType: formData.initiativeType || InitiativeType.WP,
+      // Ensure effort fields have defaults
+      estimatedEffort: formData.estimatedEffort || 0,
+      actualEffort: formData.actualEffort || 0,
+    } as Initiative;
+    
+    const tradeOffAction = enableTradeOff && tradeOffData.targetInitiativeId && tradeOffData.newValue
+      ? tradeOffData as TradeOffAction
+      : undefined;
+
+    setShowSaveConfirmation(false);
+    onSave(payload, tradeOffAction);
+    onClose();
   };
 
   // ============================================================================
@@ -1393,26 +1429,24 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Row 5: Definition of Done (not required for BAU) */}
-                  {!isBAU && (
-                    <div className={`grid grid-cols-[100px_1fr] ${formData.workType === WorkType.Unplanned ? 'border-b border-slate-200' : ''}`}>
-                      <div className="bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-600 border-r border-slate-200 flex items-start pt-2">
-                        Definition of Done <span className="text-red-500 ml-0.5">*</span>
-                      </div>
-                      <div className="bg-white">
-                        <textarea
-                          disabled={isReadOnly}
-                          value={formData.definitionOfDone || ''}
-                          onChange={(e) => handleChange('definitionOfDone', e.target.value)}
-                          placeholder="Enter the definition of done criteria..."
-                          rows={3}
-                          className={`w-full px-2 py-1.5 text-xs focus:outline-none focus:bg-blue-50 resize-none ${
-                            errors.definitionOfDone ? 'bg-red-50' : ''
-                          }`}
-                        />
-                      </div>
+                  {/* Row 5: Definition of Done (required for WP, optional for BAU) */}
+                  <div className={`grid grid-cols-[100px_1fr] ${formData.workType === WorkType.Unplanned ? 'border-b border-slate-200' : ''}`}>
+                    <div className="bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-600 border-r border-slate-200 flex items-start pt-2">
+                      Definition of Done {!isBAU && <span className="text-red-500 ml-0.5">*</span>}
                     </div>
-                  )}
+                    <div className="bg-white">
+                      <textarea
+                        disabled={isReadOnly}
+                        value={formData.definitionOfDone || ''}
+                        onChange={(e) => handleChange('definitionOfDone', e.target.value)}
+                        placeholder="Enter the definition of done criteria..."
+                        rows={3}
+                        className={`w-full px-2 py-1.5 text-xs focus:outline-none focus:bg-blue-50 resize-none ${
+                          errors.definitionOfDone ? 'bg-red-50' : ''
+                        }`}
+                      />
+                    </div>
+                  </div>
 
                   {/* Conditional: Unplanned Tags */}
                   {formData.workType === WorkType.Unplanned && (
@@ -2637,6 +2671,49 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         </div>
         </div>
       </div>
+
+      {/* Save Confirmation Dialog */}
+      {showSaveConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-900/60 transition-opacity"
+            onClick={() => setShowSaveConfirmation(false)}
+          />
+          
+          {/* Confirmation Modal */}
+          <div className="relative bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Confirm Save</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Are you sure you want to save this initiative?</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 justify-end mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowSaveConfirmation(false)}
+                  className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-all border border-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmSave}
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-md hover:shadow-lg transition-all"
+                >
+                  Save Initiative
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
