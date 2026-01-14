@@ -482,14 +482,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
   
-  // Force sync all initiatives to Google Sheets
+  // Force sync all initiatives to Google Sheets (using upsert - safe, no data loss)
   const forceSyncAllToSheet = async () => {
     if (!initiatives || initiatives.length === 0) {
       setBackupError('No initiatives to sync');
       return;
     }
     
-    if (!confirm(`Are you sure you want to sync all ${initiatives.length} initiatives to Google Sheets? This will update/add all items in the Initiatives tab.`)) {
+    if (!confirm(`Are you sure you want to sync all ${initiatives.length} initiatives to Google Sheets?\n\nThis will:\n• Update existing items\n• Add missing items\n• NOT delete anything from the sheet`)) {
       return;
     }
     
@@ -497,12 +497,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBackupError(null);
     setBackupSuccess(null);
     try {
-      const success = await sheetsSync.pushFullData({ initiatives });
-      if (success) {
-        setBackupSuccess(`Successfully synced ${initiatives.length} initiatives to Google Sheets!`);
-      } else {
-        setBackupError('Failed to sync initiatives. Check console for details.');
-      }
+      // Queue all initiatives for sync (uses upsert - safe, no data loss)
+      sheetsSync.queueInitiativesSync(initiatives);
+      // Force immediate sync
+      await sheetsSync.forceSyncNow();
+      setBackupSuccess(`Successfully synced ${initiatives.length} initiatives to Google Sheets!`);
     } catch (error) {
       logger.error('Failed to force sync', { context: 'AdminPanel.forceSyncAllToSheet', error: error instanceof Error ? error : undefined });
       setBackupError('Error syncing initiatives: ' + (error instanceof Error ? error.message : 'Unknown error'));
