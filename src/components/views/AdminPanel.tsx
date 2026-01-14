@@ -10,8 +10,6 @@ import { canBeOwner, syncCapacitiesWithUsers, logger } from '../../utils';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
-import { flattenInitiative } from '../../services/googleSheetsSync';
-import { authService } from '../../services/authService';
 
 // BadgePermission Component for visual permission display
 interface BadgePermissionProps {
@@ -484,14 +482,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
   
-  // Force sync all initiatives to Google Sheets (using safe upsert endpoint - updates existing, adds missing, never deletes)
+  // Force sync all initiatives to Google Sheets (clear sheet and re-upload all - simple and reliable)
   const forceSyncAllToSheet = async () => {
     if (!initiatives || initiatives.length === 0) {
       setBackupError('No initiatives to sync');
       return;
     }
     
-    if (!confirm(`Are you sure you want to sync all ${initiatives.length} initiatives to Google Sheets?\n\nThis will:\n• Update existing items (by ID)\n• Add missing items\n• NOT delete anything from the sheet\n\nThis is safe and will not cause data loss.`)) {
+    if (!confirm(`Are you sure you want to sync all ${initiatives.length} initiatives to Google Sheets?\n\nThis will:\n• Clear the Initiatives tab\n• Re-upload all ${initiatives.length} initiatives from your local app\n• This ensures everything in your app is backed up to the sheet`)) {
       return;
     }
     
@@ -499,29 +497,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBackupError(null);
     setBackupSuccess(null);
     try {
-      // Use the regular sync endpoint which does safe upsert (same as normal sync, but for all initiatives at once)
-      // This bypasses the queue and enabled check, calling the endpoint directly
-      const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
-      
-      const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authService.getAuthHeader()
-        },
-        body: JSON.stringify({ 
-          initiatives: (initiatives as Initiative[]).map(flattenInitiative) 
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Sync failed (${response.status}): ${errorText.substring(0, 100) || response.statusText}`);
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        setBackupSuccess(`Successfully synced ${result.count || initiatives.length} initiatives to Google Sheets!`);
+      // Use pushFullData which clears the sheet and re-adds everything (simple and reliable)
+      const success = await sheetsSync.pushFullData({ initiatives: initiatives as Initiative[] });
+      if (success) {
+        setBackupSuccess(`Successfully synced ${initiatives.length} initiatives to Google Sheets!`);
       } else {
         setBackupError('Sync completed but returned unsuccessful. Check browser console for details.');
       }
