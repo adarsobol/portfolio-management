@@ -181,6 +181,19 @@ export const HIERARCHY: Record<AssetClass, HierarchyNode[]> = {
         'Advisory'
       ]
     }
+  ],
+  [AssetClass.Production]: [
+    {
+      name: 'Production Management',
+      responsibilities: [
+        'New partners onboarding',
+        'Executing portfolio decisions',
+        'Production technical operations',
+        'QA',
+        'DOC',
+        'Delivery & BankOps'
+      ]
+    }
   ]
 };
 

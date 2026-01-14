@@ -62,7 +62,8 @@ export enum AssetClass {
   PL = 'PL',
   Auto = 'Auto',
   POS = 'POS',
-  Advisory = 'Advisory'
+  Advisory = 'Advisory',
+  Production = 'Production'
 }
 
 export interface User {
