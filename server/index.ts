@@ -2092,12 +2092,23 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         // Set initial version for new initiatives
         rowData['version'] = String((parseInt(initiative.version || '0', 10) || 0) + 1);
         try {
-          await sheet.addRow(rowData);
-          serverLogger.info(`Successfully added initiative: ${initiative.id}`, { context: 'Sync' });
-          existingIds.add(initiative.id); // Track that we added it
-          syncedCount++;
+          serverLogger.debug(`Attempting to addRow for ${initiative.id}`, { context: 'Sync', metadata: { rowDataKeys: Object.keys(rowData) } });
+          const newRow = await sheet.addRow(rowData);
+          serverLogger.debug(`addRow returned for ${initiative.id}`, { context: 'Sync', metadata: { rowIndex: newRow.rowNumber } });
+          
+          // Verify the row was actually added by checking if it exists
+          const verifyRows = await sheet.getRows();
+          const verifyRow = verifyRows.find((r: GoogleSpreadsheetRow) => r.get('id') === initiative.id);
+          if (verifyRow) {
+            serverLogger.info(`Successfully added and verified initiative: ${initiative.id}`, { context: 'Sync' });
+            existingIds.add(initiative.id); // Track that we added it
+            syncedCount++;
+          } else {
+            serverLogger.error(`addRow succeeded but row not found in sheet for ${initiative.id}`, { context: 'Sync' });
+            throw new Error(`Row was not added to sheet for initiative ${initiative.id}`);
+          }
         } catch (addRowError) {
-          serverLogger.error(`Failed to add initiative ${initiative.id}`, { context: 'Sync', error: addRowError as Error });
+          serverLogger.error(`Failed to add initiative ${initiative.id}`, { context: 'Sync', error: addRowError as Error, metadata: { rowData } });
           throw addRowError; // Re-throw to be caught by outer catch
         }
       } else {

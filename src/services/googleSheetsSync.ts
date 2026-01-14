@@ -1158,10 +1158,10 @@ class SheetsSyncManager {
       // Parse response and check for server-newer items (last-write-wins)
       const result = await response.json();
       console.log('[DEBUG] API SUCCESS:', {
-        synced: result.synced,
-        updated: result.updated,
-        added: result.added,
-        serverNewer: result.serverNewer?.length || 0
+        success: result.success,
+        count: result.count,
+        serverNewer: result.serverNewer?.length || 0,
+        message: result.message
       });
       
       if (result.serverNewer && result.serverNewer.length > 0) {
