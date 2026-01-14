@@ -43,6 +43,12 @@ export interface SheetsPullData {
 // FLATTEN HELPERS (for Sheet row format)
 // ============================================
 export function flattenInitiative(i: Initiative): Record<string, string | number | boolean> {
+  // Guard against undefined/null initiatives
+  if (!i) {
+    logger.error('flattenInitiative called with undefined/null initiative', { context: 'Sync' });
+    throw new Error('Cannot flatten undefined initiative');
+  }
+  
   const taskCount = i.tasks?.length || 0;
   if (taskCount > 0) {
     logger.debug(`flattenInitiative: ${i.id} has ${taskCount} tasks`, { context: 'Sync', metadata: { taskIds: i.tasks?.map(t => t.id) } });
@@ -1025,11 +1031,33 @@ class SheetsSyncManager {
 
   private async syncInitiatives(initiatives: Initiative[]): Promise<boolean> {
     try {
-      logger.debug(`POST ${API_ENDPOINT}/api/sheets/initiatives with ${initiatives.length} initiative(s)`, { context: 'Sync' });
+      // Filter out any undefined/null initiatives to prevent errors
+      const validInitiatives = initiatives.filter(i => {
+        if (!i) {
+          logger.warn('Found undefined initiative in sync queue, skipping', { context: 'Sync' });
+          return false;
+        }
+        if (!i.id) {
+          logger.warn('Found initiative without ID in sync queue, skipping', { context: 'Sync' });
+          return false;
+        }
+        return true;
+      });
+      
+      if (validInitiatives.length === 0) {
+        logger.warn('No valid initiatives to sync after filtering', { context: 'Sync' });
+        return true; // Nothing to sync, but not an error
+      }
+      
+      if (validInitiatives.length !== initiatives.length) {
+        logger.warn(`Filtered out ${initiatives.length - validInitiatives.length} invalid initiative(s)`, { context: 'Sync' });
+      }
+      
+      logger.debug(`POST ${API_ENDPOINT}/api/sheets/initiatives with ${validInitiatives.length} initiative(s)`, { context: 'Sync' });
       const response = await fetch(`${API_ENDPOINT}/api/sheets/initiatives`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ initiatives: initiatives.map(flattenInitiative) })
+        body: JSON.stringify({ initiatives: validInitiatives.map(flattenInitiative) })
       });
       
       logger.debug(`Response status: ${response.status}`, { context: 'Sync' });

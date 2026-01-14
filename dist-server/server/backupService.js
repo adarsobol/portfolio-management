@@ -2,12 +2,12 @@
  * Backup Service
  *
  * Provides backup management and restoration capabilities for the Portfolio Manager.
- * Works with GCS object versioning and daily backup snapshots.
+ * Works with GCS object versioning and weekly backup snapshots (Thursday at 6 PM).
  *
  * Features:
  * - List available backups
  * - List object versions
- * - Restore from daily backups
+   * - Restore from weekly backups
  * - Restore specific object versions
  * - Create manual backups
  * - Verify backup integrity
@@ -57,7 +57,7 @@ export class BackupService {
     // LIST BACKUPS
     // ============================================
     /**
-     * List all available daily backups
+     * List all available weekly backups
      */
     async listBackups() {
         await this.ensureInitialized();
@@ -173,7 +173,7 @@ export class BackupService {
     // RESTORE FROM BACKUP
     // ============================================
     /**
-     * Restore all data from a daily backup
+     * Restore all data from a weekly backup
      */
     async restoreFromBackup(date, specificFiles) {
         await this.ensureInitialized();

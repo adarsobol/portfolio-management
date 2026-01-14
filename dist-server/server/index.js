@@ -1792,16 +1792,25 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
             }
             else if (!existingIds.has(initiative.id)) {
                 // Only add if it doesn't exist (double-check to prevent duplicates)
+                serverLogger.info(`Adding NEW initiative: ${initiative.id} - ${initiative.title}`, { context: 'Sync' });
                 const rowData = {};
-                Object.keys(initiative).forEach(key => {
-                    const value = initiative[key];
-                    rowData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+                // Use INITIATIVE_HEADERS to ensure we only include columns that exist in the sheet
+                INITIATIVE_HEADERS.forEach(header => {
+                    const value = initiative[header];
+                    rowData[header] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
                 });
                 // Set initial version for new initiatives
                 rowData['version'] = String((parseInt(initiative.version || '0', 10) || 0) + 1);
-                await sheet.addRow(rowData);
-                existingIds.add(initiative.id); // Track that we added it
-                syncedCount++;
+                try {
+                    await sheet.addRow(rowData);
+                    serverLogger.info(`Successfully added initiative: ${initiative.id}`, { context: 'Sync' });
+                    existingIds.add(initiative.id); // Track that we added it
+                    syncedCount++;
+                }
+                catch (addRowError) {
+                    serverLogger.error(`Failed to add initiative ${initiative.id}`, { context: 'Sync', error: addRowError });
+                    throw addRowError; // Re-throw to be caught by outer catch
+                }
             }
             else {
                 serverLogger.warn(`Upsert: Initiative ${initiative.id} already exists, skipping add`, { context: 'Sync' });
