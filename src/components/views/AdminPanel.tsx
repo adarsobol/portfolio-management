@@ -325,6 +325,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isRestoring, setIsRestoring] = useState(false);
   const [backupError, setBackupError] = useState<string | null>(null);
   const [backupSuccess, setBackupSuccess] = useState<string | null>(null);
+  const [isForceSyncing, setIsForceSyncing] = useState(false);
   
   // User management loading state
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -478,6 +479,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setBackupError('Network error while creating backup');
     } finally {
       setIsCreatingBackup(false);
+    }
+  };
+  
+  // Force sync all initiatives to Google Sheets
+  const forceSyncAllToSheet = async () => {
+    if (!initiatives || initiatives.length === 0) {
+      setBackupError('No initiatives to sync');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to sync all ${initiatives.length} initiatives to Google Sheets? This will update/add all items in the Initiatives tab.`)) {
+      return;
+    }
+    
+    setIsForceSyncing(true);
+    setBackupError(null);
+    setBackupSuccess(null);
+    try {
+      const success = await sheetsSync.pushFullData({ initiatives });
+      if (success) {
+        setBackupSuccess(`Successfully synced ${initiatives.length} initiatives to Google Sheets!`);
+      } else {
+        setBackupError('Failed to sync initiatives. Check console for details.');
+      }
+    } catch (error) {
+      logger.error('Failed to force sync', { context: 'AdminPanel.forceSyncAllToSheet', error: error instanceof Error ? error : undefined });
+      setBackupError('Error syncing initiatives: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsForceSyncing(false);
     }
   };
   
@@ -1443,6 +1473,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={forceSyncAllToSheet}
+                      disabled={isForceSyncing}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-colors disabled:opacity-50"
+                      title="Push all initiatives from browser to Google Sheets"
+                    >
+                      {isForceSyncing ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                      Sync All to Sheet
+                    </button>
                     <button
                       onClick={createManualBackup}
                       disabled={isCreatingBackup}
