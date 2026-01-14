@@ -42,11 +42,34 @@ export interface SheetsPullData {
 // ============================================
 // FLATTEN HELPERS (for Sheet row format)
 // ============================================
+// Version: 2026-01-14-v2 - Added null checks
 export function flattenInitiative(i: Initiative): Record<string, string | number | boolean> {
   // Guard against undefined/null initiatives
   if (!i) {
-    logger.error('flattenInitiative called with undefined/null initiative', { context: 'Sync' });
-    throw new Error('Cannot flatten undefined initiative');
+    logger.error('flattenInitiative called with undefined/null initiative - SKIPPING', { context: 'Sync' });
+    // Return empty object instead of throwing to prevent batch failure
+    return {
+      id: 'ERROR_UNDEFINED',
+      title: 'ERROR: Undefined initiative',
+      status: 'Error',
+      initiativeType: 'WP',
+      l1_assetClass: '',
+      l2_pillar: '',
+      l3_responsibility: '',
+      l4_target: '',
+      ownerId: '',
+      quarter: '',
+      priority: '',
+      workType: '',
+      estimatedEffort: 0,
+      actualEffort: 0,
+      version: 0
+    };
+  }
+  
+  // Guard against missing required fields
+  if (!i.id) {
+    logger.error('flattenInitiative called with initiative missing ID', { context: 'Sync', metadata: { title: i.title } });
   }
   
   const taskCount = i.tasks?.length || 0;
@@ -54,18 +77,18 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     logger.debug(`flattenInitiative: ${i.id} has ${taskCount} tasks`, { context: 'Sync', metadata: { taskIds: i.tasks?.map(t => t.id) } });
   }
   return {
-    id: i.id,
+    id: i.id || '',
     initiativeType: i.initiativeType || 'WP',
-    l1_assetClass: i.l1_assetClass,
-    l2_pillar: i.l2_pillar,
-    l3_responsibility: i.l3_responsibility,
-    l4_target: i.l4_target,
-    title: i.title,
-    ownerId: i.ownerId,
+    l1_assetClass: i.l1_assetClass || '',
+    l2_pillar: i.l2_pillar || '',
+    l3_responsibility: i.l3_responsibility || '',
+    l4_target: i.l4_target || '',
+    title: i.title || '',
+    ownerId: i.ownerId || '',
     assignee: i.assignee || '',
-    quarter: i.quarter,
-    status: i.status,
-    priority: i.priority,
+    quarter: i.quarter || '',
+    status: i.status || 'Not Started',
+    priority: i.priority || 'P2',
     estimatedEffort: i.estimatedEffort ?? 0,
     originalEstimatedEffort: i.originalEstimatedEffort ?? 0,
     actualEffort: i.actualEffort ?? 0,
@@ -75,10 +98,10 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     createdAt: i.createdAt ?? '',
     lastWeeklyUpdate: i.lastWeeklyUpdate ?? '',
     dependencies: i.dependencies?.map(d => `${d.team} (${d.deliverable || 'N/A'}, ETA: ${d.eta || 'N/A'})`).join('; ') || '',
-    workType: i.workType,
+    workType: i.workType || 'Planned',
     unplannedTags: JSON.stringify(i.unplannedTags || []),
     riskActionLog: i.riskActionLog || '',
-    isAtRisk: i.status === 'At Risk',
+    isAtRisk: (i.status || '') === 'At Risk',
     definitionOfDone: i.definitionOfDone || '',
     tasks: JSON.stringify(i.tasks || []),
     overlookedCount: i.overlookedCount ?? 0,
