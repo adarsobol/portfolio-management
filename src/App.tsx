@@ -1740,28 +1740,6 @@ export default function App() {
             if (!item.createdAt) {
               item.createdAt = new Date().toISOString();
             }
-            
-            // Create changelog entry for new initiative creation
-            const createChangeRecord: ChangeRecord = {
-              id: generateId(),
-              issueType: 'Initiative',
-              parentId: item.id,
-              initiativeId: item.id,
-              initiativeTitle: item.title,
-              field: 'Created',
-              oldValue: '',
-              newValue: item.title,
-              changedBy: currentUser.name,
-              timestamp: new Date().toISOString()
-            };
-            
-            // Add to item's history and changelog state
-            item.history = [createChangeRecord];
-            setChangeLog(prevLog => [createChangeRecord, ...prevLog]);
-            
-            // Sync creation record to Google Sheets changelog
-            sheetsSync.queueChangeLog(createChangeRecord);
-            
             nextInitiatives.push(item);
             
             // Execute OnCreate workflows for new initiatives
@@ -1970,6 +1948,15 @@ export default function App() {
         setPendingAtRiskInitiative({ id, oldStatus: initiative.status });
         setIsAtRiskModalOpen(true);
         return; // Don't proceed with status change yet
+      }
+    }
+    
+    // Block status change to In Progress if ETA is empty
+    if (field === 'status' && value === Status.InProgress) {
+      const initiative = initiatives.find(i => i.id === id);
+      if (initiative && (!initiative.eta || !initiative.eta.trim())) {
+        showError('Cannot move to In Progress without ETA. Please set an ETA first.');
+        return; // Prevent status change
       }
     }
     
