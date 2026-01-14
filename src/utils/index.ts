@@ -40,8 +40,8 @@ export const getEligibleOwners = (users: User[]): User[] => {
  * Sync capacity planning entries (teamCapacities, teamCapacityAdjustments, teamBuffers)
  * with the current list of Team Lead users. This ensures that:
  * - Removed Team Leads are cleaned up from capacity entries
- * - Existing capacity values are preserved for current Team Leads
- * - New Team Leads do NOT get auto-assigned capacity (must be set manually)
+ * - Existing capacity values are preserved for ALL current Team Leads
+ * - New Team Leads do NOT get auto-assigned capacity (must be set manually in Admin Panel)
  * 
  * @param config - Current app configuration
  * @param users - Current list of users
@@ -56,25 +56,31 @@ export const syncCapacitiesWithUsers = (
     users.filter(u => u.role === Role.TeamLead).map(u => u.id)
   );
   
-  // Build new teamCapacities: keep existing entries for valid TLs only (no auto-assignment)
+  // Start with existing capacities and only REMOVE entries for non-Team-Leads
+  // This preserves all manually-set values and doesn't auto-assign anything
   const newCapacities: Record<string, number> = {};
   const newAdjustments: Record<string, number> = {};
   const newBuffers: Record<string, number> = {};
   
-  for (const userId of teamLeadIds) {
-    // Only preserve existing capacity - do NOT auto-assign default values
-    if (config.teamCapacities[userId] !== undefined) {
-      newCapacities[userId] = config.teamCapacities[userId];
+  // Copy existing entries for users who are still Team Leads
+  for (const [userId, capacity] of Object.entries(config.teamCapacities)) {
+    if (teamLeadIds.has(userId)) {
+      newCapacities[userId] = capacity;
     }
-    
-    // Preserve existing adjustments if they exist
-    if (config.teamCapacityAdjustments?.[userId] !== undefined) {
-      newAdjustments[userId] = config.teamCapacityAdjustments[userId];
+    // If user is no longer a Team Lead, their entry is dropped (cleaned up)
+  }
+  
+  // Copy existing adjustments for users who are still Team Leads
+  for (const [userId, adjustment] of Object.entries(config.teamCapacityAdjustments || {})) {
+    if (teamLeadIds.has(userId)) {
+      newAdjustments[userId] = adjustment;
     }
-    
-    // Preserve existing buffers if they exist
-    if (config.teamBuffers?.[userId] !== undefined) {
-      newBuffers[userId] = config.teamBuffers[userId];
+  }
+  
+  // Copy existing buffers for users who are still Team Leads
+  for (const [userId, buffer] of Object.entries(config.teamBuffers || {})) {
+    if (teamLeadIds.has(userId)) {
+      newBuffers[userId] = buffer;
     }
   }
   
