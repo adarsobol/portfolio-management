@@ -2027,6 +2027,14 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     // Create a map of existing IDs for faster lookup
     const existingIds = new Set(rows.map((r: GoogleSpreadsheetRow) => r.get('id')).filter((id: string) => id && !id.startsWith('_meta_')));
     
+    serverLogger.debug(`Processing ${deduplicated.length} initiatives, found ${existingIds.size} existing IDs in sheet`, { 
+      context: 'Sync', 
+      metadata: { 
+        existingIds: Array.from(existingIds).slice(0, 10), // Log first 10 for debugging
+        totalRows: rows.length 
+      } 
+    });
+    
     // Track items where server is newer (for client to update their local state)
     const serverNewer: Array<{
       id: string;
@@ -2035,7 +2043,20 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
     let syncedCount = 0;
     
     for (const initiative of deduplicated) {
-      const existing = rows.find((r: GoogleSpreadsheetRow) => r.get('id') === initiative.id);
+      serverLogger.debug(`Processing initiative ${initiative.id}`, { context: 'Sync', metadata: { title: initiative.title?.substring(0, 50) } });
+      const existing = rows.find((r: GoogleSpreadsheetRow) => {
+        const rowId = r.get('id');
+        return rowId === initiative.id;
+      });
+      
+      serverLogger.debug(`Row lookup for ${initiative.id}`, { 
+        context: 'Sync', 
+        metadata: { 
+          found: !!existing,
+          inExistingIds: existingIds.has(initiative.id),
+          rowId: existing?.get('id')
+        } 
+      });
 
       if (existing) {
         // Last-write-wins based on lastUpdated timestamp
