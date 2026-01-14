@@ -6,6 +6,7 @@ import { generateId } from '../utils';
 
 interface UseAppNotificationsOptions {
   isAuthenticated: boolean;
+  isAuthLoading?: boolean;
   currentUser: User | null;
   initiatives: Initiative[];
 }
@@ -38,7 +39,8 @@ interface UseAppNotificationsReturn {
  * - Delay checking for overdue initiatives
  */
 export function useAppNotifications({ 
-  isAuthenticated, 
+  isAuthenticated,
+  isAuthLoading = false,
   currentUser,
   initiatives 
 }: UseAppNotificationsOptions): UseAppNotificationsReturn {
@@ -140,8 +142,16 @@ export function useAppNotifications({
   useEffect(() => {
     logger.debug('Notification useEffect triggered', {
       context: 'useAppNotifications',
-      metadata: { isAuthenticated, currentUserId: currentUser?.id, currentUserEmail: currentUser?.email, notificationsLoaded }
+      metadata: { isAuthenticated, isAuthLoading, currentUserId: currentUser?.id, currentUserEmail: currentUser?.email, notificationsLoaded }
     });
+    
+    // Wait for auth to complete before loading
+    if (isAuthLoading) {
+      logger.debug('Skipping notification load - auth still loading', {
+        context: 'useAppNotifications'
+      });
+      return;
+    }
     
     if (!isAuthenticated || !currentUser?.id || notificationsLoaded) {
       logger.debug('Skipping notification load', {
@@ -182,7 +192,7 @@ export function useAppNotifications({
     };
 
     loadNotifications();
-  }, [isAuthenticated, currentUser?.id, currentUser?.email, notificationsLoaded]);
+  }, [isAuthenticated, isAuthLoading, currentUser?.id, currentUser?.email, notificationsLoaded]);
 
   // Subscribe to real-time notifications
   useEffect(() => {

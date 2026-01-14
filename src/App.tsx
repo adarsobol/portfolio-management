@@ -461,7 +461,7 @@ export default function App() {
     notifications: hookNotifications, 
     notificationsLoaded: hookNotificationsLoaded,
     createNotification: hookCreateNotification
-  } = useAppNotificationsHook({ isAuthenticated, currentUser, initiatives });
+  } = useAppNotificationsHook({ isAuthenticated, isAuthLoading: authLoading, currentUser, initiatives });
   
   // Shadow mode comparison - log any differences between legacy and hook
   useEffect(() => {
