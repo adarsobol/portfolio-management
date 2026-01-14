@@ -875,6 +875,8 @@ class SheetsSyncManager {
         });
       }
 
+      logger.info(`Pushing ${deduplicated.length} initiatives to ${API_ENDPOINT}/api/sheets/push`, { context: 'SheetsSyncManager.pushFullData' });
+      
       const response = await fetch(`${API_ENDPOINT}/api/sheets/push`, {
         method: 'POST',
         headers: this.getHeaders(),
@@ -884,8 +886,16 @@ class SheetsSyncManager {
       });
 
       if (!response.ok) {
-        throw new Error(`Push failed: ${response.statusText}`);
+        const errorText = await response.text();
+        logger.error(`Push failed with status ${response.status}`, { 
+          context: 'SheetsSyncManager.pushFullData', 
+          metadata: { status: response.status, statusText: response.statusText, error: errorText.substring(0, 200) } 
+        });
+        throw new Error(`Push failed (${response.status}): ${errorText.substring(0, 100) || response.statusText}`);
       }
+      
+      const result = await response.json();
+      logger.info(`Push successful: ${result.count} initiatives synced`, { context: 'SheetsSyncManager.pushFullData' });
 
       // Update local cache with deduplicated data
       cacheToLocalStorage(deduplicated);
