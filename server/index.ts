@@ -2772,11 +2772,13 @@ app.get('/api/sheets/pull', authenticateToken, async (req: AuthenticatedRequest,
 
 // POST /api/sheets/push - Full push (overwrite Initiatives tab) (Protected)
 app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  await acquireSyncMutex(); // Prevent concurrent sync operations
   try {
     const { initiatives } = req.body;
 
     if (!initiatives || !Array.isArray(initiatives)) {
-      res.status(400).json({ error: 'Invalid data' });
+      res.status(400).json({ success: false, error: 'Invalid data' });
+      releaseSyncMutex();
       return;
     }
 
@@ -2797,7 +2799,8 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
 
     const doc = await getDoc();
     if (!doc) {
-      res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+      res.status(500).json({ success: false, error: 'Failed to connect to Google Sheets' });
+      releaseSyncMutex();
       return;
     }
 
@@ -2827,7 +2830,10 @@ app.post('/api/sheets/push', authenticateToken, async (req: AuthenticatedRequest
     res.json({ success: true, count: deduplicated.length });
   } catch (error) {
     serverLogger.error('Error pushing to Sheets', { context: 'Push', error: error as Error });
-    res.status(500).json({ error: String(error) });
+    res.status(500).json({ success: false, error: String(error) });
+  } finally {
+    // CRITICAL: Always release mutex to prevent deadlock
+    releaseSyncMutex();
   }
 });
 
