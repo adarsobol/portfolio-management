@@ -1155,6 +1155,7 @@ class SheetsSyncManager {
         return false;
       }
       
+      // Parse response and check for server-newer items (last-write-wins)
       const result = await response.json();
       console.log('[DEBUG] API SUCCESS:', {
         synced: result.synced,
@@ -1162,9 +1163,6 @@ class SheetsSyncManager {
         added: result.added,
         serverNewer: result.serverNewer?.length || 0
       });
-      
-      // Parse response and check for server-newer items (last-write-wins)
-      const result = await response.json();
       
       if (result.serverNewer && result.serverNewer.length > 0) {
         // Server had newer data - log it but don't treat as error
