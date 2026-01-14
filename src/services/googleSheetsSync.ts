@@ -906,6 +906,15 @@ class SheetsSyncManager {
       }
       
       const result = await response.json();
+      console.log('[DEBUG] pushFullData response:', { success: result.success, count: result.count, result });
+      
+      if (!result.success) {
+        logger.error('Push returned unsuccessful', { context: 'SheetsSyncManager.pushFullData', metadata: { result } });
+        this.status.error = `Push failed: ${result.error || 'Server returned unsuccessful'}`;
+        this.notify();
+        return false;
+      }
+      
       logger.info(`Push successful: ${result.count} initiatives synced`, { context: 'SheetsSyncManager.pushFullData' });
 
       // Update local cache with deduplicated data
@@ -916,6 +925,8 @@ class SheetsSyncManager {
       this.notify();
       return true;
     } catch (error) {
+      console.error('[DEBUG] pushFullData error:', error);
+      logger.error('Push failed with exception', { context: 'SheetsSyncManager.pushFullData', error: error instanceof Error ? error : undefined });
       this.status.error = error instanceof Error ? error.message : 'Push failed';
       this.notify();
       return false;
