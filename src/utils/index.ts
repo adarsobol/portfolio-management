@@ -39,33 +39,33 @@ export const getEligibleOwners = (users: User[]): User[] => {
 /**
  * Sync capacity planning entries (teamCapacities, teamCapacityAdjustments, teamBuffers)
  * with the current list of Team Lead users. This ensures that:
- * - New Team Leads are automatically added with default capacity
  * - Removed Team Leads are cleaned up from capacity entries
  * - Existing capacity values are preserved for current Team Leads
+ * - New Team Leads do NOT get auto-assigned capacity (must be set manually)
  * 
  * @param config - Current app configuration
  * @param users - Current list of users
- * @param defaultCapacity - Default capacity for new Team Leads (default: 40 weeks per quarter)
  * @returns Partial AppConfig with updated capacity-related fields
  */
 export const syncCapacitiesWithUsers = (
   config: AppConfig,
-  users: User[],
-  defaultCapacity: number = 40
+  users: User[]
 ): Partial<AppConfig> => {
   // Get all Team Lead user IDs
   const teamLeadIds = new Set(
     users.filter(u => u.role === Role.TeamLead).map(u => u.id)
   );
   
-  // Build new teamCapacities: keep existing entries for valid TLs, add new ones
+  // Build new teamCapacities: keep existing entries for valid TLs only (no auto-assignment)
   const newCapacities: Record<string, number> = {};
   const newAdjustments: Record<string, number> = {};
   const newBuffers: Record<string, number> = {};
   
   for (const userId of teamLeadIds) {
-    // Preserve existing capacity or use default
-    newCapacities[userId] = config.teamCapacities[userId] ?? defaultCapacity;
+    // Only preserve existing capacity - do NOT auto-assign default values
+    if (config.teamCapacities[userId] !== undefined) {
+      newCapacities[userId] = config.teamCapacities[userId];
+    }
     
     // Preserve existing adjustments if they exist
     if (config.teamCapacityAdjustments?.[userId] !== undefined) {
