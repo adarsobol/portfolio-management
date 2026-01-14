@@ -482,7 +482,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
   
-  // Force sync all initiatives to Google Sheets (using upsert - safe, no data loss)
+  // Force sync all initiatives to Google Sheets (using pushFullData - direct API call, bypasses queue)
   const forceSyncAllToSheet = async () => {
     if (!initiatives || initiatives.length === 0) {
       setBackupError('No initiatives to sync');
@@ -497,11 +497,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setBackupError(null);
     setBackupSuccess(null);
     try {
-      // Queue all initiatives for sync (uses upsert - safe, no data loss)
-      sheetsSync.queueInitiativesSync(initiatives);
-      // Force immediate sync
-      await sheetsSync.forceSyncNow();
-      setBackupSuccess(`Successfully synced ${initiatives.length} initiatives to Google Sheets!`);
+      // Use pushFullData which directly calls /api/sheets/push (bypasses the queue and enabled check)
+      const success = await sheetsSync.pushFullData({ initiatives: initiatives as Initiative[] });
+      if (success) {
+        setBackupSuccess(`Successfully synced ${initiatives.length} initiatives to Google Sheets!`);
+      } else {
+        setBackupError('Sync completed but returned unsuccessful. Check browser console for details.');
+      }
     } catch (error) {
       logger.error('Failed to force sync', { context: 'AdminPanel.forceSyncAllToSheet', error: error instanceof Error ? error : undefined });
       setBackupError('Error syncing initiatives: ' + (error instanceof Error ? error.message : 'Unknown error'));
