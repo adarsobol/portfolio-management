@@ -6,7 +6,7 @@ import { SupportCenter } from './SupportCenter';
 import { ValueListsManager } from './ValueListsManager';
 import { User, Role, AppConfig, Initiative, PermissionKey, TabAccessLevel, TaskManagementScope, PermissionValue, VersionMetadata, Status, InitiativeType } from '../../types';
 import { migrateEnumsToConfig, getAssetClasses } from '../../utils/valueLists';
-import { canBeOwner, syncCapacitiesWithUsers, logger } from '../../utils';
+import { canBeOwner, logger } from '../../utils';
 import * as XLSX from 'xlsx';
 import { getVersionService } from '../../services/versionService';
 import { sheetsSync } from '../../services';
@@ -870,13 +870,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       
       if (result.success && result.created > 0) {
         // Refresh users list from API
-        const updatedUsers = await fetchUsers();
-        
-        // Sync capacities with updated users list (in case Team Leads were imported)
-        if (updatedUsers) {
-          const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
-          setConfig(prev => ({ ...prev, ...syncedConfig }));
-        }
+        await fetchUsers();
+        // NOTE: Capacity sync disabled - capacities are managed manually via Admin Panel
       }
     } catch (err) {
       logger.error('Import failed', { context: 'AdminPanel.import', error: err instanceof Error ? err : undefined });
@@ -1049,13 +1044,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Refresh users list from API
-      const updatedUsers = await fetchUsers();
-      
-      // Sync capacities with updated users list if a Team Lead was added
-      if (updatedUsers && (newUser.role === Role.TeamLead || !newUser.role)) {
-        const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
-        setConfig(prev => ({ ...prev, ...syncedConfig }));
-      }
+      await fetchUsers();
+      // NOTE: Capacity sync disabled - capacities are managed manually via Admin Panel
 
       // Clear form
       setNewUser({ role: Role.TeamLead });
@@ -1107,13 +1097,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Success - refresh users list from API
-      const updatedUsers = await fetchUsers();
-      
-      // Sync capacities with updated users list (removes deleted Team Lead from capacities)
-      if (updatedUsers) {
-        const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
-        setConfig(prev => ({ ...prev, ...syncedConfig }));
-      }
+      await fetchUsers();
+      // NOTE: Capacity sync disabled - capacities are managed manually via Admin Panel
+      // Deleted user's capacity entries will remain until manually removed
     } catch (error) {
       logger.error('Failed to delete user', { context: 'AdminPanel.deleteUser', error: error instanceof Error ? error : undefined });
       setUserError(error instanceof Error ? error.message : 'Failed to delete user');
@@ -1162,13 +1148,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
 
       // Refresh users list from API to get server state
-      const updatedUsers = await fetchUsers();
-      
-      // Sync capacities with updated users list if role changed (Team Lead added/removed)
-      if (updatedUsers && field === 'role') {
-        const syncedConfig = syncCapacitiesWithUsers(config, updatedUsers);
-        setConfig(prev => ({ ...prev, ...syncedConfig }));
-      }
+      await fetchUsers();
+      // NOTE: Capacity sync disabled - capacities are managed manually via Admin Panel
     } catch (error) {
       logger.error('Failed to update user', { context: 'AdminPanel.updateUser', error: error instanceof Error ? error : undefined });
       setUserError(error instanceof Error ? error.message : 'Failed to update user');
