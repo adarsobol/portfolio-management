@@ -678,14 +678,12 @@ export function migratePermissions(
 export const INITIAL_CONFIG: AppConfig = {
   bauBufferSuggestion: 15,
   // Team capacities are per quarter (weeks per quarter)
-  // Capacities are now auto-synced from Team Lead users via syncCapacitiesWithUsers()
-  // Empty by default - will be populated when users are loaded
+  // Managed manually via Admin Panel - no automatic assignment
   teamCapacities: {},
   // Team capacity adjustments are per quarter (weeks per quarter, deducted from base capacity)
   teamCapacityAdjustments: {},
   // Team buffers are per quarter (weeks per quarter reserved for BAU/unplanned work)
-  // Buffers are now auto-synced from Team Lead users via syncCapacitiesWithUsers()
-  // Empty by default - will be populated when users are loaded
+  // Managed manually via Admin Panel - no automatic assignment
   teamBuffers: {},
   healthHistory: [
     // Sample historical health data for demo purposes

@@ -4,7 +4,7 @@ import { Search, Plus, ChevronDown } from 'lucide-react';
 
 import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
 import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
-import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope, syncCapacitiesWithUsers } from './utils';
+import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck, useUsers as useUsersHook, useInitiatives as useInitiativesHook, useAppNotifications as useAppNotificationsHook } from './hooks';
 import { useUrlState } from './hooks/useUrlState';
@@ -174,28 +174,9 @@ export default function App() {
     loadUsers();
   }, [isAuthenticated, usersLoaded]);
 
-  // Sync capacity planning with Team Lead users whenever users array changes
-  useEffect(() => {
-    if (!usersLoaded || users.length === 0) return;
-    
-    // Sync capacities with current Team Lead users
-    // Use functional update to always get latest config state
-    setConfig(prev => {
-      const syncedConfig = syncCapacitiesWithUsers(prev, users);
-      
-      // Only update if there are actual changes (to avoid infinite loops)
-      const hasChanges = 
-        JSON.stringify(syncedConfig.teamCapacities) !== JSON.stringify(prev.teamCapacities) ||
-        JSON.stringify(syncedConfig.teamCapacityAdjustments) !== JSON.stringify(prev.teamCapacityAdjustments || {}) ||
-        JSON.stringify(syncedConfig.teamBuffers) !== JSON.stringify(prev.teamBuffers || {});
-      
-      if (hasChanges) {
-        return { ...prev, ...syncedConfig };
-      }
-      
-      return prev; // No changes, return same object reference
-    });
-  }, [users, usersLoaded, setConfig]); // setConfig is stable from useLocalStorage
+  // NOTE: Automatic capacity sync has been disabled for full manual control.
+  // Team capacities are now managed entirely through the Admin Panel.
+  // No auto-assignment or cleanup of capacity values happens automatically.
 
   // =============================================================================
   // SHADOW MODE: useUsers hook validation

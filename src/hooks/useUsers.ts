@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, AppConfig } from '../types';
 import { USERS } from '../constants';
-import { logger, syncCapacitiesWithUsers } from '../utils';
+import { logger } from '../utils';
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
 
@@ -20,12 +20,16 @@ interface UseUsersReturn {
  * Custom hook for managing users state.
  * Handles:
  * - Loading users from API with hardcoded fallback
- * - Syncing capacity planning with Team Lead users
+ * 
+ * NOTE: Automatic capacity sync has been disabled for full manual control.
+ * Team capacities are managed entirely through the Admin Panel.
  */
 export function useUsers({ 
   isAuthenticated, 
-  setConfig 
+  setConfig: _setConfig // Kept for API compatibility, no longer used for capacity sync
 }: UseUsersOptions): UseUsersReturn {
+  void _setConfig; // Suppress unused variable warning
+  
   // State for Users - start with hardcoded as fallback, load from API
   const [users, setUsers] = useState<User[]>(USERS);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -58,28 +62,7 @@ export function useUsers({
     loadUsers();
   }, [isAuthenticated, usersLoaded]);
 
-  // Sync capacity planning with Team Lead users whenever users array changes
-  useEffect(() => {
-    if (!usersLoaded || users.length === 0) return;
-    
-    // Sync capacities with current Team Lead users
-    // Use functional update to always get latest config state
-    setConfig(prev => {
-      const syncedConfig = syncCapacitiesWithUsers(prev, users);
-      
-      // Only update if there are actual changes (to avoid infinite loops)
-      const hasChanges = 
-        JSON.stringify(syncedConfig.teamCapacities) !== JSON.stringify(prev.teamCapacities) ||
-        JSON.stringify(syncedConfig.teamCapacityAdjustments) !== JSON.stringify(prev.teamCapacityAdjustments || {}) ||
-        JSON.stringify(syncedConfig.teamBuffers) !== JSON.stringify(prev.teamBuffers || {});
-      
-      if (hasChanges) {
-        return { ...prev, ...syncedConfig };
-      }
-      
-      return prev; // No changes, return same object reference
-    });
-  }, [users, usersLoaded, setConfig]);
+  // NOTE: Capacity sync removed - all capacity management is manual via Admin Panel
 
   return {
     users,
