@@ -216,7 +216,7 @@ export { getErrorMessage, formatErrorForUser, isNetworkError, isOfflineError } f
 export { getSystemRules, markSystemWorkflows } from './rulesExtractor';
 
 // Export ID generation utilities
-export { generateInitiativeId, parseQuarter, isJiraStyleId } from './idGenerator';
+export { generateInitiativeId, parseQuarter, isJiraStyleId, getCurrentQuarterString } from './idGenerator';
 
 // Export migration utilities
 export { migrateInitiativeIds, updateInitiativeIdReferences } from './migrateIds';

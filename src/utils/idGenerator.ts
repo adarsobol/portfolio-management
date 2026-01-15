@@ -98,6 +98,17 @@ function getCurrentQuarter(): { quarter: number; year: number } {
 }
 
 /**
+ * Get the current quarter as a formatted string (e.g., "Q1 2026")
+ * @returns Formatted quarter string
+ */
+export function getCurrentQuarterString(): string {
+  const now = new Date();
+  const month = now.getMonth(); // 0-11
+  const quarter = Math.floor(month / 3) + 1; // 1-4
+  return `Q${quarter} ${now.getFullYear()}`;
+}
+
+/**
  * Generate a new Jira-style initiative ID
  * Format: Q{quarter}{2-digit-year}-{3-digit-sequence}
  * Example: Q425-001 (Quarter 4, Year 2025, Sequence 001)

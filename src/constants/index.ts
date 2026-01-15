@@ -75,6 +75,7 @@ export const getAssetClassFromTeam = (team: string | undefined): AssetClass | un
     'Auto': AssetClass.Auto,
     'POS': AssetClass.POS,
     'Advisory': AssetClass.Advisory,
+    'Production': AssetClass.Production,
   };
   
   return teamToAssetClass[team];

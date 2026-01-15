@@ -8,7 +8,7 @@ import {
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canDeleteInitiative, canDeleteTaskItem, canEditTaskItem, getEligibleOwners } from '../../utils';
+import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canDeleteInitiative, canDeleteTaskItem, canEditTaskItem, getEligibleOwners, getCurrentQuarterString } from '../../utils';
 import { getAssetClasses, getStatuses, getPriorities, getQuarters, getUnplannedTags, getInitiativeTypes } from '../../utils/valueLists';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
@@ -165,8 +165,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // Bulk Mode State
   const [bulkRows, setBulkRows] = useState<BulkEntryRow[]>([]);
   const [bulkSharedSettings, setBulkSharedSettings] = useState({
-    quarter: 'Q4 2025',
-    l1_assetClass: AssetClass.PL,
+    quarter: getCurrentQuarterString(),
+    l1_assetClass: getAssetClassFromTeam(currentUser.team) || AssetClass.PL,
     ownerId: ''
   });
   const [bulkErrors, setBulkErrors] = useState<Record<string, Record<string, string>>>({});
@@ -198,7 +198,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     
     const defaultWorkType = WorkType.Planned;
     
-    const defaultAsset = AssetClass.PL;
+    const defaultAsset = getAssetClassFromTeam(currentUser.team) || AssetClass.PL;
     const hierarchy = getHierarchy(config);
     const hierarchyNodes = hierarchy[defaultAsset] || [];
     const defaultPillar = hierarchyNodes[0]?.name || '';
@@ -214,12 +214,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       l3_responsibility: defaultResp,
       // Effort fields optional, defaults handled in calculations
       unplannedTags: [],
-      quarter: 'Q4 2025',
+      quarter: getCurrentQuarterString(),
       definitionOfDone: '',
       comments: [],
       tasks: []
     };
-  }, [permissions]);
+  }, [permissions, currentUser.team]);
 
   const createEmptyBulkRow = useCallback((): BulkEntryRow => {
     const hierarchy = getHierarchy(config);
