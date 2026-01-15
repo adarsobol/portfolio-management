@@ -3380,6 +3380,158 @@ app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req: A
   }
 });
 
+// POST /api/admin/migrate-dependencies - Migrate dependencies from old format to JSON (admin only, one-time operation)
+app.post('/api/admin/migrate-dependencies', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Only admins can access this endpoint
+    if (req.user?.role !== 'Admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const doc = await getDoc();
+    if (!doc) {
+      res.status(500).json({ error: 'Failed to connect to database' });
+      return;
+    }
+
+    let initiativesSheet = doc.sheetsByTitle['Initiatives'];
+    if (!initiativesSheet) {
+      res.status(404).json({ error: 'Initiatives sheet not found' });
+      return;
+    }
+
+    await initiativesSheet.loadHeaderRow();
+    const rows = await initiativesSheet.getRows();
+    
+    let migratedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    // Regex to parse old format: "Team (Deliverable, ETA: date)"
+    // Handles multiple dependencies separated by semicolons
+    // Uses non-greedy matching and looks for ", ETA:" to handle commas in deliverable text
+    const dependencyPattern = /([^(]+?)\s*\(([^,]*?),\s*ETA:\s*([^)]*?)\)/g;
+
+    for (const row of rows) {
+      try {
+        const initiativeId = row.get('id');
+        if (!initiativeId || initiativeId.startsWith('_meta_')) {
+          skippedCount++;
+          continue;
+        }
+
+        const oldDependencies = row.get('dependencies');
+        
+        // Skip if empty or already JSON format
+        if (!oldDependencies || oldDependencies.trim() === '') {
+          skippedCount++;
+          continue;
+        }
+
+        // Check if already JSON format (starts with [)
+        if (oldDependencies.trim().startsWith('[')) {
+          try {
+            JSON.parse(oldDependencies);
+            skippedCount++; // Already in JSON format
+            continue;
+          } catch {
+            // Not valid JSON, proceed with migration
+          }
+        }
+
+        // Parse old format
+        // Split by semicolon first to handle multiple dependencies
+        const dependencyStrings = oldDependencies.split(';').map(s => s.trim()).filter(s => s.length > 0);
+        const matches: Array<{ team: string; deliverable: string; eta: string }> = [];
+        
+        for (const depString of dependencyStrings) {
+          // Find the pattern: Team (Deliverable, ETA: date)
+          // Need to handle commas in deliverable text, so find the last ", ETA:" before the closing )
+          const etaMatch = depString.match(/,\s*ETA:\s*([^)]+)\)\s*$/);
+          if (!etaMatch) {
+            // Try to match the full pattern
+            const fullMatch = depString.match(/^([^(]+?)\s*\((.+?),\s*ETA:\s*([^)]+?)\)\s*$/);
+            if (fullMatch) {
+              const team = fullMatch[1].trim();
+              const deliverable = fullMatch[2].trim();
+              let eta = fullMatch[3].trim();
+              if (eta.toUpperCase() === 'N/A' || eta === '') {
+                eta = '';
+              }
+              matches.push({ team, deliverable, eta });
+            }
+            continue;
+          }
+          
+          // Extract ETA value
+          let eta = etaMatch[1].trim();
+          if (eta.toUpperCase() === 'N/A' || eta === '') {
+            eta = '';
+          }
+          
+          // Find the opening parenthesis
+          const openParenIndex = depString.indexOf('(');
+          if (openParenIndex === -1) continue;
+          
+          // Extract team name (everything before the opening parenthesis)
+          const team = depString.substring(0, openParenIndex).trim();
+          
+          // Extract deliverable (everything between ( and , ETA:)
+          const etaStartIndex = depString.lastIndexOf(', ETA:');
+          if (etaStartIndex === -1) continue;
+          
+          const deliverable = depString.substring(openParenIndex + 1, etaStartIndex).trim();
+          
+          matches.push({ team, deliverable, eta });
+        }
+
+        // If no matches found, skip
+        if (matches.length === 0) {
+          skippedCount++;
+          continue;
+        }
+
+        // Convert to JSON
+        const jsonDependencies = JSON.stringify(matches);
+        
+        // Update the row
+        row.set('dependencies', jsonDependencies);
+        await row.save();
+        
+        migratedCount++;
+        serverLogger.info(`Migrated dependencies for initiative ${initiativeId}`, { 
+          context: 'Migration', 
+          metadata: { initiativeId, count: matches.length } 
+        });
+      } catch (error) {
+        errorCount++;
+        const initiativeId = row.get('id') || 'unknown';
+        const errorMsg = `Failed to migrate dependencies for ${initiativeId}: ${error instanceof Error ? error.message : String(error)}`;
+        errors.push(errorMsg);
+        serverLogger.error('Migration error for initiative', { 
+          context: 'Migration', 
+          error: error as Error,
+          metadata: { initiativeId } 
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      migrated: migratedCount,
+      skipped: skippedCount,
+      errors: errorCount,
+      errorDetails: errors.length > 0 ? errors : undefined,
+      message: `Migration completed: ${migratedCount} migrated, ${skippedCount} skipped, ${errorCount} errors`
+    });
+  } catch (error) {
+    serverLogger.error('Error migrating dependencies', { context: 'Migration', error: error as Error });
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // ============================================
 // VALUE LISTS MANAGEMENT ENDPOINTS (Admin only)
 // ============================================
