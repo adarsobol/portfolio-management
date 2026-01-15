@@ -1590,7 +1590,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 onToggle={() => toggleSection('dependencies')}
                 accentColor="indigo"
                 badge={
-                  formData.dependencies && formData.dependencies.length > 0 && (
+                  Array.isArray(formData.dependencies) && formData.dependencies.length > 0 && (
                     <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-bold rounded-full">
                       {formData.dependencies.length}
                     </span>
@@ -1600,7 +1600,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <div className="border border-slate-300 rounded-md overflow-hidden text-[10px]">
                   {/* Dependencies List */}
                   <div className="divide-y divide-slate-200">
-                    {(formData.dependencies || []).map((dep, index) => (
+                    {(Array.isArray(formData.dependencies) ? formData.dependencies : []).map((dep, index) => (
                       <div key={index} className="grid grid-cols-[140px_1fr_130px] items-center">
                         {/* Team */}
                         <div className="bg-slate-50 px-2 py-1 font-medium text-slate-600 text-[10px] border-r border-slate-200 flex items-center">
@@ -1613,7 +1613,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             type="text"
                             value={dep.deliverable || ''}
                             onChange={(e) => {
-                              const newDeps = [...(formData.dependencies || [])];
+                              const newDeps = [...(Array.isArray(formData.dependencies) ? formData.dependencies : [])];
                               newDeps[index] = { ...newDeps[index], deliverable: e.target.value };
                               handleChange('dependencies', newDeps);
                             }}
@@ -1628,7 +1628,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             type="date"
                             value={dep.eta || ''}
                             onChange={(e) => {
-                              const newDeps = [...(formData.dependencies || [])];
+                              const newDeps = [...(Array.isArray(formData.dependencies) ? formData.dependencies : [])];
                               newDeps[index] = { ...newDeps[index], eta: e.target.value };
                               handleChange('dependencies', newDeps);
                             }}
@@ -1652,7 +1652,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                               deliverable: '',
                               eta: ''
                             };
-                            handleChange('dependencies', [...(formData.dependencies || []), newDep]);
+                            handleChange('dependencies', [...(Array.isArray(formData.dependencies) ? formData.dependencies : []), newDep]);
                             e.target.value = '';
                           }
                         }}
@@ -1660,7 +1660,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       >
                         <option value="">+ Add Dependency</option>
                         {getDependencyTeamCategories(config).flatMap(c => c.teams)
-                          .filter(team => !formData.dependencies?.some(d => d.team === team))
+                          .filter(team => !(Array.isArray(formData.dependencies) && formData.dependencies.some(d => d.team === team)))
                           .map(team => (
                             <option key={team} value={team}>{team}</option>
                           ))}
@@ -1669,14 +1669,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   )}
                   
                   {/* Remove Dependency Buttons */}
-                  {!isReadOnly && formData.dependencies && formData.dependencies.length > 0 && (
+                  {!isReadOnly && Array.isArray(formData.dependencies) && formData.dependencies.length > 0 && (
                     <div className="border-t border-slate-200 bg-slate-50 px-2 py-1.5 flex flex-wrap gap-1.5">
                       {formData.dependencies.map((dep, index) => (
                         <button
                           key={index}
                           type="button"
                           onClick={() => {
-                            const newDeps = formData.dependencies?.filter((_, i) => i !== index) || [];
+                            const newDeps = (Array.isArray(formData.dependencies) ? formData.dependencies : []).filter((_, i) => i !== index);
                             handleChange('dependencies', newDeps.length > 0 ? newDeps : undefined);
                           }}
                           className="px-2 py-1 text-[10px] text-red-600 hover:bg-red-50 rounded border border-red-200 transition-colors"

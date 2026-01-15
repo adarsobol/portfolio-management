@@ -97,7 +97,7 @@ export function flattenInitiative(i: Initiative): Record<string, string | number
     lastUpdated: i.lastUpdated ?? '',
     createdAt: i.createdAt ?? '',
     lastWeeklyUpdate: i.lastWeeklyUpdate ?? '',
-    dependencies: i.dependencies?.map(d => `${d.team} (${d.deliverable || 'N/A'}, ETA: ${d.eta || 'N/A'})`).join('; ') || '',
+    dependencies: JSON.stringify(i.dependencies || []),
     workType: i.workType || 'Planned',
     unplannedTags: JSON.stringify(i.unplannedTags || []),
     riskActionLog: i.riskActionLog || '',
