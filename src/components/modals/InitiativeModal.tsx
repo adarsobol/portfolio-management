@@ -8,7 +8,7 @@ import {
   X, MessageSquare, FileText, Send, Share2, Copy, Check, Scale, History, AlertTriangle,
   ChevronDown, ChevronRight, Plus, MoreVertical, Users, Layers, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
-import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canEditAllTasks, canEditOwnTasks, canDeleteInitiative, canDeleteTaskItem, getEligibleOwners } from '../../utils';
+import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canDeleteInitiative, canDeleteTaskItem, canEditTaskItem, getEligibleOwners } from '../../utils';
 import { getAssetClasses, getStatuses, getPriorities, getQuarters, getUnplannedTags, getInitiativeTypes } from '../../utils/valueLists';
 import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
@@ -200,8 +200,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     
     const defaultAsset = AssetClass.PL;
     const hierarchy = getHierarchy(config);
-    const defaultPillar = hierarchy[defaultAsset][0].name;
-    const defaultResp = hierarchy[defaultAsset][0].responsibilities[0];
+    const hierarchyNodes = hierarchy[defaultAsset] || [];
+    const defaultPillar = hierarchyNodes[0]?.name || '';
+    const defaultResp = hierarchyNodes[0]?.responsibilities?.[0] || '';
 
     return {
       initiativeType: InitiativeType.WP, // Default to WP
@@ -224,7 +225,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     const hierarchy = getHierarchy(config);
     const hierarchyNodes = hierarchy[bulkSharedSettings.l1_assetClass] || [];
     const defaultPillar = hierarchyNodes[0]?.name || '';
-    const defaultResp = hierarchyNodes[0]?.responsibilities[0] || '';
+    const defaultResp = hierarchyNodes[0]?.responsibilities?.[0] || '';
     
     return {
       id: generateId(),
@@ -368,9 +369,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       // Only apply if different from current
       if (mappedAssetClass !== currentAssetClass) {
         const hierarchy = getHierarchy(config);
-        const pillars = hierarchy[mappedAssetClass];
+        const pillars = hierarchy[mappedAssetClass] || [];
         const defaultPillar = pillars[0]?.name || '';
-        const defaultResp = pillars[0]?.responsibilities[0] || '';
+        const defaultResp = pillars[0]?.responsibilities?.[0] || '';
 
         return {
           ...prev,
@@ -394,11 +395,15 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   const canEdit = (): boolean => {
     if (isEditMode) {
-      // Check if user can edit all tasks
-      if (canEditAllTasks(config, currentUser.role)) return true;
-      // Check if user can edit own tasks and this is their task
-      if (formData.ownerId === currentUser.id && canEditOwnTasks(config, currentUser.role)) return true;
-      return false;
+      // Use canEditTaskItem which properly handles email-to-ID matching
+      return canEditTaskItem(
+        config,
+        currentUser.role,
+        undefined, // No task owner for initiative itself
+        formData.ownerId || '',
+        currentUser.id,
+        currentUser.email
+      );
     } else {
       // Creating new task - check if user can create tasks
       return canCreateTasks(config, currentUser.role);
@@ -430,7 +435,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   };
 
   const hierarchy = getHierarchy(config);
-  const availablePillars = formData.l1_assetClass ? hierarchy[formData.l1_assetClass] : [];
+  const availablePillars = formData.l1_assetClass ? (hierarchy[formData.l1_assetClass] || []) : [];
   const selectedPillarNode = availablePillars.find(p => p.name === formData.l2_pillar);
   const availableResponsibilities = selectedPillarNode ? selectedPillarNode.responsibilities : [];
 
@@ -508,9 +513,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     assetClassManuallySetRef.current = true;
     
     const hierarchy = getHierarchy(config);
-    const pillars = hierarchy[newClass];
+    const pillars = hierarchy[newClass] || [];
     const defaultPillar = pillars[0]?.name || '';
-    const defaultResp = pillars[0]?.responsibilities[0] || '';
+    const defaultResp = pillars[0]?.responsibilities?.[0] || '';
     
     setFormData(prev => ({
       ...prev,
@@ -523,9 +528,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   const handlePillarChange = (newPillar: string) => {
     const assetClass = formData.l1_assetClass || AssetClass.PL;
     const hierarchy = getHierarchy(config);
-    const pillars = hierarchy[assetClass];
+    const pillars = hierarchy[assetClass] || [];
     const selectedPillarNode = pillars.find(p => p.name === newPillar);
-    const defaultResp = selectedPillarNode?.responsibilities[0] || '';
+    const defaultResp = selectedPillarNode?.responsibilities?.[0] || '';
 
     setFormData(prev => ({
       ...prev,
@@ -781,6 +786,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         workType: WorkType.Planned, // Default to Planned
         lastUpdated: now,
         createdAt: new Date().toISOString(),
+        createdBy: currentUser.id,
         comments: [],
         history: []
       };
@@ -832,7 +838,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     const hierarchy = getHierarchy(config);
     const hierarchyNodes = hierarchy[bulkSharedSettings.l1_assetClass] || [];
     const defaultPillar = hierarchyNodes[0]?.name || '';
-    const defaultResp = hierarchyNodes[0]?.responsibilities[0] || '';
+    const defaultResp = hierarchyNodes[0]?.responsibilities?.[0] || '';
     
     setBulkRows(prev => prev.map(row => ({
       ...row,
@@ -1067,6 +1073,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     if (platform === 'slack') {
       text = `*Initiative Update*\n` +
              `*Title:* ${formData.title}\n` +
+             (formData.description ? `*Description:* ${formData.description}\n` : '') +
              `*Owner:* ${ownerName}\n` +
              `*Status:* ${formData.status} ${formData.status === Status.AtRisk ? '(🚩 At Risk)' : ''}\n` +
              `*ETA:* ${formData.eta}\n` +
@@ -1074,12 +1081,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
              `> ${formData.riskActionLog || 'No immediate risks flagged.'}`;
     } else {
       text = `# ${formData.title}\n\n` +
+             (formData.description ? `${formData.description}\n\n` : '') +
              `**Owner:** ${ownerName}\n` +
              `**Status:** ${formData.status}\n` +
              `**ETA:** ${formData.eta}\n` +
              `**Quarter:** ${formData.quarter}\n` +
              `---\n` +
-             `**Description / Risks:**\n` +
+             `**Risks/Notes:**\n` +
              `${formData.riskActionLog || 'No immediate risks flagged.'}`;
     }
 
@@ -1309,6 +1317,23 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         className={`w-full px-2 py-1.5 text-xs focus:outline-none focus:bg-blue-50 ${
                           errors.title ? 'bg-red-50' : ''
                         }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 1.1: Description */}
+                  <div className="grid grid-cols-[100px_1fr] border-b border-slate-200">
+                    <div className="bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-600 border-r border-slate-200 flex items-start pt-2">
+                      Description
+                    </div>
+                    <div className="bg-white">
+                      <textarea
+                        disabled={isReadOnly}
+                        value={formData.description || ''}
+                        onChange={(e) => handleChange('description', e.target.value)}
+                        placeholder="Enter a brief description of this initiative..."
+                        rows={2}
+                        className="w-full px-2 py-1.5 text-xs focus:outline-none focus:bg-blue-50 resize-none"
                       />
                     </div>
                   </div>

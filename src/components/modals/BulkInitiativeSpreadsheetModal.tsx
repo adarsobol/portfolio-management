@@ -179,7 +179,7 @@ export const BulkInitiativeSpreadsheetModal: React.FC<BulkInitiativeSpreadsheetM
         const hierarchy = getHierarchy(config);
         const hierarchyNodes = hierarchy[sharedSettings.l1_assetClass] || [];
         const defaultPillar = hierarchyNodes[0]?.name || '';
-        const defaultResp = hierarchyNodes[0]?.responsibilities[0] || '';
+        const defaultResp = hierarchyNodes[0]?.responsibilities?.[0] || '';
 
         const parsedRows: BulkEntryRow[] = jsonData.map((row) => {
           // Map columns to BulkEntryRow fields with robust name matching

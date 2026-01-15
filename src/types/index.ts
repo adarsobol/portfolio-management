@@ -144,6 +144,7 @@ export interface Initiative {
   
   // L5 Initiative Details
   title: string;
+  description?: string; // Optional description/summary of the initiative
   ownerId: string; // Links to a User (Team Lead)
   assignee?: string; // Open text for assignee/stakeholder
   quarter: string; // e.g., "Q4 2024"
