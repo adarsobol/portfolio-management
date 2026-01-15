@@ -3443,7 +3443,7 @@ app.post('/api/admin/migrate-dependencies', authenticateToken, async (req: Authe
 
         // Parse old format
         // Split by semicolon first to handle multiple dependencies
-        const dependencyStrings = oldDependencies.split(';').map(s => s.trim()).filter(s => s.length > 0);
+        const dependencyStrings = oldDependencies.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
         const matches: Array<{ team: string; deliverable: string; eta: string }> = [];
         
         for (const depString of dependencyStrings) {
