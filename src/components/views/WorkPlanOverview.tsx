@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, Maximize2, Minimize2, Building2, FolderOpen, Target, FileText, Gauge, HelpCircle, ChevronUp } from 'lucide-react';
-import { Initiative, Status, User, AppConfig, InitiativeType, UserCommentReadState } from '../../types';
+import { Initiative, Status, User, AppConfig, InitiativeType, UserCommentReadState, Comment as CommentType } from '../../types';
 import { calculateCompletionRate } from '../../utils';
 
 interface WorkPlanOverviewProps {
@@ -11,7 +11,7 @@ interface WorkPlanOverviewProps {
   onInitiativeClick?: (initiative: Initiative) => void;
   filterAssetClass?: string; // Asset class filter to determine if grouping by asset class is needed
   commentReadState?: UserCommentReadState;
-  onAddComment?: (initiativeId: string, comment: Comment) => void;
+  onAddComment?: (initiativeId: string, comment: CommentType) => void;
   onMarkCommentRead?: (initiativeId: string) => void;
 }
 
