@@ -1,7 +1,7 @@
 // Data Hierarchy & Enums
 
 // View types for navigation
-export type ViewType = 'all' | 'resources' | 'timeline' | 'admin' | 'workflows' | 'dependencies';
+export type ViewType = 'all' | 'resources' | 'timeline' | 'admin' | 'workflows' | 'dependencies' | 'workplan';
 
 // Dependency teams for cross-team dependencies
 export enum DependencyTeam {
@@ -222,6 +222,7 @@ export type PermissionKey =
   | 'accessTimeline'          // Timeline tab access
   | 'accessWorkflows'         // Workflows tab access
   | 'accessWorkplanHealth'    // Workplan Health tab access
+  | 'accessWorkplan'          // Work Plan tab access
   // Task management permissions
   | 'createNewTasks'          // Create new tasks scope: no | yes | own
   | 'editTasks'               // Edit tasks scope: no | yes | own

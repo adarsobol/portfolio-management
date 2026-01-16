@@ -659,6 +659,9 @@ export function migratePermissions(
         ? (legacy.manageWorkflows ? 'edit' : 'view')
         : 'none',
       accessWorkplanHealth: legacy.accessWorkplanHealth ? 'edit' : 'none',
+      accessWorkplan: (legacy.createPlanned || legacy.createUnplanned || legacy.editOwn || legacy.editAll) 
+        ? (legacy.editAll || legacy.editOwn ? 'edit' : 'view')
+        : 'none',
       
       // Task management
       createNewTasks: (legacy.createPlanned || legacy.createUnplanned) ? 'yes' : 'no' as TaskManagementScope,
@@ -708,6 +711,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'edit',
       accessWorkflows: 'edit',
       accessWorkplanHealth: 'edit',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'yes',
       deleteTasks: 'yes',
@@ -720,6 +724,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'edit',
       accessWorkflows: 'edit',
       accessWorkplanHealth: 'edit',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'yes',
       deleteTasks: 'yes',
@@ -732,6 +737,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'edit',
       accessWorkflows: 'edit',
       accessWorkplanHealth: 'edit',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'yes',
       deleteTasks: 'no',
@@ -744,6 +750,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'edit',
       accessWorkflows: 'edit',
       accessWorkplanHealth: 'edit',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'yes',
       deleteTasks: 'no',
@@ -756,6 +763,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'edit',
       accessWorkflows: 'view',
       accessWorkplanHealth: 'edit',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'own',
       deleteTasks: 'yes',
@@ -768,6 +776,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'view',
       accessWorkflows: 'view',
       accessWorkplanHealth: 'none',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'own',
       deleteTasks: 'own', // Team Leads can delete their own initiatives
@@ -780,6 +789,7 @@ export const INITIAL_CONFIG: AppConfig = {
       accessTimeline: 'view',
       accessWorkflows: 'edit',
       accessWorkplanHealth: 'edit',
+      accessWorkplan: 'edit',
       createNewTasks: 'yes',
       editTasks: 'own',
       deleteTasks: 'no',

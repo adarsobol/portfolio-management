@@ -31,6 +31,7 @@ import { CalendarView } from './components/views/CalendarView';
 import { AdminPanel } from './components/views/AdminPanel';
 import { WorkflowsView } from './components/views/WorkflowsView';
 import { DependenciesView } from './components/views/DependenciesView';
+import { WorkPlanOverview } from './components/views/WorkPlanOverview';
 import { LoginPage } from './components/auth';
 
 const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
@@ -659,6 +660,7 @@ export default function App() {
     if (pathname === '/workflows') return 'workflows';
     if (pathname === '/dependencies') return 'dependencies';
     if (pathname === '/resources') return 'resources';
+    if (pathname === '/workplan') return 'workplan';
     if (pathname.startsWith('/item/')) return 'all'; // Item detail opens in 'all' view
     return 'all'; // Default to 'all' (dashboard)
   };
@@ -856,7 +858,8 @@ export default function App() {
       'timeline': '/timeline',
       'workflows': '/workflows',
       'dependencies': '/dependencies',
-      'resources': '/resources'
+      'resources': '/resources',
+      'workplan': '/workplan'
     };
     
     navigate(routeMap[view] || '/dashboard');
@@ -2751,6 +2754,21 @@ export default function App() {
                  }}
                  onInitiativeUpdate={handleSave}
                />
+            ) : currentView === 'workplan' ? (
+               <WorkPlanOverview
+                 initiatives={filteredInitiatives}
+                 users={users}
+                 config={config}
+                 currentUser={currentUser}
+                 filterAssetClass={filterAssetClass}
+                 commentReadState={commentReadState}
+                 onAddComment={handleAddComment}
+                 onMarkCommentRead={handleMarkCommentRead}
+                 onInitiativeClick={(initiative) => {
+                   setEditingItem(initiative);
+                   setIsModalOpen(true);
+                 }}
+               />
             ) : (
               <TaskTable 
                 filteredInitiatives={filteredInitiatives}
@@ -2952,6 +2970,21 @@ export default function App() {
                    setIsModalOpen(true);
                  }}
                  onInitiativeUpdate={handleSave}
+               />
+            ) : currentView === 'workplan' ? (
+               <WorkPlanOverview
+                 initiatives={filteredInitiatives}
+                 users={users}
+                 config={config}
+                 currentUser={currentUser}
+                 filterAssetClass={filterAssetClass}
+                 commentReadState={commentReadState}
+                 onAddComment={handleAddComment}
+                 onMarkCommentRead={handleMarkCommentRead}
+                 onInitiativeClick={(initiative) => {
+                   setEditingItem(initiative);
+                   setIsModalOpen(true);
+                 }}
                />
             ) : (
               <TaskTable 

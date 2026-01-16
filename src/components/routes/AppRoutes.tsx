@@ -24,6 +24,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({ children }) => {
       <Route path="/workflows" element={<>{children}</>} />
       <Route path="/dependencies" element={<>{children}</>} />
       <Route path="/resources" element={<>{children}</>} />
+      <Route path="/workplan" element={<>{children}</>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

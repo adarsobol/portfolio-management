@@ -57,6 +57,7 @@ export var AssetClass;
     AssetClass["Auto"] = "Auto";
     AssetClass["POS"] = "POS";
     AssetClass["Advisory"] = "Advisory";
+    AssetClass["Production"] = "Production";
 })(AssetClass || (AssetClass = {}));
 // Workflow Types
 export var WorkflowTrigger;

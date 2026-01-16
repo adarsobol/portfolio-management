@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useCallback, memo, useEffect } from 'react';
 import { 
-  Activity, 
+  Activity,
   Calendar, 
   TrendingUp, 
   TrendingDown, 
@@ -10,8 +10,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Gauge,
   Info,
   X,
@@ -1637,11 +1635,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [showDelayChart, setShowDelayChart] = useState(false);
   const [showCompletionTimeChart, setShowCompletionTimeChart] = useState(false);
   
-  // Strategic Workload grouping toggle
-  const [workloadGroupBy, setWorkloadGroupBy] = useState<'pillar' | 'responsibility'>('pillar');
-  
-  // Insights section collapsed state
-  const [insightsCollapsed, setInsightsCollapsed] = useState(false);
   
   // Pagination state for tables
   const [delayedPage, setDelayedPage] = useState(1);
@@ -1654,7 +1647,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
   const [bufferRef, isBufferVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [delayRef, isDelayVisible] = useIntersectionObserver({ threshold: 0.1 });
   const [completionTimeRef, isCompletionTimeVisible] = useIntersectionObserver({ threshold: 0.1 });
-  const [strategicWorkloadRef] = useIntersectionObserver({ threshold: 0.1 });
 
   // Calculate total completed count independently (always runs, not lazy-loaded)
   // This is needed to determine if the chart section should render
@@ -2027,230 +2019,6 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Strategic Execution & Insight Engine */}
-      <div ref={strategicWorkloadRef} className="space-y-4">
-        {(healthMetrics.strategicWorkload.byPillar.length > 0 || healthMetrics.strategicWorkload.byResponsibility.length > 0) ? (
-          <>
-          {/* Automated Insights Summary */}
-          {healthMetrics.strategicWorkload.insights.length > 0 && (
-            <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 px-4 py-3 rounded-2xl border border-indigo-200 shadow-sm">
-              <button
-                onClick={() => setInsightsCollapsed(!insightsCollapsed)}
-                className="flex items-center gap-2 w-full mb-3 hover:opacity-80 transition-opacity"
-              >
-                <Gauge className="w-4 h-4 text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-800">Automated Insights</h3>
-                <HelpCircle className="w-3 h-3 text-slate-400" />
-                <span className="text-[10px] text-slate-500 ml-auto">Based on Active Portfolio (In Progress, At Risk, Done)</span>
-                {insightsCollapsed ? (
-                  <ChevronDown className="w-4 h-4 text-slate-600" />
-                ) : (
-                  <ChevronUp className="w-4 h-4 text-slate-600" />
-                )}
-              </button>
-              {!insightsCollapsed && (
-                <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                  {healthMetrics.strategicWorkload.insights.map((insight, idx) => {
-                  const severityColors = {
-                    critical: 'bg-red-50 border-red-200 text-red-800',
-                    warning: 'bg-amber-50 border-amber-200 text-amber-800',
-                    positive: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-                  };
-                  const severityIcons = {
-                    critical: '🔴',
-                    warning: '🟡',
-                    positive: '🟢',
-                  };
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex items-start gap-2 p-2 rounded-lg border ${severityColors[insight.severity]}`}
-                    >
-                      <span className="text-sm flex-shrink-0">{severityIcons[insight.severity]}</span>
-                      <p className="text-xs font-medium flex-1 leading-relaxed">{insight.message}</p>
-                    </div>
-                  );
-                })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Execution Matrix */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Activity className="w-5 h-5 text-slate-600" />
-                <h3 className="text-lg font-bold text-slate-800">Execution Velocity & Strategic Progress</h3>
-                <HelpCircle className="w-4 h-4 text-slate-400" />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setWorkloadGroupBy('pillar')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    workloadGroupBy === 'pillar'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                  }`}
-                >
-                  By Pillar
-                </button>
-                <button
-                  onClick={() => setWorkloadGroupBy('responsibility')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    workloadGroupBy === 'responsibility'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                  }`}
-                >
-                  By Responsibility
-                </button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
-                  <tr>
-                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">
-                      {workloadGroupBy === 'pillar' ? 'Pillar' : 'Responsibility'}
-                    </th>
-                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Status Mix</th>
-                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Allocated vs. Actual</th>
-                    <th className="text-left py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Invested Effort vs. Progress</th>
-                    <th className="text-right py-2 px-3 text-xs font-bold text-slate-600 tracking-wider">Efficiency</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(workloadGroupBy === 'pillar' 
-                    ? healthMetrics.strategicWorkload.byPillar 
-                    : healthMetrics.strategicWorkload.byResponsibility
-                  ).map((item) => {
-                    const totalStatus = item.statusBreakdown.inProgress + item.statusBreakdown.atRisk + item.statusBreakdown.done;
-                    const inProgressPct = totalStatus > 0 ? (item.statusBreakdown.inProgress / totalStatus) * 100 : 0;
-                    const atRiskPct = totalStatus > 0 ? (item.statusBreakdown.atRisk / totalStatus) * 100 : 0;
-                    const donePct = totalStatus > 0 ? (item.statusBreakdown.done / totalStatus) * 100 : 0;
-                    
-                    return (
-                      <tr key={item.name} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-2 px-3">
-                          <div className="font-semibold text-slate-800 text-xs">{item.name}</div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">{item.itemCount} items</div>
-                        </td>
-                        <td className="py-2 px-3">
-                          <div className="flex items-center gap-1">
-                            {inProgressPct > 0 && (
-                              <div
-                                className="h-3 bg-blue-500 rounded"
-                                style={{ width: `${inProgressPct}%`, minWidth: '2px' }}
-                                title={`In Progress: ${item.statusBreakdown.inProgress}`}
-                              />
-                            )}
-                            {atRiskPct > 0 && (
-                              <div
-                                className="h-3 bg-red-500 rounded"
-                                style={{ width: `${atRiskPct}%`, minWidth: '2px' }}
-                                title={`At Risk: ${item.statusBreakdown.atRisk}`}
-                              />
-                            )}
-                            {donePct > 0 && (
-                              <div
-                                className="h-3 bg-emerald-500 rounded"
-                                style={{ width: `${donePct}%`, minWidth: '2px' }}
-                                title={`Done: ${item.statusBreakdown.done}`}
-                              />
-                            )}
-                            {totalStatus === 0 && (
-                              <span className="text-[10px] text-slate-400">No items</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2 px-3">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <div className="text-xs font-medium text-slate-700">
-                                {item.totalAllocated.toFixed(1)}w
-                              </div>
-                              <div className="text-[10px] text-slate-500">allocated</div>
-                            </div>
-                            <div className="text-slate-300">|</div>
-                            <div>
-                              <div className="text-xs font-medium text-slate-700">
-                                {item.actualSpent.toFixed(1)}w
-                              </div>
-                              <div className="text-[10px] text-slate-500">actual</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2 px-3">
-                          <div className="relative w-full h-6 bg-slate-100 rounded overflow-hidden">
-                            {/* Ghost bar for total allocated (100%) */}
-                            <div className="absolute inset-0 bg-slate-200 opacity-30" />
-                            {/* Invested Effort bar */}
-                            <div
-                              className="absolute bottom-0 left-0 bg-blue-400 opacity-60 h-full transition-all"
-                              style={{ width: `${Math.min(item.burnRate, 100)}%` }}
-                              title={`Invested Effort: ${item.actualSpent.toFixed(1)}w (${item.burnRate.toFixed(0)}%)`}
-                            />
-                            {/* Progress bar (foreground) */}
-                            <div
-                              className="absolute bottom-0 left-0 bg-emerald-500 h-3/4 transition-all"
-                              style={{ width: `${Math.min(item.weightedProgress, 100)}%` }}
-                              title={`Progress: ${item.weightedProgress.toFixed(0)}% weighted progress`}
-                            />
-                            {/* Gap indicator if progress < invested */}
-                            {item.weightedProgress < item.burnRate && (
-                              <div
-                                className="absolute bottom-0 bg-red-300 opacity-50 h-1/4 transition-all"
-                                style={{
-                                  left: `${item.weightedProgress}%`,
-                                  width: `${Math.min(item.burnRate - item.weightedProgress, 100 - item.weightedProgress)}%`,
-                                }}
-                                title={`Efficiency gap: ${(item.burnRate - item.weightedProgress).toFixed(0)}%`}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-[10px]">
-                            <span className="text-slate-600">
-                              Invested: <span className="font-medium">{item.burnRate.toFixed(0)}%</span>
-                            </span>
-                            <span className="text-emerald-600">
-                              Progress: <span className="font-medium">{item.weightedProgress.toFixed(0)}%</span>
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <div className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            item.efficiencyIndex >= 1.0
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : item.efficiencyIndex >= 0.8
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {(item.efficiencyIndex * 100).toFixed(0)}%
-                          </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">progress/invested</div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          </>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
-            <Activity className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">No Active Portfolio Data</h3>
-            <p className="text-sm text-slate-500">
-              This view shows workload analysis for initiatives with status: In Progress, At Risk, or Done.
-              <br />
-              Currently, there are no initiatives matching these statuses in your filtered view.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Health Metrics Grid - Schedule & Effort Sections */}

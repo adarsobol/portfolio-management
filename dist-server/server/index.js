@@ -1743,11 +1743,32 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
         // Now process deduplicated initiatives
         // Create a map of existing IDs for faster lookup
         const existingIds = new Set(rows.map((r) => r.get('id')).filter((id) => id && !id.startsWith('_meta_')));
+        serverLogger.debug(`Processing ${deduplicated.length} initiatives, found ${existingIds.size} existing IDs in sheet`, {
+            context: 'Sync',
+            metadata: {
+                existingIds: Array.from(existingIds).slice(0, 10), // Log first 10 for debugging
+                totalRows: rows.length
+            }
+        });
         // Track items where server is newer (for client to update their local state)
         const serverNewer = [];
         let syncedCount = 0;
+        // Collect all new initiatives to add in batch (like changelog does)
+        const newInitiativesToAdd = [];
         for (const initiative of deduplicated) {
-            const existing = rows.find((r) => r.get('id') === initiative.id);
+            serverLogger.debug(`Processing initiative ${initiative.id}`, { context: 'Sync', metadata: { title: initiative.title?.substring(0, 50) } });
+            const existing = rows.find((r) => {
+                const rowId = r.get('id');
+                return rowId === initiative.id;
+            });
+            serverLogger.debug(`Row lookup for ${initiative.id}`, {
+                context: 'Sync',
+                metadata: {
+                    found: !!existing,
+                    inExistingIds: existingIds.has(initiative.id),
+                    rowId: existing?.get('id')
+                }
+            });
             if (existing) {
                 // Last-write-wins based on lastUpdated timestamp
                 const serverLastUpdated = existing.get('lastUpdated') || '';
@@ -1791,8 +1812,8 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
                 syncedCount++;
             }
             else if (!existingIds.has(initiative.id)) {
-                // Only add if it doesn't exist (double-check to prevent duplicates)
-                serverLogger.info(`Adding NEW initiative: ${initiative.id} - ${initiative.title}`, { context: 'Sync' });
+                // Collect new initiatives to add in batch (more reliable than addRow)
+                serverLogger.info(`Queueing NEW initiative for batch add: ${initiative.id} - ${initiative.title}`, { context: 'Sync' });
                 const rowData = {};
                 // Use INITIATIVE_HEADERS to ensure we only include columns that exist in the sheet
                 INITIATIVE_HEADERS.forEach(header => {
@@ -1801,19 +1822,44 @@ app.post('/api/sheets/initiatives', authenticateToken, validate(initiativesArray
                 });
                 // Set initial version for new initiatives
                 rowData['version'] = String((parseInt(initiative.version || '0', 10) || 0) + 1);
-                try {
-                    await sheet.addRow(rowData);
-                    serverLogger.info(`Successfully added initiative: ${initiative.id}`, { context: 'Sync' });
-                    existingIds.add(initiative.id); // Track that we added it
-                    syncedCount++;
-                }
-                catch (addRowError) {
-                    serverLogger.error(`Failed to add initiative ${initiative.id}`, { context: 'Sync', error: addRowError });
-                    throw addRowError; // Re-throw to be caught by outer catch
-                }
+                newInitiativesToAdd.push(rowData);
+                existingIds.add(initiative.id); // Track that we're adding it
             }
             else {
                 serverLogger.warn(`Upsert: Initiative ${initiative.id} already exists, skipping add`, { context: 'Sync' });
+            }
+        }
+        // Batch add all new initiatives (like changelog does - more reliable)
+        if (newInitiativesToAdd.length > 0) {
+            try {
+                serverLogger.info(`Batch adding ${newInitiativesToAdd.length} new initiative(s) using addRows`, { context: 'Sync' });
+                await sheet.addRows(newInitiativesToAdd);
+                serverLogger.info(`Successfully batch-added ${newInitiativesToAdd.length} initiative(s)`, { context: 'Sync' });
+                syncedCount += newInitiativesToAdd.length;
+                // Verify all rows were added
+                const verifyRows = await sheet.getRows();
+                const addedIds = newInitiativesToAdd.map(r => r.id).filter(Boolean);
+                const missingIds = [];
+                for (const id of addedIds) {
+                    const found = verifyRows.find((r) => r.get('id') === id);
+                    if (!found) {
+                        missingIds.push(id);
+                    }
+                }
+                if (missingIds.length > 0) {
+                    serverLogger.error(`Batch add succeeded but ${missingIds.length} row(s) not found in sheet`, {
+                        context: 'Sync',
+                        metadata: { missingIds: missingIds.slice(0, 5) }
+                    });
+                    throw new Error(`Failed to verify ${missingIds.length} initiative(s) were added to sheet`);
+                }
+                else {
+                    serverLogger.info(`Verified all ${newInitiativesToAdd.length} initiative(s) were added to sheet`, { context: 'Sync' });
+                }
+            }
+            catch (batchAddError) {
+                serverLogger.error(`Failed to batch-add initiatives`, { context: 'Sync', error: batchAddError, metadata: { count: newInitiativesToAdd.length } });
+                throw batchAddError; // Re-throw to be caught by outer catch
             }
         }
         // Log activity
@@ -2325,7 +2371,7 @@ app.get('/api/sheets/pull', authenticateToken, async (req, res) => {
                 originalEta: row.get('originalEta') || '',
                 lastUpdated: row.get('lastUpdated') || '',
                 lastWeeklyUpdate: row.get('lastWeeklyUpdate') || undefined,
-                dependencies: row.get('dependencies') || undefined,
+                dependencies: parseJson(row.get('dependencies'), []),
                 workType: row.get('workType') || 'Planned Work',
                 unplannedTags: parseJson(row.get('unplannedTags'), []),
                 riskActionLog: row.get('riskActionLog') || undefined,
@@ -2363,10 +2409,12 @@ app.get('/api/sheets/pull', authenticateToken, async (req, res) => {
 });
 // POST /api/sheets/push - Full push (overwrite Initiatives tab) (Protected)
 app.post('/api/sheets/push', authenticateToken, async (req, res) => {
+    await acquireSyncMutex(); // Prevent concurrent sync operations
     try {
         const { initiatives } = req.body;
         if (!initiatives || !Array.isArray(initiatives)) {
-            res.status(400).json({ error: 'Invalid data' });
+            res.status(400).json({ success: false, error: 'Invalid data' });
+            releaseSyncMutex();
             return;
         }
         // Deduplicate initiatives before pushing (keep first occurrence)
@@ -2384,7 +2432,8 @@ app.post('/api/sheets/push', authenticateToken, async (req, res) => {
         }
         const doc = await getDoc();
         if (!doc) {
-            res.status(500).json({ error: 'Failed to connect to Google Sheets' });
+            res.status(500).json({ success: false, error: 'Failed to connect to Google Sheets' });
+            releaseSyncMutex();
             return;
         }
         let sheet = doc.sheetsByTitle['Initiatives'];
@@ -2412,7 +2461,11 @@ app.post('/api/sheets/push', authenticateToken, async (req, res) => {
     }
     catch (error) {
         serverLogger.error('Error pushing to Sheets', { context: 'Push', error: error });
-        res.status(500).json({ error: String(error) });
+        res.status(500).json({ success: false, error: String(error) });
+    }
+    finally {
+        // CRITICAL: Always release mutex to prevent deadlock
+        releaseSyncMutex();
     }
 });
 // POST /api/slack/webhook - Proxy Slack webhook requests to avoid CORS (Protected)
@@ -2907,6 +2960,140 @@ app.post('/api/admin/weekly-effort-validation', authenticateToken, async (req, r
     }
     catch (error) {
         serverLogger.error('Error validating weekly effort', { context: 'Validation', error: error });
+        res.status(500).json({ error: String(error) });
+    }
+});
+// POST /api/admin/migrate-dependencies - Migrate dependencies from old format to JSON (admin only, one-time operation)
+app.post('/api/admin/migrate-dependencies', authenticateToken, async (req, res) => {
+    try {
+        // Only admins can access this endpoint
+        if (req.user?.role !== 'Admin') {
+            res.status(403).json({ error: 'Admin access required' });
+            return;
+        }
+        const doc = await getDoc();
+        if (!doc) {
+            res.status(500).json({ error: 'Failed to connect to database' });
+            return;
+        }
+        let initiativesSheet = doc.sheetsByTitle['Initiatives'];
+        if (!initiativesSheet) {
+            res.status(404).json({ error: 'Initiatives sheet not found' });
+            return;
+        }
+        await initiativesSheet.loadHeaderRow();
+        const rows = await initiativesSheet.getRows();
+        let migratedCount = 0;
+        let skippedCount = 0;
+        let errorCount = 0;
+        const errors = [];
+        // Regex to parse old format: "Team (Deliverable, ETA: date)"
+        // Handles multiple dependencies separated by semicolons
+        // Uses non-greedy matching and looks for ", ETA:" to handle commas in deliverable text
+        const dependencyPattern = /([^(]+?)\s*\(([^,]*?),\s*ETA:\s*([^)]*?)\)/g;
+        for (const row of rows) {
+            try {
+                const initiativeId = row.get('id');
+                if (!initiativeId || initiativeId.startsWith('_meta_')) {
+                    skippedCount++;
+                    continue;
+                }
+                const oldDependencies = row.get('dependencies');
+                // Skip if empty or already JSON format
+                if (!oldDependencies || oldDependencies.trim() === '') {
+                    skippedCount++;
+                    continue;
+                }
+                // Check if already JSON format (starts with [)
+                if (oldDependencies.trim().startsWith('[')) {
+                    try {
+                        JSON.parse(oldDependencies);
+                        skippedCount++; // Already in JSON format
+                        continue;
+                    }
+                    catch {
+                        // Not valid JSON, proceed with migration
+                    }
+                }
+                // Parse old format
+                // Split by semicolon first to handle multiple dependencies
+                const dependencyStrings = oldDependencies.split(';').map((s) => s.trim()).filter((s) => s.length > 0);
+                const matches = [];
+                for (const depString of dependencyStrings) {
+                    // Find the pattern: Team (Deliverable, ETA: date)
+                    // Need to handle commas in deliverable text, so find the last ", ETA:" before the closing )
+                    const etaMatch = depString.match(/,\s*ETA:\s*([^)]+)\)\s*$/);
+                    if (!etaMatch) {
+                        // Try to match the full pattern
+                        const fullMatch = depString.match(/^([^(]+?)\s*\((.+?),\s*ETA:\s*([^)]+?)\)\s*$/);
+                        if (fullMatch) {
+                            const team = fullMatch[1].trim();
+                            const deliverable = fullMatch[2].trim();
+                            let eta = fullMatch[3].trim();
+                            if (eta.toUpperCase() === 'N/A' || eta === '') {
+                                eta = '';
+                            }
+                            matches.push({ team, deliverable, eta });
+                        }
+                        continue;
+                    }
+                    // Extract ETA value
+                    let eta = etaMatch[1].trim();
+                    if (eta.toUpperCase() === 'N/A' || eta === '') {
+                        eta = '';
+                    }
+                    // Find the opening parenthesis
+                    const openParenIndex = depString.indexOf('(');
+                    if (openParenIndex === -1)
+                        continue;
+                    // Extract team name (everything before the opening parenthesis)
+                    const team = depString.substring(0, openParenIndex).trim();
+                    // Extract deliverable (everything between ( and , ETA:)
+                    const etaStartIndex = depString.lastIndexOf(', ETA:');
+                    if (etaStartIndex === -1)
+                        continue;
+                    const deliverable = depString.substring(openParenIndex + 1, etaStartIndex).trim();
+                    matches.push({ team, deliverable, eta });
+                }
+                // If no matches found, skip
+                if (matches.length === 0) {
+                    skippedCount++;
+                    continue;
+                }
+                // Convert to JSON
+                const jsonDependencies = JSON.stringify(matches);
+                // Update the row
+                row.set('dependencies', jsonDependencies);
+                await row.save();
+                migratedCount++;
+                serverLogger.info(`Migrated dependencies for initiative ${initiativeId}`, {
+                    context: 'Migration',
+                    metadata: { initiativeId, count: matches.length }
+                });
+            }
+            catch (error) {
+                errorCount++;
+                const initiativeId = row.get('id') || 'unknown';
+                const errorMsg = `Failed to migrate dependencies for ${initiativeId}: ${error instanceof Error ? error.message : String(error)}`;
+                errors.push(errorMsg);
+                serverLogger.error('Migration error for initiative', {
+                    context: 'Migration',
+                    error: error,
+                    metadata: { initiativeId }
+                });
+            }
+        }
+        res.json({
+            success: true,
+            migrated: migratedCount,
+            skipped: skippedCount,
+            errors: errorCount,
+            errorDetails: errors.length > 0 ? errors : undefined,
+            message: `Migration completed: ${migratedCount} migrated, ${skippedCount} skipped, ${errorCount} errors`
+        });
+    }
+    catch (error) {
+        serverLogger.error('Error migrating dependencies', { context: 'Migration', error: error });
         res.status(500).json({ error: String(error) });
     }
 });

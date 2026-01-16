@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, List } from 'lucide-react';
+import { Settings, Trash2, Plus, MessageSquare, Upload, AlertCircle, CheckCircle2, X, Loader2, Users, ClipboardList, Gauge, ClipboardCopy, Eye, Edit, Check, XCircle, LayoutDashboard, GitBranch, Calendar, Zap, Shield, Clock, RefreshCw, Database, Download, RotateCcw, HardDrive, FileCheck, AlertTriangle, Activity, List, Layers } from 'lucide-react';
 import { ErrorLogView } from './ErrorLogView';
 import { ActivityLogView } from './ActivityLogView';
 import { SupportCenter } from './SupportCenter';
@@ -969,6 +969,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     { key: 'accessTimeline', label: 'Timeline' },
     { key: 'accessWorkflows', label: 'Workflows' },
     { key: 'accessWorkplanHealth', label: 'Workplan Health' },
+    { key: 'accessWorkplan', label: 'Work Plan' },
   ];
 
   const taskManagementPermissions: { key: PermissionKey; label: string }[] = [
@@ -2384,6 +2385,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                        {perm.key === 'accessTimeline' && <Calendar size={14} />}
                        {perm.key === 'accessWorkflows' && <Zap size={14} />}
                        {perm.key === 'accessWorkplanHealth' && <Gauge size={14} />}
+                       {perm.key === 'accessWorkplan' && <Layers size={14} />}
                        <span>{perm.label}</span>
                      </div>
                    </th>

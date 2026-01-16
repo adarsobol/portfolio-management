@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, AlertTriangle, Layers } from 'lucide-react';
 import { User as UserType, ViewType, AppConfig, Role } from '../../types';
 import { canViewTab, canAccessAdmin } from '../../utils';
 import { ValidationResult } from '../../services/weeklyEffortValidation';
@@ -27,6 +27,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 }) => {
   const location = useLocation();
   const canAccessWorkplanHealth = canViewTab(config, currentUser.role, 'accessWorkplanHealth');
+  const canAccessWorkplan = canViewTab(config, currentUser.role, 'accessWorkplan');
   const canAccessAdminPanel = canAccessAdmin(config, currentUser.role);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   
@@ -135,6 +136,7 @@ export const TopNav: React.FC<TopNavProps> = ({
     if (location.pathname === '/workflows') return 'workflows';
     if (location.pathname === '/dependencies') return 'dependencies';
     if (location.pathname === '/resources') return 'resources';
+    if (location.pathname === '/workplan') return 'workplan';
     if (location.pathname.startsWith('/item/')) return 'all';
     return 'all'; // Default
   };
@@ -175,6 +177,9 @@ export const TopNav: React.FC<TopNavProps> = ({
         </div>
         <div className="flex items-center gap-1 flex-wrap lg:flex-nowrap flex-1 min-w-0">
           <NavButton view="all" icon={LayoutDashboard} label="All Tasks" activeGradient="from-blue-500 to-blue-600" />
+          {canAccessWorkplan && (
+            <NavButton view="workplan" icon={Layers} label="Work Plan" activeGradient="from-green-500 to-green-600" />
+          )}
           <NavButton view="dependencies" icon={GitBranch} label="Dependencies" activeGradient="from-indigo-500 to-indigo-600" />
           <NavButton view="timeline" icon={Calendar} label="Timeline" activeGradient="from-purple-500 to-purple-600" />
           <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-amber-500 to-amber-600" />
