@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, ChevronDown, Maximize2, Minimize2, Building2, FolderOpen, Target, FileText, Gauge, HelpCircle, ChevronUp } from 'lucide-react';
+import { ChevronRight, ChevronDown, Maximize2, Minimize2, Building2, FolderOpen, Target, FileText, Gauge, HelpCircle, ChevronUp, Square } from 'lucide-react';
 import { Initiative, Status, User, AppConfig, InitiativeType, UserCommentReadState, Comment as CommentType } from '../../types';
 import { calculateCompletionRate } from '../../utils';
 
@@ -64,14 +64,14 @@ interface StrategicInsight {
 
 // Asset class color mapping
 const getAssetClassColors = (assetClass: string) => {
-  const colors: Record<string, { bg: string; bgDark: string; text: string; border: string }> = {
-    PL: { bg: 'bg-indigo-50', bgDark: 'bg-indigo-200', text: 'text-indigo-700', border: 'border-indigo-200' },
-    Auto: { bg: 'bg-blue-50', bgDark: 'bg-blue-200', text: 'text-blue-700', border: 'border-blue-200' },
-    POS: { bg: 'bg-green-50', bgDark: 'bg-green-200', text: 'text-green-700', border: 'border-green-200' },
-    Advisory: { bg: 'bg-purple-50', bgDark: 'bg-purple-200', text: 'text-purple-700', border: 'border-purple-200' },
-    Production: { bg: 'bg-amber-50', bgDark: 'bg-amber-200', text: 'text-amber-700', border: 'border-amber-200' },
+  const colors: Record<string, { text: string; border: string }> = {
+    PL: { text: 'text-indigo-600', border: 'border-indigo-500' },
+    Auto: { text: 'text-blue-600', border: 'border-blue-500' },
+    POS: { text: 'text-green-600', border: 'border-green-500' },
+    Advisory: { text: 'text-purple-600', border: 'border-purple-500' },
+    Production: { text: 'text-amber-600', border: 'border-amber-500' },
   };
-  return colors[assetClass] || { bg: 'bg-slate-50', bgDark: 'bg-slate-200', text: 'text-slate-700', border: 'border-slate-200' };
+  return colors[assetClass] || { text: 'text-slate-600', border: 'border-slate-500' };
 };
 
 
@@ -793,7 +793,7 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
                 {/* Asset Class header (only show when grouping by asset class) */}
                 {shouldGroupByAssetClass && (
                   <div
-                    className={`grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 px-3 py-2.5 items-center cursor-pointer hover:opacity-90 transition-colors border-l-[6px] ${assetClassColors.border} ${assetClassColors.bgDark} border-t-2 border-t-slate-300 shadow-sm`}
+                    className={`grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 px-3 py-2.5 items-center cursor-pointer hover:bg-slate-50 transition-colors border-l-[6px] ${assetClassColors.border} border-t-2 border-b-2 border-r-2 border-t-slate-400 border-b-slate-400 border-r-slate-300 bg-white shadow-sm`}
                     onClick={() => toggleAssetClass(assetClassKey)}
                   >
                     <div className="w-6 flex items-center justify-center">
@@ -804,7 +804,8 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-1.5 rounded font-bold text-xs ${assetClassColors.text} ${assetClassColors.bgDark} border-2 ${assetClassColors.border}`}>
+                      <Square size={10} className={`${assetClassColors.text} fill-current`} />
+                      <span className="font-bold text-xs text-slate-800">
                         {assetClassName}
                       </span>
                       <span className="text-[10px] font-semibold text-slate-700">
