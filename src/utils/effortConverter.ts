@@ -78,3 +78,14 @@ export function formatEffort(value: number, unit: 'weeks' | 'days' | 'hours'): s
   return `${value.toFixed(2)}w`;
 }
 
+/**
+ * Format a number to a specified number of decimal places
+ * Removes trailing zeros (e.g., 2.50 becomes "2.5", 3.00 becomes "3")
+ * @param value - The number to format
+ * @param decimals - Maximum decimal places (default: 2)
+ * @returns Formatted string representation
+ */
+export function formatNumber(value: number, decimals: number = 2): string {
+  return Number(value.toFixed(decimals)).toString();
+}
+

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { PieChart as PieChartIcon, Shield, Battery, AlertTriangle, HelpCircle } from 'lucide-react';
+import { formatNumber } from '../../utils/effortConverter';
 
 // Metric tooltip definitions
 const METRIC_TOOLTIPS: Record<string, { title: string; description: string; formula?: string; thresholds?: string }> = {
@@ -251,9 +252,9 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
         </div>
         <div className="space-y-3 flex-1 flex flex-col justify-end">
           <div className="flex justify-between text-xs text-slate-500 font-medium">
-            <span>Assigned: <strong className="text-slate-700 ">{metrics.totalEst}w</strong></span>
-            <span>Actual: <strong className="text-blue-700 ">{metrics.totalAct}w</strong></span>
-            <span>Total Cap: <strong className="text-slate-700 ">{metrics.totalCapacity}w</strong></span>
+            <span>Assigned: <strong className="text-slate-700 ">{formatNumber(metrics.totalEst)}w</strong></span>
+            <span>Actual: <strong className="text-blue-700 ">{formatNumber(metrics.totalAct)}w</strong></span>
+            <span>Total Cap: <strong className="text-slate-700 ">{formatNumber(metrics.totalCapacity)}w</strong></span>
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
              <div 

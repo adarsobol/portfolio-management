@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canDeleteInitiative, canDeleteTaskItem, canEditTaskItem, getEligibleOwners, getCurrentQuarterString } from '../../utils';
 import { getAssetClasses, getStatuses, getPriorities, getQuarters, getUnplannedTags, getInitiativeTypes } from '../../utils/valueLists';
-import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks } from '../../utils/effortConverter';
+import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks, formatNumber } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
 import { BulkInitiativeSpreadsheetModal } from './BulkInitiativeSpreadsheetModal';
@@ -1095,9 +1095,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 </button>
 
                 {showActionsMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-48 bg-white-dark rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-scale-in">
+                  <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-scale-in">
                     {/* Share/Export Section */}
-                    <div className="px-3 py-1.5 bg-white/5 border-b border-slate-200 text-[10px] font-bold text-slate-400">
+                    <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
                       Export to clipboard
                     </div>
                     <button
@@ -1105,27 +1105,27 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         handleCopy('slack');
                         setShowActionsMenu(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 flex items-center justify-between group transition-all duration-200"
+                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-between group transition-all duration-200"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Share2 size={14} className="text-cyan-400" />
+                        <Share2 size={14} className="text-cyan-500" />
                         <span>Copy for Slack</span>
                       </div>
-                      {copyFeedback === 'slack' ? <Check size={14} className="text-emerald-400"/> : <Copy size={14} className="text-slate-500 group-hover:text-cyan-400"/>}
+                      {copyFeedback === 'slack' ? <Check size={14} className="text-emerald-500"/> : <Copy size={14} className="text-slate-400 group-hover:text-cyan-500"/>}
                     </button>
-                    <div className="border-t border-slate-200"></div>
+                    <div className="border-t border-slate-100"></div>
                     <button
                       onClick={() => {
                         handleCopy('notion');
                         setShowActionsMenu(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 flex items-center justify-between group transition-all duration-200"
+                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-between group transition-all duration-200"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Share2 size={14} className="text-cyan-400" />
+                        <Share2 size={14} className="text-cyan-500" />
                         <span>Copy for Notion</span>
                       </div>
-                      {copyFeedback === 'notion' ? <Check size={14} className="text-emerald-400"/> : <Copy size={14} className="text-slate-500 group-hover:text-cyan-400"/>}
+                      {copyFeedback === 'notion' ? <Check size={14} className="text-emerald-500"/> : <Copy size={14} className="text-slate-400 group-hover:text-cyan-500"/>}
                     </button>
                     
                     {/* Delete Section - Only show if user can delete and in edit mode */}
@@ -1136,12 +1136,12 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       return showDelete;
                     })() && (
                       <>
-                        <div className="border-t border-slate-200 my-0.5"></div>
+                        <div className="border-t border-slate-100 my-0.5"></div>
                         <button
                           onClick={handleDelete}
-                          className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-1.5 group transition-all duration-200"
+                          className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 group transition-all duration-200"
                         >
-                          <Trash2 size={14} className="text-red-400" />
+                          <Trash2 size={14} className="text-red-500" />
                           <span>Delete Initiative</span>
                         </button>
                       </>
@@ -2032,7 +2032,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {isEditMode && formData.originalEstimatedEffort !== undefined && (
                       <div className="flex items-center gap-2 text-xs text-slate-500">
                         <span>
-                          <span className="font-medium">Original Effort:</span> <span className="font-mono">{formData.originalEstimatedEffort}w</span>
+                          <span className="font-medium">Original Effort:</span> <span className="font-mono">{formatNumber(formData.originalEstimatedEffort || 0)}w</span>
                         </span>
                         {formData.originalEta && (
                           <span>

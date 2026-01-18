@@ -11,3 +11,5 @@ export { useVersionCheck } from './useVersionCheck';
 export { useInitiatives } from './useInitiatives';
 export { useAppNotifications } from './useAppNotifications';
 export { useUsers } from './useUsers';
+export { useNotificationHandlers } from './useNotificationHandlers';
+export { useCommentHandlers } from './useCommentHandlers';

@@ -322,23 +322,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isOwnerDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[220px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] min-w-[220px] max-h-[280px] flex flex-col animate-scale-in" style={{ isolation: 'isolate' }}>
               {/* Search input */}
-              <div className="p-2 border-b border-slate-100">
+              <div className="p-2 border-b border-slate-100 bg-white rounded-t-xl">
                 <input
                   type="text"
                   placeholder="Search owners..."
                   value={ownerSearchQuery}
                   onChange={(e) => setOwnerSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all bg-white"
                   autoFocus
                 />
               </div>
               
               {/* Owner list */}
-              <div className="overflow-y-auto max-h-[220px]">
+              <div className="overflow-y-auto max-h-[220px] bg-white">
                 {filteredOwners.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center bg-white">
                     No owners found
                   </div>
                 ) : (
@@ -348,7 +348,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={owner.id}
                         onClick={() => toggleOwner(owner.id)}
-                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 bg-white ${
                           isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
@@ -367,7 +367,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterOwners.length > 0 && (
-                <div className="p-2 border-t border-slate-100">
+                <div className="p-2 border-t border-slate-100 bg-white rounded-b-xl">
                   <button
                     onClick={() => {
                       setFilterOwners([]);
@@ -401,23 +401,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isWorkTypeDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in" style={{ isolation: 'isolate' }}>
               {/* Search input */}
-              <div className="p-2 border-b border-slate-100">
+              <div className="p-2 border-b border-slate-100 bg-white rounded-t-xl">
                 <input
                   type="text"
                   placeholder="Search work types..."
                   value={workTypeSearchQuery}
                   onChange={(e) => setWorkTypeSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all bg-white"
                   autoFocus
                 />
               </div>
               
               {/* Work Type list */}
-              <div className="overflow-y-auto max-h-[220px]">
+              <div className="overflow-y-auto max-h-[220px] bg-white">
                 {filteredWorkTypes.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center bg-white">
                     No work types found
                   </div>
                 ) : (
@@ -429,7 +429,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={opt.label}
                         onClick={() => toggleWorkType(opt.value, opt.singleSelect)}
-                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 bg-white ${
                           isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
@@ -448,7 +448,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterWorkType.length > 0 && (
-                <div className="p-2 border-t border-slate-100">
+                <div className="p-2 border-t border-slate-100 bg-white rounded-b-xl">
                   <button
                     onClick={() => {
                       setFilterWorkType([]);
@@ -482,23 +482,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isQuarterDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in" style={{ isolation: 'isolate' }}>
               {/* Search input */}
-              <div className="p-2 border-b border-slate-100">
+              <div className="p-2 border-b border-slate-100 bg-white rounded-t-xl">
                 <input
                   type="text"
                   placeholder="Search quarters..."
                   value={quarterSearchQuery}
                   onChange={(e) => setQuarterSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all bg-white"
                   autoFocus
                 />
               </div>
               
               {/* Quarter list */}
-              <div className="overflow-y-auto max-h-[220px]">
+              <div className="overflow-y-auto max-h-[220px] bg-white">
                 {filteredQuarters.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center bg-white">
                     No quarters found
                   </div>
                 ) : (
@@ -508,7 +508,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={quarter}
                         onClick={() => toggleQuarter(quarter)}
-                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 bg-white ${
                           isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
@@ -527,7 +527,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterQuarter.length > 0 && (
-                <div className="p-2 border-t border-slate-100">
+                <div className="p-2 border-t border-slate-100 bg-white rounded-b-xl">
                   <button
                     onClick={() => {
                       setFilterQuarter([]);
@@ -561,23 +561,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isPriorityDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[150px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] min-w-[150px] max-h-[280px] flex flex-col animate-scale-in" style={{ isolation: 'isolate' }}>
               {/* Search input */}
-              <div className="p-2 border-b border-slate-100">
+              <div className="p-2 border-b border-slate-100 bg-white rounded-t-xl">
                 <input
                   type="text"
                   placeholder="Search priorities..."
                   value={prioritySearchQuery}
                   onChange={(e) => setPrioritySearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all bg-white"
                   autoFocus
                 />
               </div>
               
               {/* Priority list */}
-              <div className="overflow-y-auto max-h-[220px]">
+              <div className="overflow-y-auto max-h-[220px] bg-white">
                 {filteredPriorities.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center bg-white">
                     No priorities found
                   </div>
                 ) : (
@@ -587,7 +587,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={priority}
                         onClick={() => togglePriority(priority)}
-                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 bg-white ${
                           isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
@@ -606,7 +606,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterPriority.length > 0 && (
-                <div className="p-2 border-t border-slate-100">
+                <div className="p-2 border-t border-slate-100 bg-white rounded-b-xl">
                   <button
                     onClick={() => {
                       setFilterPriority([]);
@@ -640,23 +640,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isStatusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in" style={{ isolation: 'isolate' }}>
               {/* Search input */}
-              <div className="p-2 border-b border-slate-100">
+              <div className="p-2 border-b border-slate-100 bg-white rounded-t-xl">
                 <input
                   type="text"
                   placeholder="Search statuses..."
                   value={statusSearchQuery}
                   onChange={(e) => setStatusSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all bg-white"
                   autoFocus
                 />
               </div>
               
               {/* Status list */}
-              <div className="overflow-y-auto max-h-[220px]">
+              <div className="overflow-y-auto max-h-[220px] bg-white">
                 {filteredStatuses.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center bg-white">
                     No statuses found
                   </div>
                 ) : (
@@ -666,7 +666,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={status}
                         onClick={() => toggleStatus(status)}
-                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 bg-white ${
                           isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
@@ -685,7 +685,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterStatus.length > 0 && (
-                <div className="p-2 border-t border-slate-100">
+                <div className="p-2 border-t border-slate-100 bg-white rounded-b-xl">
                   <button
                     onClick={() => {
                       setFilterStatus([]);
@@ -719,9 +719,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isSavedViewsDropdownOpen && (
-            <div className="absolute top-full right-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[260px] max-h-[360px] flex flex-col animate-scale-in">
+            <div className="absolute top-full right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-[9999] min-w-[260px] max-h-[360px] flex flex-col animate-scale-in" style={{ isolation: 'isolate' }}>
               {/* Header */}
-              <div className="p-3 border-b border-slate-100">
+              <div className="p-3 border-b border-slate-100 bg-white rounded-t-xl">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-700 tracking-tight">Saved Filter Views</span>
                 </div>
@@ -738,16 +738,16 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               </div>
               
               {/* Saved views list */}
-              <div className="overflow-y-auto max-h-[280px]">
+              <div className="overflow-y-auto max-h-[280px] bg-white rounded-b-xl">
                 {savedViews.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center bg-white">
                     No saved views
                   </div>
                 ) : (
                   savedViews.map(view => (
                     <div
                       key={view.id}
-                      className="px-2.5 py-1.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                      className="px-2.5 py-1.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0 bg-white"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <button

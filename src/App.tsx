@@ -3,10 +3,10 @@ import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router
 import { Search, Plus, ChevronDown } from 'lucide-react';
 
 import { INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
-import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
+import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, ViewType, Role, PermissionKey, Notification, NotificationType, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { formatError } from './utils/errorUtils';
-import { useLocalStorage, useVersionCheck, useUsers as useUsersHook, useInitiatives as useInitiativesHook, useAppNotifications as useAppNotificationsHook } from './hooks';
+import { useLocalStorage, useVersionCheck, useUsers as useUsersHook, useInitiatives as useInitiativesHook, useAppNotifications as useAppNotificationsHook, useNotificationHandlers, useCommentHandlers } from './hooks';
 import { useUrlState } from './hooks/useUrlState';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService, logService } from './services';
 import { getVersionService } from './services/versionService';
@@ -511,6 +511,20 @@ export default function App() {
     value: any;
     timestamp: number;
   }>>(new Map());
+
+  // Notification Handlers - extracted to hook
+  const {
+    handleMarkAsRead,
+    handleMarkAllAsRead,
+    handleClearAll,
+    handleNotificationClick,
+  } = useNotificationHandlers({
+    notifications,
+    setNotifications,
+    initiatives,
+    setEditingItem,
+    setIsModalOpen,
+  });
 
   // Handle route-based navigation for initiative links (e.g., /item/Q425-003)
   // Also handle legacy hash-based navigation for backward compatibility
@@ -1029,6 +1043,18 @@ export default function App() {
     }
   }, []);
 
+  // Comment Handlers - extracted to hook
+  const {
+    handleAddComment,
+    handleMarkCommentRead,
+  } = useCommentHandlers({
+    setInitiatives,
+    currentUser,
+    users,
+    addNotification,
+    createNotification,
+    setCommentReadState,
+  });
 
   // Actions
   const recordChange = (initiative: Initiative, field: string, oldValue: any, newValue: any, taskId?: string, tradeOffSourceId?: string, tradeOffSourceTitle?: string): ChangeRecord => {
@@ -2113,126 +2139,11 @@ export default function App() {
     setSearchQuery('');
   };
 
-  // Notification Handlers
-  const handleMarkAsRead = (id: string) => {
-    // Update local state immediately
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    
-    // Sync with server
-    notificationService.markAsRead(id).catch(error => {
-      logger.error('Failed to mark notification as read on server', { 
-        context: 'App.handleMarkAsRead', 
-        error: error instanceof Error ? error : new Error(String(error)) 
-      });
-    });
-  };
+  // NOTE: Notification handlers (handleMarkAsRead, handleMarkAllAsRead, handleClearAll, handleNotificationClick)
+  // are now provided by useNotificationHandlers hook above.
 
-  const handleMarkAllAsRead = () => {
-    // Update local state immediately
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    
-    // Sync with server
-    notificationService.markAllAsRead().catch(error => {
-      logger.error('Failed to mark all notifications as read on server', { 
-        context: 'App.handleMarkAllAsRead', 
-        error: error instanceof Error ? error : new Error(String(error)) 
-      });
-    });
-  };
-
-  const handleClearAll = () => {
-    // Update local state immediately
-    setNotifications([]);
-    
-    // Sync with server
-    notificationService.clearAll().catch(error => {
-      logger.error('Failed to clear notifications on server', { 
-        context: 'App.handleClearAll', 
-        error: error instanceof Error ? error : new Error(String(error)) 
-      });
-    });
-  };
-
-  const handleNotificationClick = (notification: Notification) => {
-    // Find and open the initiative modal
-    const initiative = initiatives.find(i => i.id === notification.initiativeId);
-    if (initiative) {
-      setEditingItem(initiative);
-      setIsModalOpen(true);
-    }
-  };
-
-  // Comment Handlers
-  const handleAddComment = (initiativeId: string, comment: Comment) => {
-    setInitiatives(prev => prev.map(initiative => {
-      if (initiative.id === initiativeId) {
-        const updatedInitiative = {
-          ...initiative,
-          comments: [...(initiative.comments || []), comment],
-          lastUpdated: new Date().toISOString().split('T')[0]
-        };
-        
-        // Update localStorage cache
-        const cached = localStorage.getItem('portfolio-initiatives-cache');
-        if (cached) {
-          const cachedInitiatives: Initiative[] = JSON.parse(cached);
-          const index = cachedInitiatives.findIndex(i => i.id === updatedInitiative.id);
-          if (index >= 0) {
-            cachedInitiatives[index] = updatedInitiative;
-          } else {
-            cachedInitiatives.push(updatedInitiative);
-          }
-          localStorage.setItem('portfolio-initiatives-cache', JSON.stringify(cachedInitiatives));
-        }
-        
-        // Create notification for the owner if it's not their own comment
-        if (initiative.ownerId && initiative.ownerId !== currentUser.id) {
-          addNotification(createNotification(
-            NotificationType.NewComment,
-            'New comment',
-            `${currentUser.name} commented on "${initiative.title}"`,
-            initiative.id,
-            initiative.title,
-            initiative.ownerId,
-            { commentId: comment.id, commentText: comment.text, ownerId: initiative.ownerId }
-          ));
-        }
-        
-        // Handle @mentions in the comment
-        const mentionedUserIds = parseMentions(comment.text, users);
-        mentionedUserIds.forEach(userId => {
-          // Don't notify the owner again (they already get a NewComment notification above)
-          if (userId !== initiative.ownerId) {
-            addNotification(createNotification(
-              NotificationType.Mention,
-              'You were mentioned',
-              `${currentUser.name} mentioned you in a comment on "${initiative.title}"`,
-              initiative.id,
-              initiative.title,
-              userId,
-              { commentId: comment.id, commentText: comment.text }
-            ));
-          }
-        });
-        
-        // Sync comment to Google Sheets
-        sheetsSync.queueInitiativeSync(updatedInitiative);
-        
-        return updatedInitiative;
-      }
-      return initiative;
-    }));
-    
-    // Mark as read for the commenter (they've seen the latest since they just commented)
-    handleMarkCommentRead(initiativeId);
-  };
-
-  const handleMarkCommentRead = (initiativeId: string) => {
-    setCommentReadState(prev => ({
-      ...prev,
-      [initiativeId]: new Date().toISOString()
-    }));
-  };
+  // NOTE: Comment handlers (handleAddComment, handleMarkCommentRead)
+  // are now provided by useCommentHandlers hook above.
 
   // Show loading state while checking authentication or loading data
   if (authLoading || (isAuthenticated && isDataLoading)) {

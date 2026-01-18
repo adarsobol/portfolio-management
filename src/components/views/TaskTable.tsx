@@ -5,7 +5,7 @@ import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserC
 import { StatusBadge, PriorityBadge, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
 import { checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
-import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks } from '../../utils/effortConverter';
+import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks, formatNumber } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
 import { getStatuses, getPriorities } from '../../utils/valueLists';
@@ -1085,12 +1085,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   ? `${weeksToHours(item.actualEffort || 0).toFixed(1)}/${weeksToHours(item.estimatedEffort || 0).toFixed(1)}h`
                   : displayUnit === 'days' 
                   ? `${weeksToDays(item.actualEffort || 0).toFixed(1)}/${weeksToDays(item.estimatedEffort || 0).toFixed(1)}d`
-                  : `${item.actualEffort}/${item.estimatedEffort}w`}
+                  : `${formatNumber(item.actualEffort || 0)}/${formatNumber(item.estimatedEffort || 0)}w`}
               </div>
             </div>
           )}
           {item.originalEstimatedEffort !== item.estimatedEffort && (
-             <div className="text-[9px] text-slate-400 italic text-right mt-1">Orig: {item.originalEstimatedEffort}w</div>
+             <div className="text-[9px] text-slate-400 italic text-right mt-1">Orig: {formatNumber(item.originalEstimatedEffort || 0)}w</div>
           )}
         </td>
         <td className="px-2.5 py-1.5 border-r border-slate-200 min-w-[90px]">
@@ -1564,7 +1564,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               {/* Add Task Form */}
               {editable && isAddingTask && (
                 <div className="border-t border-slate-200 pt-3 mt-3">
-                  <div className="bg-white/95 backdrop-blur-sm border border-blue-200 rounded-lg shadow-lg p-2.5 space-y-2.5 animate-scale-in">
+                  <div className="bg-white border border-blue-200 rounded-lg shadow-lg p-2.5 space-y-2.5 animate-scale-in">
                       {/* Header */}
                       <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
                         <h3 className="text-xs font-semibold text-slate-800">New Task</h3>

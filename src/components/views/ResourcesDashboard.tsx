@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 import { useDebounce, useIntersectionObserver } from '../../hooks';
 import { calculateCompletionRate, metricsCache, paginate } from '../../utils';
+import { formatNumber } from '../../utils/effortConverter';
 
 interface WorkplanHealthDashboardProps {
   filteredInitiatives: Initiative[];
@@ -862,14 +863,14 @@ const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortP
             )}
           </div>
         </td>
-        <td className="px-3 py-2 text-slate-500 font-mono text-xs">{item.originalEstimatedEffort || 0}w</td>
-        <td className="px-3 py-2 font-semibold text-slate-700 font-mono text-xs">{item.estimatedEffort || 0}w</td>
+        <td className="px-3 py-2 text-slate-500 font-mono text-xs">{formatNumber(item.originalEstimatedEffort || 0)}w</td>
+        <td className="px-3 py-2 font-semibold text-slate-700 font-mono text-xs">{formatNumber(item.estimatedEffort || 0)}w</td>
         <td className="px-3 py-2">
           <div className="flex flex-col gap-0.5">
             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
               effortDiff > 0 ? 'bg-red-100 text-red-700' : effortDiff < 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
             }`}>
-              {effortDiff > 0 ? '+' : ''}{effortDiff}w
+              {effortDiff > 0 ? '+' : ''}{formatNumber(effortDiff)}w
             </span>
             {item.originalEstimatedEffort && item.originalEstimatedEffort > 0 && (
               <span className={`text-[9px] ${isSignificantEffort ? 'font-bold text-amber-600' : 'text-slate-500'}`}>
@@ -2159,12 +2160,12 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
             <div>
               <div className="flex items-baseline gap-1">
                 <span className={`text-3xl font-black ${healthMetrics.netScopeChange === 0 ? 'text-slate-800' : healthMetrics.netScopeChange > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                  {isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange > 0 ? '+' : ''}{isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange}
+                  {isNaN(healthMetrics.netScopeChange) ? '0' : healthMetrics.netScopeChange > 0 ? '+' : ''}{isNaN(healthMetrics.netScopeChange) ? '0' : formatNumber(healthMetrics.netScopeChange)}
                 </span>
                 <span className="text-slate-400 text-sm">weeks</span>
               </div>
               <p className="text-xs text-slate-400 mt-2">
-                {healthMetrics.totalCurrentEffort}w current vs {healthMetrics.totalOriginalEffort}w original
+                {formatNumber(healthMetrics.totalCurrentEffort)}w current vs {formatNumber(healthMetrics.totalOriginalEffort)}w original
               </p>
             </div>
           </div>
@@ -2377,8 +2378,8 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
             Effort Burndown
           </h3>
           <div className="flex items-center gap-4 text-xs">
-            <span className="text-slate-500">Total: <span className="font-bold text-slate-700">{burndownData.totalPlanned}w</span></span>
-            <span className="text-slate-500">Remaining: <span className="font-bold text-amber-600">{burndownData.remaining}w</span></span>
+            <span className="text-slate-500">Total: <span className="font-bold text-slate-700">{formatNumber(burndownData.totalPlanned)}w</span></span>
+            <span className="text-slate-500">Remaining: <span className="font-bold text-amber-600">{formatNumber(burndownData.remaining)}w</span></span>
           </div>
         </div>
         {showBurndownChart && (
@@ -2391,7 +2392,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
                   <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip 
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`${value}w`, '']}
+                    formatter={(value: number) => [`${formatNumber(value)}w`, '']}
                   />
                   <ReferenceLine y={burndownData.totalPlanned} stroke="#94a3b8" strokeDasharray="5 5" />
                   <Area 
@@ -2554,9 +2555,9 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
                 <Tooltip 
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: number, name: string) => {
-                    if (name === 'used') return [`${value}w used`, 'Buffer Used'];
-                    if (name === 'remaining') return [`${value}w left`, 'Buffer Remaining'];
-                    return [`${value}w`, name];
+                    if (name === 'used') return [`${formatNumber(value)}w used`, 'Buffer Used'];
+                    if (name === 'remaining') return [`${formatNumber(value)}w left`, 'Buffer Remaining'];
+                    return [`${formatNumber(value)}w`, name];
                   }}
                 />
                 <ReferenceLine y={bufferTrendData[0]?.total || 0} stroke="#94a3b8" strokeDasharray="5 5" label={{ value: 'Total Allocated', fill: '#94a3b8', fontSize: 10, position: 'right' }} />
