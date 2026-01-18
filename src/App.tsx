@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, useParams, Routes, Route } from 'react-router-dom';
 import { Search, Plus, ChevronDown } from 'lucide-react';
 
-import { USERS, INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
-import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, User, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
+import { INITIAL_INITIATIVES, INITIAL_CONFIG, migratePermissions, getAssetClassFromTeam } from './constants';
+import { Initiative, Status, WorkType, AppConfig, ChangeRecord, TradeOffAction, ViewType, Role, PermissionKey, Notification, NotificationType, Comment, UserCommentReadState, InitiativeType, AssetClass, UnplannedTag, Task, WorkflowTrigger, ActivityType } from './types';
 import { getOwnerName, generateId, parseMentions, logger, canCreateTasks, canViewTab, canDeleteInitiative, getTaskManagementScope } from './utils';
 import { formatError } from './utils/errorUtils';
 import { useLocalStorage, useVersionCheck, useUsers as useUsersHook, useInitiatives as useInitiativesHook, useAppNotifications as useAppNotificationsHook } from './hooks';
@@ -47,56 +47,27 @@ export default function App() {
   // Ref for main scrollable container
   const mainContainerRef = useRef<HTMLElement>(null);
   
-  // Ref to track latest initiatives for workflow execution (prevents race conditions)
-  const initiativesRef = useRef<Initiative[]>([]);
+  // Config - must be declared before hooks that depend on setConfig
+  const [config, setConfig] = useLocalStorage<AppConfig>('portfolio-config', INITIAL_CONFIG);
   
-  // State for Users - start with hardcoded as fallback, load from API
-  const [users, setUsers] = useState<User[]>(USERS);
-  const [usersLoaded, setUsersLoaded] = useState(false);
+  // Users - loaded via useUsers hook
+  const { users, setUsers } = useUsersHook({ isAuthenticated, setConfig });
   
   // Use authenticated user or fallback
   const currentUser = authUser || users.find(u => u.email === 'adar.sobol@pagaya.com') || users[0]; 
   
-  // Data loading state
-  const [isDataLoading, setIsDataLoading] = useState(true);
+  // Initiatives - loaded via useInitiatives hook (handles loading, deduplication, and realtime updates)
+  const { 
+    initiatives, 
+    setInitiatives, 
+    initiativesRef, 
+    isLoading: isDataLoading,
+    deduplicateInitiatives
+  } = useInitiativesHook({ isAuthenticated, currentUser });
   
-  // Initiatives - loaded from localStorage
-  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
-  
-  // Helper function to deduplicate initiatives by ID (keeps first occurrence)
-  const deduplicateInitiatives = (initiatives: Initiative[]): Initiative[] => {
-    const seenIds = new Set<string>();
-    const duplicates: string[] = [];
-    const deduplicated = initiatives.filter(init => {
-      if (seenIds.has(init.id)) {
-        duplicates.push(init.id);
-        return false;
-      }
-      seenIds.add(init.id);
-      return true;
-    });
-    if (duplicates.length > 0) {
-      logger.warn(`Found ${duplicates.length} duplicate initiative IDs`, { context: 'App.deduplicateInitiatives', metadata: { duplicates } });
-    }
-    return deduplicated;
-  };
-
-  // Keep ref in sync with state and detect duplicates
-  useEffect(() => {
-    initiativesRef.current = initiatives;
-    
-    // Safety check: if duplicates are detected in state, deduplicate immediately
-    const duplicateIds = initiatives.map(i => i.id).filter((id, idx, arr) => arr.indexOf(id) !== idx);
-    if (duplicateIds.length > 0) {
-      logger.error('CRITICAL: Duplicates detected in state! Deduplicating...', { context: 'App.useEffect[initiatives]', metadata: { duplicateIds: [...new Set(duplicateIds)] } });
-      const deduplicated = deduplicateInitiatives(initiatives);
-      // Only update if the deduplicated array is different (prevents infinite loop)
-      if (deduplicated.length !== initiatives.length) {
-        setInitiatives(deduplicated);
-      }
-    }
-  }, [initiatives]);
-  const [config, setConfig] = useLocalStorage<AppConfig>('portfolio-config', INITIAL_CONFIG);
+  // Operation loading state - for CRUD operations (separate from initial data loading)
+  const [isOperationLoading, setIsOperationLoading] = useState(false);
+  void isOperationLoading; // Used by setIsOperationLoading, value could be displayed in UI for loading indicators
   
   // Load value lists from backend on startup (all authenticated users need them)
   useEffect(() => {
@@ -148,83 +119,9 @@ export default function App() {
   const [commentReadState, setCommentReadState] = useLocalStorage<UserCommentReadState>('portfolio-comment-read-state', {});
 
 
-  // Load users from API
-  useEffect(() => {
-    if (!isAuthenticated || usersLoaded) return;
-
-    const loadUsers = async () => {
-      try {
-        const response = await fetch(`${API_ENDPOINT}/api/auth/users`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.users && data.users.length > 0) {
-            // Use only API users - no fallback merge to prevent deleted users from reappearing
-            setUsers(data.users);
-          }
-        }
-      } catch (error) {
-        logger.error('Failed to load users from API', { context: 'App.loadUsers', error: error instanceof Error ? error : new Error(String(error)) });
-        // Keep using USERS as fallback only when API completely fails
-      } finally {
-        setUsersLoaded(true);
-      }
-    };
-
-    loadUsers();
-  }, [isAuthenticated, usersLoaded]);
-
-  // NOTE: Automatic capacity sync has been disabled for full manual control.
-  // Team capacities are now managed entirely through the Admin Panel.
-  // No auto-assignment or cleanup of capacity values happens automatically.
-
-  // =============================================================================
-  // SHADOW MODE: useUsers hook validation
-  // This runs the new hook alongside legacy code to validate behavior parity
-  // After validation period, we'll switch to using the hook directly
-  // =============================================================================
-  const { 
-    users: hookUsers, 
-    usersLoaded: hookUsersLoaded 
-  } = useUsersHook({ isAuthenticated, setConfig });
-  
-  // Shadow mode comparison - log any differences between legacy and hook
-  useEffect(() => {
-    if (!usersLoaded || !hookUsersLoaded) return;
-    
-    // Compare user counts
-    if (users.length !== hookUsers.length) {
-      logger.warn('SHADOW MODE: useUsers count mismatch', {
-        context: 'App.shadowMode.useUsers',
-        metadata: { 
-          legacyCount: users.length, 
-          hookCount: hookUsers.length,
-          difference: Math.abs(users.length - hookUsers.length)
-        }
-      });
-    }
-    
-    // Compare user IDs
-    const legacyIds = new Set(users.map(u => u.id));
-    const hookIds = new Set(hookUsers.map(u => u.id));
-    const missingInHook = users.filter(u => !hookIds.has(u.id));
-    const extraInHook = hookUsers.filter(u => !legacyIds.has(u.id));
-    
-    if (missingInHook.length > 0 || extraInHook.length > 0) {
-      logger.warn('SHADOW MODE: useUsers ID mismatch', {
-        context: 'App.shadowMode.useUsers',
-        metadata: { 
-          missingInHook: missingInHook.map(u => u.id),
-          extraInHook: extraInHook.map(u => u.id)
-        }
-      });
-    } else if (users.length === hookUsers.length) {
-      logger.debug('SHADOW MODE: useUsers validation passed', {
-        context: 'App.shadowMode.useUsers',
-        metadata: { userCount: users.length }
-      });
-    }
-  }, [users, hookUsers, usersLoaded, hookUsersLoaded]);
-  // =============================================================================
+  // NOTE: Users are now loaded via useUsers hook above.
+  // Automatic capacity sync has been disabled for full manual control.
+  // Team capacities are managed entirely through the Admin Panel.
 
   // Load notifications from server
   useEffect(() => {
@@ -265,90 +162,13 @@ export default function App() {
     loadNotifications();
   }, [isAuthenticated, currentUser?.id, notificationsLoaded]);
 
-  // Load initiatives from Google Sheets on startup (with localStorage fallback)
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsDataLoading(false);
-      return;
-    }
+  // NOTE: Initiatives are now loaded via useInitiatives hook above.
+  // The hook handles loading from Google Sheets, deduplication, and realtime updates for initiatives.
 
-    let isMounted = true;
-
-    const loadData = async () => {
-      setIsDataLoading(true);
-      try {
-        // Use sheetsSync which fetches from Google Sheets with localStorage fallback
-        const loadedInitiatives = await sheetsSync.loadInitiatives();
-        
-        if (!isMounted) return;
-        
-        // Deduplicate by ID (keep first occurrence)
-        const deduplicatedInitiatives = deduplicateInitiatives(loadedInitiatives);
-        
-        const duplicatesRemoved = loadedInitiatives.length - deduplicatedInitiatives.length;
-        if (duplicatesRemoved > 0) {
-          logger.debug('loadData: Setting initiatives after deduplication', { context: 'App.loadData', metadata: { count: deduplicatedInitiatives.length, duplicatesRemoved } });
-        }
-        
-        // #region agent log
-        const sampleOwnerIds = deduplicatedInitiatives.slice(0, 5).map(i => ({ id: i.id, title: i.title, ownerId: i.ownerId }));
-        fetch('http://127.0.0.1:7242/ingest/30bff00f-1252-4a6a-a1a1-ff6715802d11',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:loadData',message:'Data loaded - current user and sample initiatives',data:{currentUserId:currentUser?.id,currentUserEmail:currentUser?.email,currentUserRole:currentUser?.role,sampleOwnerIds,totalInitiatives:deduplicatedInitiatives.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})}).catch(()=>{});
-        // #endregion
-        setInitiatives(deduplicatedInitiatives);
-      } catch (error) {
-        logger.error('Failed to load initiatives', { context: 'App.loadData', error: error instanceof Error ? error : new Error(String(error)) });
-        if (isMounted) {
-          setInitiatives([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsDataLoading(false);
-        }
-      }
-    };
-
-    loadData();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated]);
-
-  // Connect to real-time collaboration service
+  // Connect to real-time service for notifications only
+  // (Initiative realtime updates are handled by useInitiatives hook)
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      realtimeService.connect(currentUser);
-
-      // Subscribe to real-time initiative updates
-      const unsubUpdate = realtimeService.onInitiativeUpdate(({ initiative }) => {
-        setInitiatives(prev => {
-          return prev.map(i => i.id === initiative.id ? initiative : i);
-        });
-      });
-
-      const unsubCreate = realtimeService.onInitiativeCreate(({ initiative }) => {
-        setInitiatives(prev => {
-          const existing = prev.find(i => i.id === initiative.id);
-          if (existing) {
-            logger.warn('realtime create: Initiative already exists, skipping duplicate', { context: 'App.realtimeService.onInitiativeCreate', metadata: { initiativeId: initiative.id } });
-            return prev;
-          }
-          logger.debug('realtime create: Adding new initiative', { context: 'App.realtimeService.onInitiativeCreate', metadata: { initiativeId: initiative.id } });
-          return [...prev, initiative];
-        });
-      });
-
-      const unsubComment = realtimeService.onCommentAdded(({ initiativeId, comment }) => {
-        setInitiatives(prev => prev.map(i => {
-          if (i.id === initiativeId) {
-            const existingComments = i.comments || [];
-            if (existingComments.find(c => c.id === comment.id)) return i;
-            return { ...i, comments: [...existingComments, comment] };
-          }
-          return i;
-        }));
-      });
-
       // Subscribe to real-time notifications
       const unsubNotification = realtimeService.onNotificationReceived(({ notification }) => {
         logger.debug('Received notification via Socket.IO', {
@@ -369,68 +189,11 @@ export default function App() {
       });
 
       return () => {
-        unsubUpdate();
-        unsubCreate();
-        unsubComment();
         unsubNotification();
         realtimeService.disconnect();
       };
     }
   }, [isAuthenticated, currentUser]);
-
-  // =============================================================================
-  // SHADOW MODE: useInitiatives hook validation
-  // This runs the new hook alongside legacy code to validate behavior parity
-  // After validation period, we'll switch to using the hook directly
-  // =============================================================================
-  const { 
-    initiatives: hookInitiatives, 
-    isLoading: hookInitiativesLoading,
-    initiativesRef: hookInitiativesRef
-  } = useInitiativesHook({ isAuthenticated, currentUser });
-  
-  // Shadow mode comparison - log any differences between legacy and hook
-  useEffect(() => {
-    // Wait until both are loaded
-    if (isDataLoading || hookInitiativesLoading) return;
-    
-    // Compare initiative counts
-    if (initiatives.length !== hookInitiatives.length) {
-      logger.warn('SHADOW MODE: useInitiatives count mismatch', {
-        context: 'App.shadowMode.useInitiatives',
-        metadata: { 
-          legacyCount: initiatives.length, 
-          hookCount: hookInitiatives.length,
-          difference: Math.abs(initiatives.length - hookInitiatives.length)
-        }
-      });
-    }
-    
-    // Compare initiative IDs
-    const legacyIds = new Set(initiatives.map(i => i.id));
-    const hookIds = new Set(hookInitiatives.map(i => i.id));
-    const missingInHook = initiatives.filter(i => !hookIds.has(i.id));
-    const extraInHook = hookInitiatives.filter(i => !legacyIds.has(i.id));
-    
-    if (missingInHook.length > 0 || extraInHook.length > 0) {
-      logger.warn('SHADOW MODE: useInitiatives ID mismatch', {
-        context: 'App.shadowMode.useInitiatives',
-        metadata: { 
-          missingInHook: missingInHook.map(i => i.id).slice(0, 5),
-          extraInHook: extraInHook.map(i => i.id).slice(0, 5)
-        }
-      });
-    } else if (initiatives.length === hookInitiatives.length && initiatives.length > 0) {
-      logger.debug('SHADOW MODE: useInitiatives validation passed', {
-        context: 'App.shadowMode.useInitiatives',
-        metadata: { initiativeCount: initiatives.length }
-      });
-    }
-  }, [initiatives, hookInitiatives, isDataLoading, hookInitiativesLoading]);
-  
-  // Suppress unused variable warning - hookInitiativesRef will be used when we switch over
-  void hookInitiativesRef;
-  // =============================================================================
 
   // =============================================================================
   // SHADOW MODE: useAppNotifications hook validation
@@ -1386,7 +1149,7 @@ export default function App() {
     }
 
     try {
-      setIsDataLoading(true);
+      setIsOperationLoading(true);
       
       // Soft delete in Google Sheets
       const result = await sheetsSync.deleteInitiative(id);
@@ -1422,7 +1185,7 @@ export default function App() {
       });
       showErrorWithDetails(errorDetails);
     } finally {
-      setIsDataLoading(false);
+      setIsOperationLoading(false);
     }
   };
 
@@ -1445,7 +1208,7 @@ export default function App() {
     }
     
     try {
-      setIsDataLoading(true);
+      setIsOperationLoading(true);
       const results: { success: boolean; id: string }[] = [];
       
       // Delete each initiative sequentially
@@ -1518,7 +1281,7 @@ export default function App() {
       });
       showError('An error occurred during bulk delete. Please try again.');
     } finally {
-      setIsDataLoading(false);
+      setIsOperationLoading(false);
     }
   };
 
@@ -1530,7 +1293,7 @@ export default function App() {
     }
 
     try {
-      setIsDataLoading(true);
+      setIsOperationLoading(true);
       
       const success = await sheetsSync.restoreInitiative(id);
       
@@ -1565,7 +1328,7 @@ export default function App() {
       });
       showErrorWithDetails(errorDetails);
     } finally {
-      setIsDataLoading(false);
+      setIsOperationLoading(false);
     }
   };
 
@@ -2289,7 +2052,7 @@ export default function App() {
 
   // Handle data refresh from localStorage
   const handleRefreshData = async () => {
-    setIsDataLoading(true);
+    setIsOperationLoading(true);
     showInfo('Refreshing data...');
     try {
       const cached = localStorage.getItem('portfolio-initiatives-cache');
@@ -2315,13 +2078,13 @@ export default function App() {
       logger.error('Failed to refresh data', { context: 'App.handleRefreshData', error: error instanceof Error ? error : new Error(String(error)) });
       showError('Failed to refresh data. Please try again.');
     } finally {
-      setIsDataLoading(false);
+      setIsOperationLoading(false);
     }
   };
 
   // Clear corrupted cache and reload
   const handleClearCache = async () => {
-    setIsDataLoading(true);
+    setIsOperationLoading(true);
     showInfo('Clearing corrupted cache...');
     
     try {
@@ -2336,7 +2099,7 @@ export default function App() {
       logger.error('Failed to clear cache', { context: 'App.handleClearCache', error: error instanceof Error ? error : new Error(String(error)) });
       showError('Failed to clear cache. Please try again.');
     } finally {
-      setIsDataLoading(false);
+      setIsOperationLoading(false);
     }
   };
 
