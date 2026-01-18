@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Notification, NotificationType, User, Initiative, Status } from '../types';
+import { Notification, NotificationType, User, Initiative } from '../types';
 import { logger } from '../utils/logger';
 import { notificationService, realtimeService } from '../services';
 import { generateId } from '../utils';
@@ -36,14 +36,17 @@ interface UseAppNotificationsReturn {
  * - Loading notifications from the server
  * - Creating and adding notifications
  * - Real-time notification updates via Socket.IO
- * - Delay checking for overdue initiatives
+ * 
+ * NOTE: Delay checking is currently handled in App.tsx during shadow mode.
+ * Once migration is complete, delay checking should be added here.
  */
 export function useAppNotifications({ 
   isAuthenticated,
   isAuthLoading = false,
   currentUser,
-  initiatives 
+  initiatives: _initiatives // Unused during shadow mode - will be used for delay checking after migration
 }: UseAppNotificationsOptions): UseAppNotificationsReturn {
+  void _initiatives; // Suppress unused variable warning
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoaded, setNotificationsLoaded] = useState(false);
 
@@ -233,44 +236,10 @@ export function useAppNotifications({
     }
   }, [isAuthenticated, currentUser]);
 
-  // Check for delays and create notifications
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const checkDelays = () => {
-      initiatives.forEach(initiative => {
-        if (initiative.eta && initiative.eta < today && 
-            initiative.status !== Status.Done && 
-            initiative.status !== Status.AtRisk) {
-          setNotifications(prev => {
-            const todayStr = new Date().toDateString();
-            const existingDelayNotification = prev.find(
-              n => n.initiativeId === initiative.id && 
-                   n.type === NotificationType.Delay &&
-                   new Date(n.timestamp).toDateString() === todayStr
-            );
-            
-            if (!existingDelayNotification) {
-              const notification = createNotification(
-                NotificationType.Delay,
-                'Initiative delayed',
-                `${initiative.title} has passed its ETA (${initiative.eta}) and is now delayed`,
-                initiative.id,
-                initiative.title,
-                initiative.ownerId,
-                { eta: initiative.eta, ownerId: initiative.ownerId }
-              );
-              return [notification, ...prev];
-            }
-            return prev;
-          });
-        }
-      });
-    };
-
-    checkDelays();
-    const delayCheckInterval = setInterval(checkDelays, 60000);
-    return () => clearInterval(delayCheckInterval);
-  }, [initiatives, createNotification]);
+  // NOTE: Delay-checking logic is intentionally NOT included here during shadow mode.
+  // App.tsx has the delay-checking logic as the source of truth.
+  // Once shadow mode validation passes and we complete the migration,
+  // delay-checking should be moved here from App.tsx.
 
   return {
     notifications,
