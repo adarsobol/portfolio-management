@@ -4,19 +4,23 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Portfolio Work Plan Manager</title>
-    <!-- Google Fonts - Poppins -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Configure Tailwind to use Poppins as the default sans font
+      // Configure Tailwind
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Poppins', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-            }
+              sans: ['DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            },
+            animation: {
+              'scale-in': 'scaleIn 0.2s ease-out',
+              'badge-pop': 'badgePop 0.3s ease-out',
+            },
           }
         }
       }
@@ -29,6 +33,7 @@
       }
       .custom-scrollbar::-webkit-scrollbar-track {
         background: #f1f5f9;
+        border-radius: 4px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background: #cbd5e1;
@@ -38,19 +43,95 @@
         background: #94a3b8;
       }
       
-      /* Fade in animation for admin panel sections */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(8px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+      /* Typography utilities - Keep for TopNav */
+      .font-display {
+        font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+        letter-spacing: -0.02em;
       }
-      .animate-fadeIn {
-        animation: fadeIn 0.3s ease-out;
+      
+      /* Keyframe Animations - Keep only what's needed */
+      @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      @keyframes badgePop {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+      }
+      
+      /* Subtle noise texture overlay - Keep for TopNav */
+      .noise-texture::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        opacity: 0.02;
+        pointer-events: none;
+        mix-blend-mode: overlay;
+      }
+      
+      /* Glass morphism effect - Keep for TopNav */
+      .glass-dark {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      /* Card hover glow effect - Keep for FilterBar and WorkPlanOverview */
+      .card-glow {
+        transition: all 0.3s ease;
+      }
+      .card-glow:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(245, 158, 11, 0.1);
+        transform: translateY(-2px);
+      }
+      
+      /* Efficiency badge gradient styles - Keep for WorkPlanOverview */
+      .efficiency-excellent {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      }
+      .efficiency-good {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+      }
+      .efficiency-poor {
+        background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+      }
+      
+      /* Status bar rounded pill style - Keep for WorkPlanOverview */
+      .status-pill {
+        border-radius: 9999px;
+        overflow: hidden;
+      }
+      .status-pill > div {
+        margin-right: 2px;
+      }
+      .status-pill > div:last-child {
+        margin-right: 0;
+      }
+      
+      /* Row hover accent effect - Keep for WorkPlanOverview */
+      .row-hover-accent {
+        position: relative;
+        transition: all 0.2s ease;
+      }
+      .row-hover-accent::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        background: linear-gradient(90deg, rgba(245, 158, 11, 0.15), transparent);
+        transition: width 0.2s ease;
+      }
+      .row-hover-accent:hover::before {
+        width: 100%;
+      }
+      .row-hover-accent:hover {
+        background: rgba(245, 158, 11, 0.03);
       }
     </style>
   <script type="importmap">
@@ -66,7 +147,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-[#F9FAFB] text-slate-900 font-sans antialiased">
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased">
     <div id="root"></div>
   <script type="module" src="/src/index.tsx"></script>
 </body>

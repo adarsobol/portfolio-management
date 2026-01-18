@@ -15,62 +15,7 @@ import { slackService, sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
 import { BulkInitiativeSpreadsheetModal } from './BulkInitiativeSpreadsheetModal';
 
-// ============================================================================
-// ACCORDION SECTION COMPONENT
-// ============================================================================
-interface AccordionSectionProps {
-  title: string;
-  icon: React.ReactNode;
-  isExpanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-  badge?: React.ReactNode;
-  accentColor?: string;
-}
-
-const AccordionSection: React.FC<AccordionSectionProps> = ({
-  title, icon, isExpanded, onToggle, children, badge, accentColor = 'blue'
-}) => {
-  const gradientMap: Record<string, string> = {
-    blue: 'from-blue-500 to-blue-600',
-    indigo: 'from-indigo-500 to-purple-500',
-    cyan: 'from-cyan-500 to-cyan-600',
-    amber: 'from-amber-500 to-amber-600'
-  };
-
-  return (
-    <div className={`border rounded-lg overflow-hidden transition-all duration-300 ${
-      isExpanded ? 'border-slate-300 shadow-md' : 'border-slate-200'
-    }`}>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full flex items-center justify-between px-3 py-2 text-left transition-all cursor-pointer ${
-          isExpanded 
-            ? 'bg-gradient-to-r from-slate-50 to-white' 
-            : 'bg-white hover:bg-slate-50'
-        }`}
-      >
-        <div className="flex items-center gap-2 pointer-events-none">
-          <div className={`w-1 h-4 rounded-full bg-gradient-to-b ${gradientMap[accentColor]}`} />
-          <span className="text-slate-500">{icon}</span>
-          <span className="text-xs font-semibold text-slate-800">{title}</span>
-          {badge}
-        </div>
-        <div className={`transform transition-transform duration-200 pointer-events-none ${isExpanded ? 'rotate-180' : ''}`}>
-          <ChevronDown size={14} className="text-slate-400" />
-        </div>
-      </button>
-      <div className={`transition-all duration-300 ease-in-out ${
-        isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-      }`}>
-        <div className="p-3 pt-1.5 border-t border-slate-100 bg-white">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-};
+// AccordionSection component removed - replaced with tabs
 
 // ============================================================================
 // BULK ENTRY ROW TYPE
@@ -151,15 +96,8 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // Track if asset class was manually changed (to prevent auto-override)
   const assetClassManuallySetRef = useRef<boolean>(false);
 
-  // Accordion State
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    core: true,
-    hierarchy: false,
-    dependencies: false,
-    effort: false,
-    risk: false,
-    tradeoff: false
-  });
+  // Details Tab State (replaces accordion state)
+  const [activeDetailsTab, setActiveDetailsTab] = useState<'core' | 'hierarchy' | 'dependencies' | 'effort' | 'risk' | 'tradeoff' | 'tasks'>('core');
 
 
   // Bulk Mode State
@@ -281,7 +219,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       setShowSaveConfirmation(false);
       setEnableTradeOff(false);
       setTradeOffData({ field: 'eta' });
-      setExpandedSections({ core: true, hierarchy: false, dependencies: false, effort: false, risk: false, tradeoff: false, tasks: false });
+      setActiveDetailsTab('core');
       
       // Initialize bulk mode with 2 empty rows
       setBulkRows([createEmptyBulkRow(), createEmptyBulkRow()]);
@@ -471,9 +409,6 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
   // HANDLERS - SINGLE MODE
   // ============================================================================
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const handleChange = (field: keyof Initiative, value: any) => {
     // Validate ETA when changing status to In Progress
@@ -601,19 +536,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
     
     // Auto-expand sections with errors
     if (newErrors.title || newErrors.ownerId || newErrors.quarter || newErrors.definitionOfDone) {
-      setExpandedSections(prev => ({ ...prev, core: true }));
+      setActiveDetailsTab('core');
     }
     if (newErrors.estimatedEffort || newErrors.eta) {
-      setExpandedSections(prev => ({ ...prev, effort: true }));
+      setActiveDetailsTab('effort');
     }
     if (newErrors.riskActionLog) {
-      setExpandedSections(prev => ({ ...prev, risk: true }));
+      setActiveDetailsTab('risk');
     }
     if (newErrors.tasks || Object.keys(newErrors).some(k => k.startsWith('task_'))) {
-      setExpandedSections(prev => ({ ...prev, tasks: true }));
+      setActiveDetailsTab('tasks');
     }
     if (newErrors.estimatedEffort || newErrors.actualEffort) {
-      setExpandedSections(prev => ({ ...prev, effort: true }));
+      setActiveDetailsTab('effort');
     }
     
     return Object.keys(newErrors).length === 0;
@@ -877,7 +812,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   const addTask = () => {
     setTasks(prev => [...prev, createEmptyTask()]);
-    setExpandedSections(prev => ({ ...prev, tasks: true }));
+    setActiveDetailsTab('tasks');
   };
 
   const updateTask = (taskId: string, field: keyof Task, value: any) => {
@@ -1112,10 +1047,10 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
   return (
     <>
-      {/* Backdrop overlay - light, non-blurry */}
+      {/* Backdrop overlay - lighter with reduced blur */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-slate-100/50 transition-opacity duration-300"
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-300"
           onClick={onClose}
         />
       )}
@@ -1124,20 +1059,18 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
       <div className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
         isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}>
-        <div className={`bg-white shadow-2xl overflow-hidden flex flex-col border border-slate-200 rounded-lg transition-all duration-300 ${
-          isOpen ? 'scale-100' : 'scale-95'
-        } ${mode === 'bulk' ? 'w-[55vw] max-w-[61vw] h-[90vh]' : 'w-[55vw] max-w-[770px] h-[90vh]'}`}>
+        <div className={`bg-white shadow-2xl overflow-hidden flex flex-col border border-slate-200 rounded-lg transition-all duration-300 ${isOpen ? 'scale-100' : 'scale-95'} ${mode === 'bulk' ? 'w-[50vw] max-w-[55vw] h-[90vh]' : 'w-[50vw] max-w-[680px] h-[90vh]'}`}>
         
         {/* ================================================================ */}
         {/* HEADER */}
         {/* ================================================================ */}
-        <div className="flex justify-between items-center px-4 py-2.5 border-b border-slate-200 bg-gradient-to-r from-slate-800 to-slate-900">
+        <div className="flex justify-between items-center px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-slate-800 to-slate-900 ">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-1.5">
+              <h2 className="text-base font-bold text-white flex items-center gap-1.5  tracking-tight">
                 {isEditMode ? 'Edit Initiative' : 'New Initiative'}
                 {isEditMode && formData.id && (
-                  <span className="px-1.5 py-0.5 bg-slate-700 text-slate-200 text-[10px] font-mono font-semibold rounded">
+                  <span className="px-1.5 py-0.5 bg-slate-700/50 text-amber-300 text-[10px] font-mono font-semibold rounded border border-slate-200">
                     {formData.id}
                   </span>
                 )}
@@ -1155,16 +1088,16 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowActionsMenu(!showActionsMenu)}
-                  className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-amber-400 transition-all duration-200"
                   title="Actions"
                 >
                   <MoreVertical size={16} />
                 </button>
 
                 {showActionsMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="absolute right-0 top-full mt-1.5 w-48 bg-white-dark rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-scale-in">
                     {/* Share/Export Section */}
-                    <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500">
+                    <div className="px-3 py-1.5 bg-white/5 border-b border-slate-200 text-[10px] font-bold text-slate-400">
                       Export to clipboard
                     </div>
                     <button
@@ -1172,27 +1105,27 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         handleCopy('slack');
                         setShowActionsMenu(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-between group"
+                      className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 flex items-center justify-between group transition-all duration-200"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Share2 size={14} className="text-slate-400" />
+                        <Share2 size={14} className="text-cyan-400" />
                         <span>Copy for Slack</span>
                       </div>
-                      {copyFeedback === 'slack' ? <Check size={14} className="text-emerald-600"/> : <Copy size={14} className="text-slate-400 group-hover:text-slate-600"/>}
+                      {copyFeedback === 'slack' ? <Check size={14} className="text-emerald-400"/> : <Copy size={14} className="text-slate-500 group-hover:text-cyan-400"/>}
                     </button>
-                    <div className="border-t border-slate-100"></div>
+                    <div className="border-t border-slate-200"></div>
                     <button
                       onClick={() => {
                         handleCopy('notion');
                         setShowActionsMenu(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-between group"
+                      className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/5 flex items-center justify-between group transition-all duration-200"
                     >
                       <div className="flex items-center gap-1.5">
-                        <Share2 size={14} className="text-slate-400" />
+                        <Share2 size={14} className="text-cyan-400" />
                         <span>Copy for Notion</span>
                       </div>
-                      {copyFeedback === 'notion' ? <Check size={14} className="text-emerald-600"/> : <Copy size={14} className="text-slate-400 group-hover:text-slate-600"/>}
+                      {copyFeedback === 'notion' ? <Check size={14} className="text-emerald-400"/> : <Copy size={14} className="text-slate-500 group-hover:text-cyan-400"/>}
                     </button>
                     
                     {/* Delete Section - Only show if user can delete and in edit mode */}
@@ -1206,9 +1139,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                         <div className="border-t border-slate-200 my-0.5"></div>
                         <button
                           onClick={handleDelete}
-                          className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5 group"
+                          className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-1.5 group transition-all duration-200"
                         >
-                          <Trash2 size={14} className="text-red-600" />
+                          <Trash2 size={14} className="text-red-400" />
                           <span>Delete Initiative</span>
                         </button>
                       </>
@@ -1220,7 +1153,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
 
             <button 
               onClick={onClose} 
-              className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-amber-400 transition-all duration-200"
             >
               <X size={16} />
             </button>
@@ -1228,50 +1161,62 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         </div>
 
         {/* ================================================================ */}
-        {/* TABS (Single Mode Only) */}
+        {/* PRIMARY TABS (Single Mode Only) - Top Level Navigation */}
         {/* ================================================================ */}
         {mode === 'single' && (
-          <div className="flex border-b border-slate-200 px-4 bg-slate-50/50">
+          <div className="flex border-b-2 border-slate-300 px-4 bg-gradient-to-b from-slate-100 to-slate-50 shadow-sm">
             <button 
               onClick={() => setActiveTab('details')}
-              className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition-all ${
+              className={`flex items-center gap-2 py-3 px-4 text-sm font-bold transition-all relative ${
                 activeTab === 'details' 
-                  ? 'border-blue-600 text-blue-600 bg-white' 
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'text-blue-700' 
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <FileText size={14} /> Details
+              <FileText size={16} className={activeTab === 'details' ? 'text-blue-600' : 'text-slate-500'} /> 
+              <span>Details</span>
+              {activeTab === 'details' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+              )}
             </button>
             <button 
               onClick={() => setActiveTab('comments')}
-              className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition-all ${
+              className={`flex items-center gap-2 py-3 px-4 text-sm font-bold transition-all relative ${
                 activeTab === 'comments' 
-                  ? 'border-blue-600 text-blue-600 bg-white' 
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'text-blue-700' 
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <MessageSquare size={14} /> Comments 
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+              <MessageSquare size={16} className={activeTab === 'comments' ? 'text-blue-600' : 'text-slate-500'} /> 
+              <span>Comments</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ml-1 ${
                 activeTab === 'comments' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
               }`}>
                 {formData.comments?.length || 0}
               </span>
+              {activeTab === 'comments' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+              )}
             </button>
             {isEditMode && (
               <button 
                 onClick={() => setActiveTab('history')}
-                className={`flex items-center gap-1.5 py-2 px-3 text-xs font-semibold border-b-2 transition-all ${
+                className={`flex items-center gap-2 py-3 px-4 text-sm font-bold transition-all relative ${
                   activeTab === 'history' 
-                    ? 'border-blue-600 text-blue-600 bg-white' 
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                    ? 'text-blue-700' 
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <History size={14} /> History
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                <History size={16} className={activeTab === 'history' ? 'text-blue-600' : 'text-slate-500'} /> 
+                <span>History</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ml-1 ${
                   activeTab === 'history' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
                 }`}>
                   {formData.history?.length || 0}
                 </span>
+                {activeTab === 'history' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+                )}
               </button>
             )}
           </div>
@@ -1281,26 +1226,141 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         {/* BODY - SINGLE MODE */}
         {/* ================================================================ */}
         {mode === 'single' && activeTab === 'details' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
               
-              {/* ============================================ */}
-              {/* CORE DETAILS SECTION - SPREADSHEET STYLE */}
-              {/* ============================================ */}
-              <AccordionSection
-                title="Core Details"
-                icon={<FileText size={14} />}
-                isExpanded={expandedSections.core}
-                onToggle={() => toggleSection('core')}
-                accentColor="blue"
-                badge={
-                  (errors.title || errors.ownerId || errors.quarter || errors.definitionOfDone) && (
-                    <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">
-                      Required
-                    </span>
-                  )
-                }
-              >
+              {/* Secondary Tab Navigation - Details Sub-sections */}
+              <div className="border-b border-slate-200 bg-white px-3 py-1.5">
+                <div className="flex gap-0.5 overflow-x-auto custom-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailsTab('core')}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                      activeDetailsTab === 'core'
+                        ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <FileText size={12} />
+                    <span>Core</span>
+                    {(errors.title || errors.ownerId || errors.quarter || errors.definitionOfDone) && (
+                      <span className="px-1 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded-full ml-0.5">
+                        !
+                      </span>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailsTab('hierarchy')}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                      activeDetailsTab === 'hierarchy'
+                        ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-500'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Layers size={12} />
+                    <span>Hierarchy</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailsTab('dependencies')}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                      activeDetailsTab === 'dependencies'
+                        ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-500'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Users size={12} />
+                    <span>Dependencies</span>
+                    {Array.isArray(formData.dependencies) && formData.dependencies.length > 0 && (
+                      <span className="px-1 py-0.5 bg-indigo-100 text-indigo-600 text-[9px] font-bold rounded-full ml-0.5">
+                        {formData.dependencies.length}
+                      </span>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailsTab('effort')}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                      activeDetailsTab === 'effort'
+                        ? 'bg-cyan-50 text-cyan-700 border-b-2 border-cyan-500'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Scale size={12} />
+                    <span>Effort</span>
+                    {(errors.estimatedEffort || errors.eta) && (
+                      <span className="px-1 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded-full ml-0.5">
+                        !
+                      </span>
+                    )}
+                  </button>
+                  
+                  {formData.status === Status.AtRisk && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveDetailsTab('risk')}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                        activeDetailsTab === 'risk'
+                          ? 'bg-amber-50 text-amber-700 border-b-2 border-amber-500'
+                          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <AlertTriangle size={12} />
+                      <span>Risk</span>
+                      {errors.riskActionLog && (
+                        <span className="px-1 py-0.5 bg-red-100 text-red-600 text-[9px] font-bold rounded-full ml-0.5">
+                          !
+                        </span>
+                      )}
+                    </button>
+                  )}
+                  
+                  {!isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveDetailsTab('tradeoff')}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                        activeDetailsTab === 'tradeoff'
+                          ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-500'
+                          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Scale size={12} />
+                      <span>Trade-off</span>
+                    </button>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailsTab('tasks')}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-all rounded-t-lg ${
+                      activeDetailsTab === 'tasks'
+                        ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-500'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Layers size={12} />
+                    <span>Tasks</span>
+                    {tasks.length > 0 && (
+                      <span className="px-1 py-0.5 bg-purple-100 text-purple-600 text-[9px] font-bold rounded-full ml-0.5">
+                        {tasks.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                {/* ============================================ */}
+                {/* CORE DETAILS SECTION */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'core' && (
+                  <div className="space-y-3">
                 <div className="border border-slate-300 rounded-md overflow-hidden text-xs">
                   {/* Row 1: Title */}
                   <div className="grid grid-cols-[100px_1fr] border-b border-slate-200">
@@ -1495,7 +1555,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                   : currentTags.filter(t => t !== tag);
                                 handleChange('unplannedTags', newTags);
                               }}
-                              className="rounded text-amber-600 focus:ring-amber-500"
+                              className="rounded text-blue-600 focus:ring-amber-500"
                             />
                             <span className="text-amber-800">{tag}</span>
                           </label>
@@ -1505,18 +1565,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </div>
                   )}
                 </div>
-              </AccordionSection>
+                  </div>
+                )}
 
-              {/* ============================================ */}
-              {/* HIERARCHY SECTION - SPREADSHEET STYLE */}
-              {/* ============================================ */}
-              <AccordionSection
-                title="Hierarchy & Classification"
-                icon={<Layers size={14} />}
-                isExpanded={expandedSections.hierarchy}
-                onToggle={() => toggleSection('hierarchy')}
-                accentColor="indigo"
-              >
+                {/* ============================================ */}
+                {/* HIERARCHY SECTION */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'hierarchy' && (
+                  <div className="space-y-3">
                 <div className="border border-slate-300 rounded-md overflow-hidden text-xs">
                   {/* Row 1: Asset Class | Pillar */}
                   <div className="grid grid-cols-[100px_1fr_100px_1fr] border-b border-slate-200">
@@ -1578,25 +1634,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </div>
                   </div>
                 </div>
-              </AccordionSection>
+                  </div>
+                )}
 
-              {/* ============================================ */}
-              {/* EXTERNAL TEAM DEPENDENCIES - SPREADSHEET STYLE */}
-              {/* ============================================ */}
-              <AccordionSection
-                title="External Team Dependencies"
-                icon={<Users size={14} />}
-                isExpanded={expandedSections.dependencies}
-                onToggle={() => toggleSection('dependencies')}
-                accentColor="indigo"
-                badge={
-                  Array.isArray(formData.dependencies) && formData.dependencies.length > 0 && (
-                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-bold rounded-full">
-                      {formData.dependencies.length}
-                    </span>
-                  )
-                }
-              >
+                {/* ============================================ */}
+                {/* EXTERNAL TEAM DEPENDENCIES */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'dependencies' && (
+                  <div className="space-y-3">
                 <div className="border border-slate-300 rounded-md overflow-hidden text-[10px]">
                   {/* Dependencies List */}
                   <div className="divide-y divide-slate-200">
@@ -1687,25 +1732,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </div>
                   )}
                 </div>
-              </AccordionSection>
+                  </div>
+                )}
 
-              {/* ============================================ */}
-              {/* EFFORT & TIMELINE - SPREADSHEET STYLE */}
-              {/* ============================================ */}
-              <AccordionSection
-                title="Effort & Timeline"
-                icon={<Scale size={14} />}
-                isExpanded={expandedSections.effort}
-                onToggle={() => toggleSection('effort')}
-                accentColor="cyan"
-                badge={
-                  (errors.estimatedEffort || errors.eta) && (
-                    <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">
-                      Required
-                    </span>
-                  )
-                }
-              >
+                {/* ============================================ */}
+                {/* EFFORT & TIMELINE */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'effort' && (
+                  <div className="space-y-3">
                 <div className="space-y-2">
                   {/* BAU: Effort calculation info */}
                   {isBAU && (
@@ -1735,7 +1769,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             handleChange('estimatedEffort', Math.max(0, currentWeeks - decrement));
                           }}
                           disabled={isReadOnly}
-                          className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                         >
                           <ArrowDown size={12} />
@@ -1768,7 +1802,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             handleChange('estimatedEffort', currentWeeks + increment);
                           }}
                           disabled={isReadOnly}
-                          className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                         >
                           <ArrowUp size={12} />
@@ -1793,7 +1827,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             handleChange('actualEffort', Math.max(0, currentWeeks - decrement));
                           }}
                           disabled={isReadOnly}
-                          className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                         >
                           <ArrowDown size={12} />
@@ -1824,7 +1858,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             handleChange('actualEffort', currentWeeks + increment);
                           }}
                           disabled={isReadOnly}
-                          className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                         >
                           <ArrowUp size={12} />
@@ -1843,7 +1877,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           disabled={isReadOnly}
                           checked={formData.isSoftCap || false}
                           onChange={(e) => handleChange('isSoftCap', e.target.checked)}
-                          className="rounded text-blue-600 focus:ring-blue-500"
+                          className="rounded text-blue-600 focus:ring-amber-500"
                         />
                       </div>
                     </div>
@@ -1858,7 +1892,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           type="button"
                           onClick={() => handleChange('completionRate', Math.max(0, Number(formData.completionRate || 0) - 5))}
                           disabled={isReadOnly}
-                          className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title="Decrease by 5%"
                         >
                           <ArrowDown size={12} />
@@ -1881,7 +1915,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           type="button"
                           onClick={() => handleChange('completionRate', Math.min(100, Number(formData.completionRate || 0) + 5))}
                           disabled={isReadOnly}
-                          className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                          className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
                           title="Increase by 5%"
                         >
                           <ArrowUp size={12} />
@@ -1920,7 +1954,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             onClick={() => setEffortDisplayUnit('days')}
                             className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
                               effortDisplayUnit === 'days' 
-                                ? 'bg-blue-600 text-white' 
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
                                 : 'text-slate-600 hover:bg-slate-100'
                             }`}
                           >
@@ -1931,7 +1965,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                             onClick={() => setEffortDisplayUnit('weeks')}
                             className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
                               effortDisplayUnit === 'weeks' 
-                                ? 'bg-blue-600 text-white' 
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
                                 : 'text-slate-600 hover:bg-slate-100'
                             }`}
                           >
@@ -1956,26 +1990,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     )}
                   </div>
                 </div>
-              </AccordionSection>
+                  </div>
+                )}
 
-              {/* ============================================ */}
-              {/* RISK SECTION - SPREADSHEET STYLE (Conditional) */}
-              {/* ============================================ */}
-              {formData.status === Status.AtRisk && (
-                <AccordionSection
-                  title="Risk Documentation"
-                  icon={<AlertTriangle size={14} />}
-                  isExpanded={expandedSections.risk || true}
-                  onToggle={() => toggleSection('risk')}
-                  accentColor="amber"
-                  badge={
-                    errors.riskActionLog && (
-                      <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-bold rounded-full">
-                        Required
-                      </span>
-                    )
-                  }
-                >
+                {/* ============================================ */}
+                {/* RISK SECTION (Conditional) */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'risk' && formData.status === Status.AtRisk && (
+                  <div className="space-y-3">
                   <div className="border border-red-300 rounded-md overflow-hidden text-sm">
                     <div className="grid grid-cols-[100px_1fr]">
                       <div className="bg-red-100 px-3 py-2 font-medium text-red-800 border-r border-red-200 flex items-start pt-3">
@@ -1996,20 +2018,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     </div>
                   </div>
                   {errors.riskActionLog && <p className="text-red-600 text-xs mt-1 font-medium">{errors.riskActionLog}</p>}
-                </AccordionSection>
-              )}
+                  </div>
+                )}
 
-              {/* ============================================ */}
-              {/* TRADE-OFF SECTION - SPREADSHEET STYLE */}
-              {/* ============================================ */}
-              {!isReadOnly && (
-                <AccordionSection
-                  title="Trade-off Tracking (Optional)"
-                  icon={<Scale size={14} />}
-                  isExpanded={expandedSections.tradeoff}
-                  onToggle={() => toggleSection('tradeoff')}
-                  accentColor="indigo"
-                >
+                {/* ============================================ */}
+                {/* TRADE-OFF SECTION */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'tradeoff' && !isReadOnly && (
+                  <div className="space-y-3">
                   <div className="border border-slate-300 rounded-md overflow-hidden text-xs">
                     {/* Enable Row */}
                     <div className="grid grid-cols-[100px_1fr] border-b border-slate-200">
@@ -2103,26 +2119,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   </div>
                   {errors.tradeOffTarget && <p className="text-red-500 text-xs mt-1">{errors.tradeOffTarget}</p>}
                   {errors.tradeOffValue && <p className="text-red-500 text-xs mt-1">{errors.tradeOffValue}</p>}
-                </AccordionSection>
-              )}
+                  </div>
+                )}
 
-              {/* ============================================ */}
-              {/* TASKS SECTION - ALL INITIATIVE TYPES */}
-              {/* ============================================ */}
-              <AccordionSection
-                  title="Tasks"
-                  icon={<Layers size={14} />}
-                  isExpanded={expandedSections.tasks}
-                  onToggle={() => toggleSection('tasks')}
-                  accentColor="purple"
-                  badge={
-                    tasks.length > 0 && (
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-600 text-xs font-bold rounded-full">
-                        {tasks.length}
-                      </span>
-                    )
-                  }
-                >
+                {/* ============================================ */}
+                {/* TASKS SECTION */}
+                {/* ============================================ */}
+                {activeDetailsTab === 'tasks' && (
+                  <div className="space-y-3">
                   <div className="space-y-3">
                     {errors.tasks && (
                       <div className="bg-red-50 border border-red-200 rounded-md px-2 py-1.5 text-xs text-red-600">
@@ -2275,7 +2279,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => updateTask(task.id, 'estimatedEffort', Math.max(0, Number(task.estimatedEffort || 0) - 0.25))}
-                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
+                                      className="p-1 hover:bg-amber-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
                                       title="Decrease planned by 0.25"
                                     >
                                       <ArrowDown size={14} />
@@ -2295,7 +2299,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => updateTask(task.id, 'estimatedEffort', Number(task.estimatedEffort || 0) + 0.25)}
-                                      className="p-1 hover:bg-blue-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
+                                      className="p-1 hover:bg-amber-100 rounded text-blue-500 hover:text-blue-700 transition-colors"
                                       title="Increase planned by 0.25"
                                     >
                                       <ArrowUp size={14} />
@@ -2430,7 +2434,9 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       Add Task
                     </button>
                   </div>
-                </AccordionSection>
+                  </div>
+                )}
+              </div>
             </form>
           </div>
         )}
@@ -2530,7 +2536,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     onChange={handleCommentInputChange}
                     onKeyDown={handleCommentKeyDown}
                     placeholder="Type a comment... (@ to mention)"
-                    className="w-full rounded-lg border border-slate-300 px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                   
                   {/* Mention Autocomplete Dropdown */}
@@ -2641,13 +2647,13 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         {/* ================================================================ */}
         {/* FOOTER */}
         {/* ================================================================ */}
-        <div className="flex justify-between items-center gap-2 px-4 py-2.5 border-t border-slate-200 bg-gradient-to-t from-slate-50 to-white">
+        <div className="flex justify-between items-center gap-2 px-4 py-2.5 border-t border-slate-200 bg-gradient-to-t from-white/50 to-white backdrop-blur-sm">
           <div className="flex items-center gap-3 text-xs text-slate-500">
             {mode === 'bulk' && (
               <>
                 <span>{validBulkRowsCount} of {bulkRows.length} rows ready</span>
                 {tradeOffRowsCount > 0 && (
-                  <span className="flex items-center gap-1 text-indigo-600">
+                  <span className="flex items-center gap-1 text-cyan-600">
                     <Scale size={12} />
                     {tradeOffRowsCount} trade-off{tradeOffRowsCount > 1 ? 's' : ''}
                   </span>
@@ -2659,7 +2665,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <span className="text-xs text-slate-500">
                   Required fields: {filledRequiredFields}/{requiredFieldsCount}
                 </span>
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                <span className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-semibold rounded-full shadow-sm font-mono">
                   {Math.round(progressPercent)}%
                 </span>
               </div>
@@ -2669,7 +2675,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
             <button 
               type="button" 
               onClick={onClose}
-              className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-all border border-slate-200"
+              className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-all duration-200 border border-slate-200"
             >
               Cancel
             </button>
@@ -2679,7 +2685,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                   <button 
                     type="button"
                     onClick={handleSubmit} 
-                    className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-md hover:shadow-lg transition-all"
+                    className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-amber-600 hover:to-amber-700 rounded-lg shadow-md shadow-blue-500/20 hover:shadow-lg transition-all duration-200"
                   >
                     Save Initiative
                   </button>
@@ -2688,7 +2694,7 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <button 
                   type="button"
                   onClick={handleBulkSubmit} 
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-md hover:shadow-lg transition-all"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-amber-600 hover:to-amber-700 rounded-lg shadow-md shadow-blue-500/20 hover:shadow-lg transition-all duration-200"
                 >
                   Save All ({validBulkRowsCount})
                 </button>
@@ -2704,19 +2710,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-slate-900/60 transition-opacity"
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
             onClick={() => setShowSaveConfirmation(false)}
           />
           
           {/* Confirmation Modal */}
-          <div className="relative bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full mx-4">
+          <div className="relative bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full mx-4 animate-scale-in">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-amber-100 to-amber-200 rounded-full flex items-center justify-center shadow-sm">
                   <AlertTriangle className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-800">Confirm Save</h3>
+                  <h3 className="text-sm font-semibold text-slate-800 ">Confirm Save</h3>
                   <p className="text-xs text-slate-500 mt-0.5">Are you sure you want to save this initiative?</p>
                 </div>
               </div>
@@ -2725,14 +2731,14 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowSaveConfirmation(false)}
-                  className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-all border border-slate-200"
+                  className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-all duration-200 border border-slate-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={confirmSave}
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg shadow-md hover:shadow-lg transition-all"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-amber-600 hover:to-amber-700 rounded-lg shadow-md shadow-blue-500/20 hover:shadow-lg transition-all duration-200"
                 >
                   Save Initiative
                 </button>

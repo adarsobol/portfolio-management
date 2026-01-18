@@ -156,24 +156,24 @@ export const TopNav: React.FC<TopNavProps> = ({
   }) => (
     <button 
       onClick={() => setCurrentView(view)} 
-      className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all font-medium text-xs ${
+      className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all duration-200 font-medium text-xs group ${
         activeView === view 
-          ? `bg-gradient-to-r ${activeGradient} text-white shadow-lg` 
-          : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+          ? `bg-gradient-to-r ${activeGradient} text-white shadow-lg shadow-amber-500/10 border border-white/10` 
+          : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 hover:border-amber-500/20 border border-transparent'
       }`}
     >
-      <Icon size={14} />
-      <span>{label}</span>
+      <Icon size={14} className={`transition-transform duration-200 ${activeView !== view ? 'group-hover:scale-110' : ''}`} />
+      <span className="tracking-tight">{label}</span>
     </button>
   );
 
   return (
-    <nav className="w-full bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 text-white flex items-center justify-between px-3 md:px-4 py-2 sticky top-0 z-30 border-b border-slate-800/50 shadow-md">
+    <nav className="w-full bg-gradient-to-r from-[#0F172A] via-[#1E293B] to-[#0F172A] text-white flex items-center justify-between px-3 md:px-4 py-2 sticky top-0 z-30 border-b border-white/5 shadow-lg backdrop-blur-sm noise-texture">
       {/* Left side - Logo and Navigation */}
       <div className="flex items-center gap-4 lg:gap-6 flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <h1 className="text-base font-black tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">PortfolioMgr</h1>
-          <span className="text-[10px] text-slate-500 font-medium hidden lg:inline">Work Plan Management</span>
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          <h1 className="text-base font-extrabold tracking-tight bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 bg-clip-text text-transparent font-display">PortfolioMgr</h1>
+          <span className="text-[10px] text-slate-500 font-medium hidden lg:inline tracking-wide">Work Plan Management</span>
         </div>
         <div className="flex items-center gap-1 flex-wrap lg:flex-nowrap flex-1 min-w-0">
           <NavButton view="all" icon={LayoutDashboard} label="All Tasks" activeGradient="from-blue-500 to-blue-600" />
@@ -196,12 +196,12 @@ export const TopNav: React.FC<TopNavProps> = ({
       <div className="relative">
         <button
           onClick={() => setUserMenuOpen(!userMenuOpen)}
-          className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-800/50 transition-all"
+          className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-all duration-200 border border-transparent hover:border-amber-500/20"
         >
           <img 
             src={currentUser.avatar} 
             alt={currentUser.name} 
-            className="w-7 h-7 rounded-lg ring-2 ring-slate-700 shadow-lg"
+            className="w-7 h-7 rounded-lg ring-2 ring-amber-500/30 shadow-lg shadow-amber-500/10"
           />
           <div className="hidden sm:block text-left">
             <div className="flex items-center gap-2">
@@ -225,7 +225,7 @@ export const TopNav: React.FC<TopNavProps> = ({
               className="fixed inset-0 z-40" 
               onClick={() => setUserMenuOpen(false)}
             />
-            <div className="absolute right-0 mt-2 w-56 bg-slate-800 rounded-lg shadow-xl border border-slate-700/50 py-2 z-50">
+            <div className="absolute right-0 mt-2 w-56 glass-dark rounded-xl shadow-2xl py-2 z-50 animate-scale-in">
               <div className="px-3 py-2 border-b border-slate-700/50 sm:hidden">
                 <p className="text-xs font-semibold text-white">{currentUser.name}</p>
                 <p className="text-[10px] text-slate-500 font-medium">{currentUser.role}</p>
@@ -268,7 +268,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                             }}
                             className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                               adjustmentMode === 'add'
-                                ? 'bg-blue-600 text-white shadow-md'
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20'
                                 : 'text-slate-400 hover:text-slate-200'
                             }`}
                           >
@@ -287,7 +287,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                             }}
                             className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                               adjustmentMode === 'deduct'
-                                ? 'bg-blue-600 text-white shadow-md'
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20'
                                 : 'text-slate-400 hover:text-slate-200'
                             }`}
                           >
@@ -309,7 +309,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                                   handleCapacityChange();
                                 }
                               }}
-                              className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs font-mono focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
                               placeholder="0"
                             />
                             <p className="text-[10px] text-slate-500 mt-0.5 text-center">weeks</p>
@@ -329,7 +329,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                                   handleCapacityChange();
                                 }
                               }}
-                              className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs font-mono focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
                               placeholder="0"
                             />
                             <p className="text-[10px] text-slate-500 mt-0.5 text-center">days</p>

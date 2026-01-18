@@ -86,7 +86,7 @@ const HelpButton: React.FC<{
             {tooltip.formula && (
               <div className="bg-slate-800 rounded px-2 py-1.5 mb-2">
                 <p className="text-[10px] text-slate-400 tracking-wider mb-0.5">Formula</p>
-                <code className="text-xs text-blue-300 font-mono whitespace-pre-line">{tooltip.formula}</code>
+                <code className="text-xs text-blue-300  whitespace-pre-line">{tooltip.formula}</code>
               </div>
             )}
             {tooltip.thresholds && (
@@ -140,14 +140,17 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       
       {/* 1. Initiative Status */}
-      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col  ">
         <HelpButton metricKey="initiativesStatus" position="left" />
         <div className="flex justify-between items-start mb-3 pr-6">
           <div>
-            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Initiatives status</p>
-            <h3 className="text-3xl font-black text-slate-800">{metrics.countOpen} <span className="text-sm font-normal text-slate-400">Open</span></h3>
+            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1 uppercase">Initiatives status</p>
+            <h3 className="text-3xl font-black text-slate-800  tracking-tight">
+              <span className="">{metrics.countOpen}</span> 
+              <span className="text-sm font-normal text-slate-400 ml-1">Open</span>
+            </h3>
           </div>
-          <div className="p-2.5 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl text-blue-600 shadow-sm">
+          <div className="p-2.5 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl text-blue-600 shadow-sm border border-blue-200/50">
             <PieChartIcon size={22} />
           </div>
         </div>
@@ -179,27 +182,30 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
       </div>
 
       {/* 2. BAU Buffer Health */}
-      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
         <HelpButton metricKey="bauBufferHealth" position="left" />
         <div className="flex justify-between items-start mb-4 pr-6">
           <div>
-            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">BAU effort</p>
-            <h3 className="text-3xl font-black text-slate-800">{(metrics.bauInitiativeActuals || 0).toFixed(1)}<span className="text-sm font-normal text-slate-400">w</span></h3>
+            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1 uppercase">BAU effort</p>
+            <h3 className="text-3xl font-black text-slate-800  tracking-tight">
+              <span className="">{(metrics.bauInitiativeActuals || 0).toFixed(1)}</span>
+              <span className="text-sm font-normal text-slate-400 ml-0.5">w</span>
+            </h3>
           </div>
-          <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 shadow-sm">
+          <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 shadow-sm border border-purple-200/50">
             <Shield size={22} />
           </div>
         </div>
         <div className="space-y-3 flex-1">
-          <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-lg p-3 space-y-2 border border-slate-100">
             <div className="flex justify-between text-xs">
               <span className="text-slate-600">Planned Effort:</span>
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-slate-800 ">
                 {(metrics.bauInitiativeEstimated || 0).toFixed(1)}w
                 {metrics.bauPlannedEffortPercentOfBuffer !== undefined && metrics.bauBufferTotal > 0 && (
-                  <span className={`ml-2 ${
+                  <span className={`ml-2 font-sans ${
                     metrics.bauPlannedEffortPercentOfBuffer > 100 ? 'text-red-600' :
-                    metrics.bauPlannedEffortPercentOfBuffer > 80 ? 'text-amber-600' :
+                    metrics.bauPlannedEffortPercentOfBuffer > 80 ? 'text-blue-600' :
                     'text-slate-500'
                   }`}>
                     ({Math.round(metrics.bauPlannedEffortPercentOfBuffer)}%)
@@ -209,12 +215,12 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-slate-600">Actual Effort:</span>
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-slate-800 ">
                 {(metrics.bauInitiativeActuals || 0).toFixed(1)}w
                 {metrics.bauActualEffortPercentOfBuffer !== undefined && metrics.bauBufferTotal > 0 && (
-                  <span className={`ml-2 ${
+                  <span className={`ml-2 font-sans ${
                     metrics.bauActualEffortPercentOfBuffer > 100 ? 'text-red-600' :
-                    metrics.bauActualEffortPercentOfBuffer > 80 ? 'text-amber-600' :
+                    metrics.bauActualEffortPercentOfBuffer > 80 ? 'text-blue-600' :
                     'text-slate-500'
                   }`}>
                     ({Math.round(metrics.bauActualEffortPercentOfBuffer)}%)
@@ -228,36 +234,36 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
       </div>
 
       {/* 3. Capacity Load */}
-      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
         <HelpButton metricKey="capacityLoad" position="left" />
         <div className="flex justify-between items-start mb-4 pr-6">
           <div>
-            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Capacity Load / Actual Rate</p>
-            <h3 className="text-3xl font-black text-slate-800">
-              {Math.round(metrics.capacityLoad)}%
+            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1 uppercase">Capacity Load / Actual Rate</p>
+            <h3 className="text-3xl font-black text-slate-800  tracking-tight">
+              <span className="">{Math.round(metrics.capacityLoad)}%</span>
               <span className="text-sm font-normal text-slate-400 mx-1">/</span>
-              <span className="text-emerald-600">{Math.round(metrics.actualRate)}%</span>
+              <span className="text-blue-600 ">{Math.round(metrics.actualRate)}%</span>
             </h3>
           </div>
-          <div className="p-2.5 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl text-purple-600 shadow-sm">
+          <div className="p-2.5 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl text-blue-600 shadow-sm border border-blue-200/50">
             <Battery size={22} />
           </div>
         </div>
         <div className="space-y-3 flex-1 flex flex-col justify-end">
           <div className="flex justify-between text-xs text-slate-500 font-medium">
-            <span>Assigned: <strong className="text-slate-700">{metrics.totalEst}w</strong></span>
-            <span>Actual: <strong className="text-emerald-700">{metrics.totalAct}w</strong></span>
-            <span>Total Cap: <strong className="text-slate-700">{metrics.totalCapacity}w</strong></span>
+            <span>Assigned: <strong className="text-slate-700 ">{metrics.totalEst}w</strong></span>
+            <span>Actual: <strong className="text-blue-700 ">{metrics.totalAct}w</strong></span>
+            <span>Total Cap: <strong className="text-slate-700 ">{metrics.totalCapacity}w</strong></span>
           </div>
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
              <div 
-               className={`h-full transition-all duration-1000 ${metrics.capacityLoad > 100 ? 'bg-red-500' : 'bg-purple-500'}`} 
+               className={`h-full transition-all duration-1000 rounded-full ${metrics.capacityLoad > 100 ? 'bg-gradient-to-r from-red-500 to-red-400' : 'bg-gradient-to-r from-blue-500 to-blue-400'}`} 
                style={{ width: `${Math.min(metrics.capacityLoad, 100)}%` }}
              />
           </div>
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
              <div 
-               className="h-full bg-emerald-500 transition-all duration-1000" 
+               className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000 rounded-full" 
                style={{ width: `${Math.min(metrics.actualRate, 100)}%` }}
              />
           </div>
@@ -265,23 +271,23 @@ export const MetricsDashboard: React.FC<MetricsProps> = ({ metrics }) => {
       </div>
 
       {/* 4. Work Type Mix */}
-      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+      <div className="relative bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
         <HelpButton metricKey="workMix" position="left" />
         <div className="flex items-start gap-3 mb-3 pr-6">
-          <div className="p-2.5 bg-gradient-to-br from-orange-100 to-orange-200 rounded-xl text-orange-600 shadow-sm shrink-0">
+          <div className="p-2.5 bg-gradient-to-br from-amber-50 to-orange-100 rounded-xl text-orange-600 shadow-sm shrink-0 border border-orange-200/50">
             <AlertTriangle size={20} />
           </div>
           <div>
-            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1">Work mix</p>
-            <h3 className="text-3xl font-black text-slate-800 whitespace-nowrap">
-              <span className="text-blue-600">{metrics.wpPercentage ?? 0}%</span>
+            <p className="text-[10px] text-slate-500 font-bold tracking-wider mb-1 uppercase">Work mix</p>
+            <h3 className="text-3xl font-black text-slate-800 whitespace-nowrap  tracking-tight">
+              <span className="text-blue-600 ">{metrics.wpPercentage ?? 0}%</span>
               <span className="text-slate-400 mx-0.5">/</span>
-              <span className="text-orange-700 font-black">{metrics.bauPercentage ?? 0}%</span>
+              <span className="text-blue-600  font-black">{metrics.bauPercentage ?? 0}%</span>
             </h3>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              <span className="text-blue-600 font-medium">WP</span>
-              <span className="mx-1">•</span>
-              <span className="text-orange-700 font-bold">BAU</span>
+              <span className="text-blue-600 font-semibold">WP</span>
+              <span className="mx-1 text-slate-300">•</span>
+              <span className="text-blue-600 font-bold">BAU</span>
             </p>
           </div>
         </div>

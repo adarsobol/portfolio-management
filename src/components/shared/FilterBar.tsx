@@ -287,11 +287,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   }, [availablePriorities, prioritySearchQuery]);
 
   return (
-    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm card-glow">
       {/* Filter Row */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex items-center text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg">
-          <Filter size={14} className="mr-1.5 text-blue-500" />
+        <div className="flex items-center text-slate-700 bg-gradient-to-r from-amber-50 to-amber-100/50 px-3 py-1.5 rounded-lg border border-amber-200/50">
+          <Filter size={14} className="mr-1.5 text-amber-600" />
           <span className="text-xs font-bold tracking-wide">Filters</span>
         </div>
         
@@ -299,7 +299,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <select 
           value={filterAssetClass}
           onChange={(e) => setFilterAssetClass(e.target.value)}
-          className="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors min-w-[120px]"
+          className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none shadow-sm hover:border-amber-300 hover:bg-amber-50/30 transition-all duration-200 min-w-[120px] cursor-pointer"
         >
           <option value="">All Asset Classes</option>
           {getAssetClasses(config).map(ac => <option key={ac} value={ac}>{ac}</option>)}
@@ -309,28 +309,28 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={ownerDropdownRef}>
           <button
             onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
-            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className={`flex items-center gap-1.5 text-xs bg-slate-50 border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none shadow-sm transition-all duration-200 ${filterOwners.length > 0 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'}`}
           >
-            <Filter size={14} className="text-blue-500" />
+            <Filter size={14} className={filterOwners.length > 0 ? 'text-amber-600' : 'text-amber-500'} />
             <span className="text-slate-700">Owners</span>
             {filterOwners.length > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm animate-badge-pop">
                 {filterOwners.length}
               </span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isOwnerDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[220px] max-h-[280px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[220px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
-              <div className="p-1.5 border-b border-slate-200">
+              <div className="p-2 border-b border-slate-100">
                 <input
                   type="text"
                   placeholder="Search owners..."
                   value={ownerSearchQuery}
                   onChange={(e) => setOwnerSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
@@ -338,7 +338,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {/* Owner list */}
               <div className="overflow-y-auto max-h-[220px]">
                 {filteredOwners.length === 0 ? (
-                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
                     No owners found
                   </div>
                 ) : (
@@ -348,17 +348,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={owner.id}
                         onClick={() => toggleOwner(owner.id)}
-                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
-                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                          isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 accent-amber-500"
                         />
-                        <span className="flex-1">{owner.name}</span>
+                        <span className="flex-1 font-medium">{owner.name}</span>
                       </button>
                     );
                   })
@@ -367,13 +367,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterOwners.length > 0 && (
-                <div className="p-1.5 border-t border-slate-200">
+                <div className="p-2 border-t border-slate-100">
                   <button
                     onClick={() => {
                       setFilterOwners([]);
                       setOwnerSearchQuery('');
                     }}
-                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium"
                   >
                     <X size={12} />
                     Clear selection
@@ -388,28 +388,28 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={workTypeDropdownRef}>
           <button
             onClick={() => setIsWorkTypeDropdownOpen(!isWorkTypeDropdownOpen)}
-            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className={`flex items-center gap-1.5 text-xs bg-slate-50 border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none shadow-sm transition-all duration-200 ${filterWorkType.length > 0 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'}`}
           >
-            <Filter size={14} className="text-blue-500" />
+            <Filter size={14} className={filterWorkType.length > 0 ? 'text-amber-600' : 'text-amber-500'} />
             <span className="text-slate-700">Work Type</span>
             {filterWorkType.length > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm animate-badge-pop">
                 {filterWorkType.length}
               </span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isWorkTypeDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isWorkTypeDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isWorkTypeDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[180px] max-h-[280px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
-              <div className="p-1.5 border-b border-slate-200">
+              <div className="p-2 border-b border-slate-100">
                 <input
                   type="text"
                   placeholder="Search work types..."
                   value={workTypeSearchQuery}
                   onChange={(e) => setWorkTypeSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
@@ -417,7 +417,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {/* Work Type list */}
               <div className="overflow-y-auto max-h-[220px]">
                 {filteredWorkTypes.length === 0 ? (
-                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
                     No work types found
                   </div>
                 ) : (
@@ -429,17 +429,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={opt.label}
                         onClick={() => toggleWorkType(opt.value, opt.singleSelect)}
-                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
-                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                          isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 accent-amber-500"
                         />
-                        <span className="flex-1">{opt.label}</span>
+                        <span className="flex-1 font-medium">{opt.label}</span>
                       </button>
                     );
                   })
@@ -448,13 +448,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterWorkType.length > 0 && (
-                <div className="p-1.5 border-t border-slate-200">
+                <div className="p-2 border-t border-slate-100">
                   <button
                     onClick={() => {
                       setFilterWorkType([]);
                       setWorkTypeSearchQuery('');
                     }}
-                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium"
                   >
                     <X size={12} />
                     Clear selection
@@ -469,28 +469,28 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={quarterDropdownRef}>
           <button
             onClick={() => setIsQuarterDropdownOpen(!isQuarterDropdownOpen)}
-            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className={`flex items-center gap-1.5 text-xs bg-slate-50 border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none shadow-sm transition-all duration-200 ${filterQuarter.length > 0 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'}`}
           >
-            <Filter size={14} className="text-blue-500" />
+            <Filter size={14} className={filterQuarter.length > 0 ? 'text-amber-600' : 'text-amber-500'} />
             <span className="text-slate-700">Quarter</span>
             {filterQuarter.length > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm animate-badge-pop">
                 {filterQuarter.length}
               </span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isQuarterDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isQuarterDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isQuarterDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[180px] max-h-[280px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
-              <div className="p-1.5 border-b border-slate-200">
+              <div className="p-2 border-b border-slate-100">
                 <input
                   type="text"
                   placeholder="Search quarters..."
                   value={quarterSearchQuery}
                   onChange={(e) => setQuarterSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
@@ -498,7 +498,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {/* Quarter list */}
               <div className="overflow-y-auto max-h-[220px]">
                 {filteredQuarters.length === 0 ? (
-                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
                     No quarters found
                   </div>
                 ) : (
@@ -508,17 +508,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={quarter}
                         onClick={() => toggleQuarter(quarter)}
-                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
-                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                          isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 accent-amber-500"
                         />
-                        <span className="flex-1">{quarter}</span>
+                        <span className="flex-1 font-medium">{quarter}</span>
                       </button>
                     );
                   })
@@ -527,13 +527,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterQuarter.length > 0 && (
-                <div className="p-1.5 border-t border-slate-200">
+                <div className="p-2 border-t border-slate-100">
                   <button
                     onClick={() => {
                       setFilterQuarter([]);
                       setQuarterSearchQuery('');
                     }}
-                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium"
                   >
                     <X size={12} />
                     Clear selection
@@ -548,28 +548,28 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={priorityDropdownRef}>
           <button
             onClick={() => setIsPriorityDropdownOpen(!isPriorityDropdownOpen)}
-            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className={`flex items-center gap-1.5 text-xs bg-slate-50 border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none shadow-sm transition-all duration-200 ${filterPriority.length > 0 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'}`}
           >
-            <Filter size={14} className="text-blue-500" />
+            <Filter size={14} className={filterPriority.length > 0 ? 'text-amber-600' : 'text-amber-500'} />
             <span className="text-slate-700">Priority</span>
             {filterPriority.length > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm animate-badge-pop">
                 {filterPriority.length}
               </span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isPriorityDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isPriorityDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isPriorityDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[150px] max-h-[280px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[150px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
-              <div className="p-1.5 border-b border-slate-200">
+              <div className="p-2 border-b border-slate-100">
                 <input
                   type="text"
                   placeholder="Search priorities..."
                   value={prioritySearchQuery}
                   onChange={(e) => setPrioritySearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
@@ -577,7 +577,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {/* Priority list */}
               <div className="overflow-y-auto max-h-[220px]">
                 {filteredPriorities.length === 0 ? (
-                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
                     No priorities found
                   </div>
                 ) : (
@@ -587,17 +587,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={priority}
                         onClick={() => togglePriority(priority)}
-                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
-                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                          isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 accent-amber-500"
                         />
-                        <span className="flex-1">{priority}</span>
+                        <span className="flex-1 font-medium">{priority}</span>
                       </button>
                     );
                   })
@@ -606,13 +606,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterPriority.length > 0 && (
-                <div className="p-1.5 border-t border-slate-200">
+                <div className="p-2 border-t border-slate-100">
                   <button
                     onClick={() => {
                       setFilterPriority([]);
                       setPrioritySearchQuery('');
                     }}
-                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium"
                   >
                     <X size={12} />
                     Clear selection
@@ -627,28 +627,28 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={statusDropdownRef}>
           <button
             onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className={`flex items-center gap-1.5 text-xs bg-slate-50 border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none shadow-sm transition-all duration-200 ${filterStatus.length > 0 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'}`}
           >
-            <Filter size={14} className="text-blue-500" />
+            <Filter size={14} className={filterStatus.length > 0 ? 'text-amber-600' : 'text-amber-500'} />
             <span className="text-slate-700">Status</span>
             {filterStatus.length > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm animate-badge-pop">
                 {filterStatus.length}
               </span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isStatusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[180px] max-h-[280px] flex flex-col">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
-              <div className="p-1.5 border-b border-slate-200">
+              <div className="p-2 border-b border-slate-100">
                 <input
                   type="text"
                   placeholder="Search statuses..."
                   value={statusSearchQuery}
                   onChange={(e) => setStatusSearchQuery(e.target.value)}
-                  className="w-full px-2.5 py-1 text-xs border border-slate-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none"
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 focus:outline-none transition-all"
                   autoFocus
                 />
               </div>
@@ -656,7 +656,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {/* Status list */}
               <div className="overflow-y-auto max-h-[220px]">
                 {filteredStatuses.length === 0 ? (
-                  <div className="px-2.5 py-1.5 text-xs text-slate-500 text-center">
+                  <div className="px-2.5 py-3 text-xs text-slate-500 text-center">
                     No statuses found
                   </div>
                 ) : (
@@ -666,17 +666,17 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <button
                         key={status}
                         onClick={() => toggleStatus(status)}
-                        className={`w-full px-2.5 py-1.5 text-left text-xs hover:bg-slate-50 transition-colors flex items-center gap-2 ${
-                          isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        className={`w-full px-2.5 py-2 text-left text-xs transition-all duration-150 flex items-center gap-2 ${
+                          isSelected ? 'bg-amber-50 text-amber-700 border-l-2 border-amber-500' : 'text-slate-700 hover:bg-slate-50 border-l-2 border-transparent'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => {}}
-                          className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          className="w-3.5 h-3.5 text-amber-600 border-slate-300 rounded focus:ring-amber-500 accent-amber-500"
                         />
-                        <span className="flex-1">{status}</span>
+                        <span className="flex-1 font-medium">{status}</span>
                       </button>
                     );
                   })
@@ -685,13 +685,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               
               {/* Clear selection */}
               {filterStatus.length > 0 && (
-                <div className="p-1.5 border-t border-slate-200">
+                <div className="p-2 border-t border-slate-100">
                   <button
                     onClick={() => {
                       setFilterStatus([]);
                       setStatusSearchQuery('');
                     }}
-                    className="w-full px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors flex items-center justify-center gap-1"
+                    className="w-full px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-1 font-medium"
                   >
                     <X size={12} />
                     Clear selection
@@ -706,31 +706,31 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         <div className="relative" ref={savedViewsDropdownRef}>
           <button
             onClick={() => setIsSavedViewsDropdownOpen(!isSavedViewsDropdownOpen)}
-            className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-400 focus:outline-none shadow-sm hover:border-slate-300 transition-colors"
+            className={`flex items-center gap-1.5 text-xs bg-slate-50 border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-400 focus:outline-none shadow-sm transition-all duration-200 ${savedViews.length > 0 ? 'border-cyan-300 bg-cyan-50/50' : 'border-slate-200 hover:border-cyan-300 hover:bg-cyan-50/30'}`}
           >
-            <Bookmark size={14} className="text-blue-500" />
+            <Bookmark size={14} className={savedViews.length > 0 ? 'text-cyan-600' : 'text-cyan-500'} />
             <span className="text-slate-700">Saved Views</span>
             {savedViews.length > 0 && (
-              <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full font-semibold">
+              <span className="bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                 {savedViews.length}
               </span>
             )}
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isSavedViewsDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isSavedViewsDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {isSavedViewsDropdownOpen && (
-            <div className="absolute top-full right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[260px] max-h-[360px] flex flex-col">
+            <div className="absolute top-full right-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[260px] max-h-[360px] flex flex-col animate-scale-in">
               {/* Header */}
-              <div className="p-2.5 border-b border-slate-200">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-slate-700">Saved Filter Views</span>
+              <div className="p-3 border-b border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-700 tracking-tight">Saved Filter Views</span>
                 </div>
                 <button
                   onClick={() => {
                     setIsSaveViewModalOpen(true);
                     setIsSavedViewsDropdownOpen(false);
                   }}
-                  className="w-full px-2.5 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
+                  className="w-full px-2.5 py-1.5 text-xs bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-sm flex items-center justify-center gap-1.5 font-medium"
                 >
                   <Save size={12} />
                   Save Current View
@@ -781,7 +781,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         {hasActiveFilters && (
           <button 
             onClick={resetFilters}
-            className="text-xs text-red-600 hover:text-red-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+            className="text-xs text-red-600 hover:text-white font-semibold px-3 py-1.5 rounded-lg hover:bg-red-500 transition-all duration-200 border border-red-200 hover:border-red-500"
           >
             Clear All
           </button>

@@ -72,7 +72,7 @@ const BadgePermission: React.FC<BadgePermissionProps> = ({ value, onChange, type
     const configs = {
       no: { label: 'No', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', icon: XCircle },
       yes: { label: 'Yes', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Check },
-      own: { label: 'Only own', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Edit },
+      own: { label: 'Only own', bg: 'bg-amber-50', text: 'text-blue-700', border: 'border-amber-200', icon: Edit },
     };
     const config = configs[scope];
     if (!config) {
@@ -1195,7 +1195,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-3">
           <div className="mb-3">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-1.5">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-1.5  tracking-tight">
               <div className="p-1.5 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl shadow-md">
                 <Settings className="text-white" size={18} />
               </div>
@@ -1204,16 +1204,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* Content Area - Show only active section */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden ">
             {activeSection === 'slack' && (
               <div className="animate-fadeIn">
-                <div className="px-3 py-1.5 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+                <div className="px-3 py-2 border-b border-slate-200 bg-gradient-to-r from-purple-50 to-indigo-50 backdrop-blur-sm">
                   <div className="flex items-center gap-1.5">
-                    <div className="p-0.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg">
+                    <div className="p-0.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg shadow-sm">
                       <MessageSquare size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-slate-800">Slack Integration</h3>
+                      <h3 className="text-sm font-semibold text-slate-800 ">Slack Integration</h3>
                     </div>
                   </div>
                 </div>
@@ -1285,7 +1285,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Clock size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Login History</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Login History</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Track when users last logged in</p>
                     </div>
                   </div>
@@ -1394,7 +1394,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <AlertTriangle size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Error Logs</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Error Logs</h3>
                       <p className="text-xs text-slate-500 mt-0.5">View and search application error logs for debugging</p>
                     </div>
                   </div>
@@ -1413,7 +1413,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Activity size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Activity Logs</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Activity Logs</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Track user actions and system activities</p>
                     </div>
                   </div>
@@ -1432,7 +1432,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <MessageSquare size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Support Center</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Support Center</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Manage support tickets and user feedback</p>
                     </div>
                   </div>
@@ -1451,7 +1451,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Database size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Backup Management</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Backup Management</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Create backups, restore data, and manage backup history</p>
                     </div>
                   </div>
@@ -1538,7 +1538,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                     <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                       backup.status === 'success' ? 'bg-emerald-100 text-emerald-700' :
-                      backup.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                      backup.status === 'partial' ? 'bg-amber-100 text-blue-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {backup.status}
                     </span>
@@ -1594,7 +1594,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Clock size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Data Versions</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Data Versions</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Automatic local versioning of initiatives and tasks data</p>
                     </div>
                   </div>
@@ -1674,7 +1674,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               {versions.map((version) => (
                 <div
                   key={version.id}
-                  className="border border-slate-200 rounded-lg p-3 hover:border-blue-300 hover:shadow-sm transition-all"
+                  className="border border-slate-200 rounded-lg p-3 hover:border-amber-300 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -1684,7 +1684,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {version.syncedToSheets ? (
                           <CheckCircle2 size={16} className="text-emerald-600" />
                         ) : (
-                          <Clock size={16} className="text-blue-600" />
+                          <Clock size={16} className="text-amber-600" />
                         )}
                       </div>
                       <div>
@@ -1712,7 +1712,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <button
                       onClick={() => restoreVersion(version.id)}
                       disabled={isRestoringVersion}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-50"
                     >
                       {isRestoringVersion ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
                       Restore
@@ -1764,7 +1764,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Trash2 size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Trash</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Trash</h3>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {deletedInitiatives.length} deleted initiative{deletedInitiatives.length !== 1 ? 's' : ''} - restore or permanently remove items
                       </p>
@@ -1830,7 +1830,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                       </div>
                       <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-xs text-amber-800">
+                        <p className="text-xs text-blue-800">
                           <strong>Note:</strong> Items in trash are kept in the database with a "Deleted" status. 
                           You can restore them at any time. To permanently delete items, remove them directly from the Google Sheet.
                         </p>
@@ -1849,7 +1849,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Upload size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Bulk Import</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Bulk Import</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Import users and tasks from Excel/CSV files</p>
                     </div>
                   </div>
@@ -1860,7 +1860,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-2.5 py-1.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                 <h4 className="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
-                  <Users size={16} className="text-blue-600" /> Bulk Import Users
+                  <Users size={16} className="text-amber-600" /> Bulk Import Users
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">Upload Excel/CSV with columns: Email, Name, Role</p>
               </div>
@@ -1877,7 +1877,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
               <label
                 htmlFor="user-file-upload"
-                className="flex items-center gap-2 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer text-sm font-medium"
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 cursor-pointer text-sm font-medium"
               >
                 <Upload size={16} /> Select File
               </label>
@@ -2093,7 +2093,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <List size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Value Lists Management</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Value Lists Management</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Manage editable value lists for asset classes, statuses, and dependency teams</p>
                     </div>
                   </div>
@@ -2125,7 +2125,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Users size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">User Management</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">User Management</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Add, edit, or remove users and assign roles</p>
                     </div>
                   </div>
@@ -2192,7 +2192,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
            <button 
              onClick={handleAddUser}
              disabled={!newUser.name || !newUser.email || isAddingUser}
-             className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+             className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm px-3 py-1.5 rounded hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
            >
              {isAddingUser ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} 
              {isAddingUser ? 'Adding...' : 'Add User'}
@@ -2261,7 +2261,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                            value={u.role}
                            onChange={(e) => handleUpdateUser(u.id, 'role', e.target.value as Role)}
                            disabled={isUpdatingUser === u.id}
-                           className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                           className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                          >
                            {Object.values(Role).map(r => (
                              <option key={r} value={r}>{r}</option>
@@ -2273,7 +2273,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                            value={u.team || ''}
                            onChange={(e) => handleUpdateUser(u.id, 'team', e.target.value || undefined)}
                            disabled={isUpdatingUser === u.id}
-                           className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                           className="text-xs px-2 py-1 rounded border border-slate-200 bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                          >
                            <option value="">Unassigned</option>
                            {teamOptions.map(team => (
@@ -2321,7 +2321,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Shield size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Authorization Levels Management Center</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Authorization Levels Management Center</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Click badges to cycle through permission levels. Organized by category for easier management.</p>
                     </div>
                   </div>
@@ -2347,7 +2347,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                onClick={() => setActivePermissionTab('tasks')}
                className={`px-3 py-1.5 text-sm font-medium transition-colors border-b-2 ${
                  activePermissionTab === 'tasks'
-                   ? 'border-blue-500 text-blue-600 bg-white'
+                   ? 'border-blue-500 text-amber-600 bg-white'
                    : 'border-transparent text-slate-600 hover:text-slate-800'
                }`}
              >
@@ -2471,7 +2471,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Gauge size={16} className="text-white" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">Team Capacity Planning (Per Quarter)</h3>
+                      <h3 className="font-bold text-slate-800  tracking-tight">Team Capacity Planning (Per Quarter)</h3>
                       <p className="text-xs text-slate-500 mt-0.5">Set the weekly capacity and buffer (reserved for BAU/unplanned) for each Team Lead **per quarter**</p>
                     </div>
                   </div>

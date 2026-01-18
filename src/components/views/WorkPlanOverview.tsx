@@ -388,7 +388,7 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
 
 
 
-  // Render Status Mix bar (all statuses)
+  // Render Status Mix bar (all statuses) - pill style with gaps
   const renderStatusMix = (breakdown: StatusBreakdown) => {
     const total = breakdown.notStarted + breakdown.inProgress + breakdown.atRisk + breakdown.done + breakdown.obsolete + breakdown.deleted;
     if (total === 0) {
@@ -403,46 +403,46 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
     const deletedPct = (breakdown.deleted / total) * 100;
 
     return (
-      <div className="flex items-center gap-0.5 h-3 w-full">
+      <div className="flex items-center gap-0.5 h-3.5 w-full status-pill">
         {notStartedPct > 0 && (
           <div
-            className="h-full bg-slate-400/70 rounded"
-            style={{ width: `${notStartedPct}%`, minWidth: notStartedPct > 2 ? '2px' : '0px' }}
+            className="h-full bg-gradient-to-b from-slate-400 to-slate-500 rounded-full shadow-sm"
+            style={{ width: `${notStartedPct}%`, minWidth: notStartedPct > 2 ? '4px' : '0px' }}
             title={`Not Started: ${breakdown.notStarted}`}
           />
         )}
         {inProgressPct > 0 && (
           <div
-            className="h-full bg-blue-500/80 rounded"
-            style={{ width: `${inProgressPct}%`, minWidth: inProgressPct > 2 ? '2px' : '0px' }}
+            className="h-full bg-gradient-to-b from-cyan-400 to-cyan-500 rounded-full shadow-sm"
+            style={{ width: `${inProgressPct}%`, minWidth: inProgressPct > 2 ? '4px' : '0px' }}
             title={`In Progress: ${breakdown.inProgress}`}
           />
         )}
         {atRiskPct > 0 && (
           <div
-            className="h-full bg-orange-500/80 rounded"
-            style={{ width: `${atRiskPct}%`, minWidth: atRiskPct > 2 ? '2px' : '0px' }}
+            className="h-full bg-gradient-to-b from-amber-400 to-amber-500 rounded-full shadow-sm"
+            style={{ width: `${atRiskPct}%`, minWidth: atRiskPct > 2 ? '4px' : '0px' }}
             title={`At Risk: ${breakdown.atRisk}`}
           />
         )}
         {donePct > 0 && (
           <div
-            className="h-full bg-teal-500/80 rounded"
-            style={{ width: `${donePct}%`, minWidth: donePct > 2 ? '2px' : '0px' }}
+            className="h-full bg-gradient-to-b from-emerald-400 to-emerald-500 rounded-full shadow-sm"
+            style={{ width: `${donePct}%`, minWidth: donePct > 2 ? '4px' : '0px' }}
             title={`Done: ${breakdown.done}`}
           />
         )}
         {obsoletePct > 0 && (
           <div
-            className="h-full bg-slate-300/60 rounded"
-            style={{ width: `${obsoletePct}%`, minWidth: obsoletePct > 2 ? '2px' : '0px' }}
+            className="h-full bg-gradient-to-b from-slate-300 to-slate-400 rounded-full shadow-sm"
+            style={{ width: `${obsoletePct}%`, minWidth: obsoletePct > 2 ? '4px' : '0px' }}
             title={`Obsolete: ${breakdown.obsolete}`}
           />
         )}
         {deletedPct > 0 && (
           <div
-            className="h-full bg-rose-400/70 rounded"
-            style={{ width: `${deletedPct}%`, minWidth: deletedPct > 2 ? '2px' : '0px' }}
+            className="h-full bg-gradient-to-b from-rose-400 to-rose-500 rounded-full shadow-sm"
+            style={{ width: `${deletedPct}%`, minWidth: deletedPct > 2 ? '4px' : '0px' }}
             title={`Deleted: ${breakdown.deleted}`}
           />
         )}
@@ -455,17 +455,17 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
     return (
       <div className="flex items-center gap-2">
         <div>
-          <div className="text-xs font-medium text-slate-700">
+          <div className="text-xs font-semibold text-slate-700 font-mono">
             {allocated.toFixed(1)}w
           </div>
-          <div className="text-[10px] text-slate-500">allocated</div>
+          <div className="text-[9px] text-slate-500 font-medium">allocated</div>
         </div>
-        <div className="text-slate-300">|</div>
+        <div className="text-slate-300 font-light">|</div>
         <div>
-          <div className="text-xs font-medium text-slate-700">
+          <div className="text-xs font-semibold text-cyan-700 font-mono">
             {actual.toFixed(1)}w
           </div>
-          <div className="text-[10px] text-slate-500">actual</div>
+          <div className="text-[9px] text-slate-500 font-medium">actual</div>
         </div>
       </div>
     );
@@ -475,25 +475,25 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
   const renderInvestedVsProgress = (burnRate: number, weightedProgress: number) => {
     return (
       <div>
-        <div className="relative w-full h-6 bg-slate-100/50 rounded overflow-hidden">
+        <div className="relative w-full h-6 bg-slate-100 rounded-lg overflow-hidden">
           {/* Ghost bar for total allocated (100%) */}
-          <div className="absolute inset-0 bg-slate-200/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-100 to-slate-200/50" />
           {/* Invested Effort bar */}
           <div
-            className="absolute bottom-0 left-0 bg-indigo-400/70 h-full transition-all rounded"
+            className="absolute bottom-0 left-0 bg-gradient-to-r from-amber-400/70 to-amber-500/70 h-full transition-all duration-500 rounded-lg"
             style={{ width: `${Math.min(burnRate, 100)}%` }}
             title={`Invested Effort: ${burnRate.toFixed(0)}%`}
           />
           {/* Progress bar (foreground) */}
           <div
-            className="absolute bottom-0 left-0 bg-teal-500/85 h-3/4 transition-all rounded"
+            className="absolute bottom-0 left-0 bg-gradient-to-r from-cyan-500 to-cyan-400 h-3/4 transition-all duration-500 rounded-lg shadow-sm"
             style={{ width: `${Math.min(weightedProgress, 100)}%` }}
             title={`Progress: ${weightedProgress.toFixed(0)}% weighted progress`}
           />
           {/* Gap indicator if progress < invested */}
           {weightedProgress < burnRate && (
             <div
-              className="absolute bottom-0 bg-amber-400/60 h-1/4 transition-all rounded"
+              className="absolute bottom-0 bg-gradient-to-r from-rose-400/60 to-rose-500/60 h-1/4 transition-all duration-500 rounded"
               style={{
                 left: `${weightedProgress}%`,
                 width: `${Math.min(burnRate - weightedProgress, 100 - weightedProgress)}%`,
@@ -502,32 +502,32 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
             />
           )}
         </div>
-        <div className="flex items-center gap-2 mt-1 text-[10px]">
-          <span className="text-slate-600">
-            Invested: <span className="font-medium text-indigo-700">{burnRate.toFixed(0)}%</span>
+        <div className="flex items-center gap-3 mt-1 text-[9px]">
+          <span className="text-slate-600 font-medium">
+            Invested: <span className="font-bold text-amber-700 font-mono">{burnRate.toFixed(0)}%</span>
           </span>
-          <span className="text-teal-700">
-            Progress: <span className="font-medium">{weightedProgress.toFixed(0)}%</span>
+          <span className="text-cyan-700 font-medium">
+            Progress: <span className="font-bold font-mono">{weightedProgress.toFixed(0)}%</span>
           </span>
         </div>
       </div>
     );
   };
 
-  // Render Efficiency badge
+  // Render Efficiency badge with gradient styling
   const renderEfficiency = (efficiencyIndex: number) => {
+    const getEfficiencyClass = () => {
+      if (efficiencyIndex >= 1.0) return 'efficiency-excellent text-white shadow-emerald-500/30';
+      if (efficiencyIndex >= 0.8) return 'efficiency-good text-white shadow-amber-500/30';
+      return 'efficiency-poor text-white shadow-rose-500/30';
+    };
+    
     return (
       <div className="flex flex-col items-end">
-        <div className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
-          efficiencyIndex >= 1.0
-            ? 'bg-teal-50 text-teal-700 border border-teal-200'
-            : efficiencyIndex >= 0.8
-            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-            : 'bg-rose-50 text-rose-700 border border-rose-200'
-        }`}>
+        <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono shadow-md ${getEfficiencyClass()}`}>
           {(efficiencyIndex * 100).toFixed(0)}%
         </div>
-        <div className="text-[10px] text-slate-500 mt-0.5">progress/invested</div>
+        <div className="text-[9px] text-slate-500 mt-0.5 font-medium">progress/invested</div>
       </div>
     );
   };
@@ -651,12 +651,12 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden card-glow">
       {/* Header with expand/collapse controls */}
-      <div className="px-4 py-2.5 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold text-slate-700">Work Plan Overview</h2>
-          <span className="text-[10px] text-slate-500">
+      <div className="px-4 py-3 bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-bold text-slate-800 tracking-tight">Work Plan Overview</h2>
+          <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
             {totalItems} initiative{totalItems !== 1 ? 's' : ''}
           </span>
         </div>
@@ -1046,7 +1046,7 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
                                                           return (
                                                             <div
                                                               key={initiative.id}
-                                                              className={`grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto_auto_auto] gap-2 px-3 py-1 items-center hover:bg-blue-50/50 transition-colors ${initiativeIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
+                                                              className={`grid grid-cols-[auto_auto_auto_auto_1fr_auto_auto_auto_auto] gap-2 px-3 py-1.5 items-center row-hover-accent cursor-pointer ${initiativeIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
                                                               onClick={() => onInitiativeClick?.(initiative)}
                                                             >
                                                               <div className="w-6"></div>
@@ -1056,17 +1056,17 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
                                                               <div className="flex items-center gap-1.5 min-w-0">
                                                                 <FileText size={10} className="text-slate-400 flex-shrink-0" />
                                                                 <span
-                                                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0 ${
+                                                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold flex-shrink-0 shadow-sm ${
                                                                     initiative.initiativeType === InitiativeType.WP
-                                                                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                                                                      : 'bg-purple-100 text-purple-700 border border-purple-300'
+                                                                      ? 'bg-gradient-to-r from-cyan-500 to-cyan-600 text-white'
+                                                                      : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white'
                                                                   }`}
                                                                   title={initiative.initiativeType === InitiativeType.WP ? 'Work Plan' : 'Business As Usual'}
                                                                 >
                                                                   {initiative.initiativeType === InitiativeType.WP ? 'WP' : 'BAU'}
                                                                 </span>
                                                                 <span
-                                                                  className="text-[11px] text-slate-800 truncate cursor-pointer hover:text-blue-600 flex-1 min-w-0"
+                                                                  className="text-[11px] text-slate-800 truncate hover:text-amber-600 flex-1 min-w-0 transition-colors font-medium"
                                                                   title={initiative.title}
                                                                 >
                                                                   {initiative.title}

@@ -321,6 +321,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       return;
     }
     
+    // Block status change to In Progress if ETA is empty
+    if (field === 'status' && value === Status.InProgress) {
+      if (!taskToUpdate.eta || !taskToUpdate.eta.trim()) {
+        alert('Cannot move to In Progress without ETA. Please set an ETA first.');
+        return; // Prevent status change
+      }
+    }
+    
     logger.debug('Task to update', { context: 'TaskTable.handleUpdateTask', metadata: { taskId, field, value } });
     
     // Create a new array with updated task - ensure we create a completely new object
@@ -475,12 +483,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
 
     return (
       <th 
-        className={`px-3 py-2.5 text-center font-bold text-slate-700 cursor-pointer bg-gradient-to-b from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 transition-all border-r border-slate-200 select-none whitespace-nowrap text-xs tracking-wider ${alignRight ? 'text-right' : ''}`}
+        className={`px-3 py-2.5 text-center font-bold text-slate-700 cursor-pointer bg-gradient-to-b from-slate-100 to-slate-50 hover:from-slate-150 hover:to-slate-100 transition-all duration-200 border-r border-slate-200 select-none whitespace-nowrap text-xs tracking-wider ${alignRight ? 'text-right' : ''}`}
         onClick={() => handleSort(sortKey)}
       >
         <div className={`flex items-center gap-1.5 ${alignRight ? 'justify-end' : 'justify-center'}`}>
           {label}
-          <div className={`${isActive ? 'text-blue-500' : 'text-slate-400'}`}>
+          <div className={`transition-colors duration-200 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
             {isActive ? (
                isAsc ? <ArrowUp size={13} /> : <ArrowDown size={13} />
             ) : (
@@ -511,7 +519,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       // P0: Bright red with strong presence
       case Priority.P0: return 'bg-gradient-to-r from-red-500 to-red-600 text-white border-red-700 shadow-md ring-1 ring-red-200';
       // P1: Clear amber for important items
-      case Priority.P1: return 'bg-amber-500 text-white border-amber-600 shadow-sm';
+      case Priority.P1: return 'bg-blue-500 text-white border-blue-600 shadow-sm';
       // P2: Neutral slate for lower priority
       case Priority.P2: return 'bg-slate-200 text-slate-600 border-slate-300';
       default: return 'bg-white text-slate-700 border-slate-200';
@@ -521,13 +529,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   // Icon utilities for visual hierarchy
   const getInitiativeIcon = (initiative: Initiative): React.ReactNode => {
     if (initiative.initiativeType === InitiativeType.BAU) {
-      return <Layers size={14} className="text-purple-600" />;
+      return <Layers size={14} className="text-blue-600" />;
     }
-    return <FileText size={14} className="text-blue-600" />;
+    return <FileText size={14} className="text-cyan-600" />;
   };
 
   const getTaskIcon = (_task: Task): React.ReactNode => {
-    return <CheckSquare size={12} className="text-purple-500" />;
+    return <CheckSquare size={12} className="text-blue-500" />;
   };
 
   // Loading indicator component
@@ -566,14 +574,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     
     return (
       <>
-        <tr key={item.id} className={`group hover:bg-slate-50 transition-colors border-b border-slate-200 ${zebraStripe} ${isUpdating ? 'bg-blue-50/30' : ''} ${isSelected ? 'bg-blue-100/50' : ''}`}>
+        <tr key={item.id} className={`group  transition-all duration-200 border-b border-slate-200 ${zebraStripe} ${isUpdating ? 'bg-blue-50/30' : ''} ${isSelected ? 'bg-blue-100/50 border-l-2 border-l-blue-500' : ''}`}>
           {isAdmin && (
             <td className="px-2 py-1.5 border-r border-slate-200 text-center bg-slate-50/50">
               <input
                 type="checkbox"
                 checked={isSelected}
                 onChange={() => handleSelectItem(item.id)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer accent-blue-500"
                 onClick={(e) => e.stopPropagation()}
               />
             </td>
@@ -596,13 +604,13 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     {activeTasks.length > 0 ? (
                       <button
                         onClick={() => toggleTasks(item.id)}
-                        className={`p-1 hover:bg-purple-100 rounded transition-colors ${isBAU ? '' : 'hover:bg-blue-100'}`}
+                        className={`p-1 hover:bg-blue-100 rounded transition-all duration-200 ${isBAU ? 'hover:bg-blue-100' : 'hover:bg-blue-100'}`}
                         title={tasksExpanded ? `Collapse ${activeTasks.length} tasks` : `Expand ${activeTasks.length} tasks`}
                       >
                         {tasksExpanded ? (
-                          <ChevronDown size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                          <ChevronDown size={14} className={`transition-transform duration-200 ${isBAU ? "text-blue-600" : "text-blue-600"}`} />
                         ) : (
-                          <ChevronRight size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                          <ChevronRight size={14} className={`transition-transform duration-200 ${isBAU ? "text-blue-600" : "text-blue-600"}`} />
                         )}
                       </button>
                     ) : null}
@@ -615,15 +623,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     e.stopPropagation();
                     navigate(`/item/${encodeURIComponent(item.id)}`);
                   }}
-                  className={`font-semibold text-slate-900 text-xs leading-relaxed break-words text-left flex-1 min-w-0 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all cursor-pointer ${
-                    isBAU ? 'bg-purple-50/50 border border-purple-200' : 'bg-blue-50/30 border border-blue-200'
+                  className={`font-semibold text-slate-900 text-xs leading-relaxed break-words text-left flex-1 min-w-0 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all duration-200 cursor-pointer ${
+                    isBAU ? 'bg-purple-50 border border-purple-200' : 'bg-blue-50 border border-blue-200'
                   }`}
                   title={item.title}
                 >
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="break-words">{item.title}</span>
                     {isBAU && (
-                      <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded flex-shrink-0">
+                      <span className="px-1 py-0.5 bg-purple-600 text-white text-[8px] font-bold rounded flex-shrink-0 shadow-sm">
                         BAU
                       </span>
                     )}
@@ -634,27 +642,27 @@ export const TaskTable: React.FC<TaskTableProps> = ({
               <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                 {!tasksExpanded && activeTasks.length > 0 && (
                   <>
-                    <span className="px-1.5 py-0.5 bg-purple-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
+                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center shadow-sm">
                       {activeTasks.length}
                     </span>
                     {/* Show status breakdown dots */}
                     <div className="flex gap-0.5">
                       {activeTasks.filter(t => t.status === Status.InProgress).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" title={`${activeTasks.filter(t => t.status === Status.InProgress).length} in progress`} />
+                        <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full shadow-sm" title={`${activeTasks.filter(t => t.status === Status.InProgress).length} in progress`} />
                       )}
                       {activeTasks.filter(t => t.status === Status.AtRisk).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full" title={`${activeTasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-sm" title={`${activeTasks.filter(t => t.status === Status.AtRisk).length} at risk`} />
                       )}
                       {activeTasks.filter(t => t.status === Status.Done).length > 0 && (
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" title={`${activeTasks.filter(t => t.status === Status.Done).length} done`} />
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-sm" title={`${activeTasks.filter(t => t.status === Status.Done).length} done`} />
                       )}
                     </div>
                   </>
                 )}
                 {/* Add task button and comment popover - stacked vertically to save space */}
                 <div className="flex flex-col items-center gap-0.5">
-                  {/* Add task button - visible when editable and no tasks exist */}
-                  {editable && activeTasks.length === 0 && (
+                  {/* Add task button - visible when editable */}
+                  {editable && (
                     <button
                       onClick={(e) => {
                         e.preventDefault();
@@ -685,10 +693,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                           tradeOffEta: undefined
                         });
                       }}
-                      className={`p-1 hover:bg-blue-100 rounded transition-colors flex-shrink-0 ${isBAU ? 'hover:bg-purple-100' : ''}`}
+                      className="p-1 hover:bg-blue-100 rounded transition-all duration-200 flex-shrink-0 group"
                       title="Add new task"
                     >
-                      <Plus size={14} className={isBAU ? "text-purple-600" : "text-blue-600"} />
+                      <Plus size={14} className="text-blue-600 group-hover:scale-110 transition-transform duration-200" />
                     </button>
                   )}
                   {/* Comment popover - positioned below the + button */}
@@ -709,7 +717,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
           <div className="text-xs text-slate-500 mt-1 flex gap-1 items-center flex-wrap">
              {viewMode === 'flat' && (
                <>
-                 <span className="font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{item.l1_assetClass}</span>
+                 <span className="font-bold text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded-md border border-cyan-200">{item.l1_assetClass}</span>
                  <span className="text-slate-400">•</span>
                  <span className="text-slate-500 truncate max-w-[100px] italic" title={item.l2_pillar}>{item.l2_pillar}</span>
                  {item.l3_responsibility && (
@@ -721,7 +729,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                </>
              )}
              {item.workType === WorkType.Unplanned && (
-               <span className="text-amber-600 font-bold flex items-center gap-0.5 bg-amber-50 px-1 py-0.5 rounded">
+               <span className="text-blue-600 font-bold flex items-center gap-0.5 bg-gradient-to-r from-blue-50 to-blue-100 px-1.5 py-0.5 rounded-md border border-blue-200 shadow-sm">
                  <AlertTriangle size={8} />
                  <span className="text-[8px]">Unplanned</span>
                </span>
@@ -768,7 +776,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       }
                       setHoveredAtRiskDot(null);
                     }}
-                    className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-sm hover:bg-red-600 transition-colors cursor-pointer"
+                    className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-md shadow-red-500/30 hover:bg-red-600 transition-all duration-200 cursor-pointer"
                     title="Click to edit risk reason"
                   />
                   {/* Hover Tooltip */}
@@ -796,17 +804,17 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     
                     return (
                       <div
-                        className="w-64 bg-white rounded-lg shadow-xl border border-slate-200 p-3 pointer-events-none"
+                        className="w-64 glass-dark rounded-xl shadow-2xl border border-white/10 p-3 pointer-events-none animate-scale-in"
                         style={tooltipStyle}
                       >
-                      <div className="text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                        <AlertTriangle size={12} className="text-red-600" />
+                      <div className="text-xs font-semibold text-white mb-1.5 flex items-center gap-1.5">
+                        <AlertTriangle size={12} className="text-red-400" />
                         At Risk Reason
                       </div>
-                      <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">
+                      <p className="text-xs text-slate-300 whitespace-pre-wrap break-words">
                         {item.riskActionLog}
                       </p>
-                      <div className="mt-2 pt-2 border-t border-slate-100 text-center">
+                      <div className="mt-2 pt-2 border-t border-white/10 text-center">
                         <span className="text-[10px] text-blue-600 font-medium">Click to edit →</span>
                       </div>
                     </div>
@@ -840,7 +848,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
              <select 
                value={item.status}
                onChange={(e) => handleInlineUpdate(item.id, 'status', e.target.value)}
-               className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full ${getStatusSelectStyle(item.status)}`}
+               className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full transition-all duration-200 ${getStatusSelectStyle(item.status)}`}
              >
                {getStatuses(config).filter(s => s !== Status.Deleted).map(s => <option key={s} value={s} className="bg-white text-slate-900">{s}</option>)}
              </select>
@@ -858,7 +866,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
             <select 
               value={item.priority}
               onChange={(e) => handleInlineUpdate(item.id, 'priority', e.target.value)}
-              className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full ${getPrioritySelectStyle(item.priority)}`}
+              className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer h-full transition-all duration-200 ${getPrioritySelectStyle(item.priority)}`}
             >
               {getPriorities(config).map(p => <option key={p} value={p} className="bg-white text-slate-900">{p}</option>)}
             </select>
@@ -904,7 +912,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       : inputValue;
                     handleInlineUpdate(item.id, 'actualEffort', weeksValue);
                   }}
-                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   title="Actual Effort"
                 />
                 <button
@@ -916,7 +924,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     const increment = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'actualEffort', currentWeeks + increment);
                   }}
-                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                   title={displayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                 >
                   <ArrowUp size={12} />
@@ -933,7 +941,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     const decrement = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'estimatedEffort', Math.max(0, currentWeeks - decrement));
                   }}
-                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                   title={displayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                 >
                   <ArrowDown size={12} />
@@ -952,7 +960,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       : inputValue;
                     handleInlineUpdate(item.id, 'estimatedEffort', weeksValue);
                   }}
-                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   title="Planned Effort"
                 />
                 <button
@@ -964,45 +972,45 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                     const increment = displayUnit === 'days' ? daysToWeeks(1) : 0.25;
                     handleInlineUpdate(item.id, 'estimatedEffort', currentWeeks + increment);
                   }}
-                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-colors flex-shrink-0"
+                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                   title={displayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                 >
                   <ArrowUp size={12} />
                 </button>
               </div>
               <div className="flex items-center gap-0.5 border border-slate-300 rounded ml-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDisplayUnit(item.id, 'days');
-                  }}
-                  className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
-                    displayUnit === 'days' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-slate-600 hover:bg-slate-100 bg-white'
-                  }`}
-                  title="Switch to days"
-                >
-                  D
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDisplayUnit(item.id, 'weeks');
-                  }}
-                  className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
-                    displayUnit === 'weeks' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-slate-600 hover:bg-slate-100 bg-white'
-                  }`}
-                  title="Switch to weeks"
-                >
-                  W
-                </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setDisplayUnit(item.id, 'days');
+                                    }}
+                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-all duration-200 ${
+                                      displayUnit === 'days' 
+                                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm' 
+                                        : 'text-slate-600 hover:bg-slate-100 bg-white'
+                                    }`}
+                                    title="Switch to days"
+                                  >
+                                    D
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setDisplayUnit(item.id, 'weeks');
+                                    }}
+                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-all duration-200 ${
+                                      displayUnit === 'weeks' 
+                                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm' 
+                                        : 'text-slate-600 hover:bg-slate-100 bg-white'
+                                    }`}
+                                    title="Switch to weeks"
+                                  >
+                                    W
+                                  </button>
               </div>
               <span className="text-slate-400 text-xs font-medium flex-shrink-0">{displayUnit === 'days' ? 'd' : 'w'}</span>
             </div>
@@ -1036,7 +1044,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   step="1"
                   value={item.completionRate ?? 0}
                   onChange={(e) => handleInlineUpdate(item.id, 'completionRate', Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                  className="w-14 bg-white text-xs font-semibold text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-14 bg-white text-xs font-semibold text-slate-700 border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right transition-all duration-200 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   title="Completion %"
                 />
                 <span className="text-xs text-slate-400 font-medium">%</span>
@@ -1049,7 +1057,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 className={`h-full transition-all duration-300 ${
                   (item.completionRate ?? 0) === 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
                   (item.completionRate ?? 0) >= 50 ? 'bg-gradient-to-r from-blue-400 to-blue-500' :
-                  (item.completionRate ?? 0) > 0 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-slate-200'
+                  (item.completionRate ?? 0) > 0 ? 'bg-gradient-to-r from-blue-400 to-blue-500' : 'bg-slate-200'
                 }`}
                 style={{ width: `${item.completionRate ?? 0}%` }}
               />
@@ -1063,10 +1071,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                   type="date"
                   value={item.eta || ''}
                   onChange={(e) => handleInlineUpdate(item.id, 'eta', e.target.value)}
-                  className="w-full bg-white text-xs border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md"
+                  className="w-full bg-white text-xs border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md transition-all duration-200 font-mono"
                />
              ) : (
-               <span className="text-xs font-semibold text-slate-700">{item.eta || 'N/A'}</span>
+               <span className="text-xs font-semibold text-slate-700 font-mono">{item.eta || 'N/A'}</span>
              )}
              
              {prevEta !== null && (
@@ -1084,21 +1092,21 @@ export const TaskTable: React.FC<TaskTableProps> = ({
       
       {/* Tasks dropdown row for all initiatives with tasks */}
       {tasksExpanded && (
-        <tr className="bg-purple-50/30">
+        <tr className="bg-slate-50">
           <td colSpan={isAdmin ? 9 : 8} className="px-3 py-1.5 border-b border-slate-200">
             <div className="space-y-1.5">
               {/* Tasks List */}
               {tasks.filter(t => t.status !== Status.Deleted).length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-[10px] font-semibold text-purple-700 mb-1.5 tracking-wide">Tasks ({tasks.filter(t => t.status !== Status.Deleted).length})</div>
+                  <div className="text-[10px] font-semibold text-slate-700 mb-1.5 tracking-wide">Tasks ({tasks.filter(t => t.status !== Status.Deleted).length})</div>
                   {tasks.filter(task => task.status !== Status.Deleted).map((task, taskIndex) => (
-                    <div key={task.id} className="bg-purple-50/30 border-l-4 border-l-purple-400 border border-purple-200 rounded-md shadow-sm hover:shadow transition-shadow ml-8">
+                    <div key={task.id} className="bg-slate-50 border-l-4 border-l-blue-400 border border-slate-200 rounded-md shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 ml-8">
                       <div className="flex items-center">
                         {/* Column 1: ID - Empty, matching initiative ID column width */}
-                        <div className="w-12 px-2.5 py-2 text-center border-r border-purple-200"></div>
+                        <div className="w-12 px-2.5 py-2 text-center border-r border-slate-200"></div>
                         
                         {/* Column 2: Task Title (aligned with Initiative column) */}
-                        <div className="px-3 py-2 border-r border-purple-200 min-w-[320px] flex-1">
+                        <div className="px-3 py-2 border-r border-slate-200 min-w-[320px] flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {getTaskIcon(task)}
                             {editable ? (
@@ -1107,7 +1115,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 value={task.title || ''}
                                 onChange={(e) => handleUpdateTask(item.id, task.id, 'title', e.target.value || undefined)}
                                 placeholder={`Task ${taskIndex + 1}`}
-                                className="flex-1 min-w-[120px] text-xs font-medium text-slate-700 px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
+                                className="flex-1 min-w-[120px] text-xs font-medium text-slate-700 px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white transition-all duration-200"
                               />
                             ) : (
                               <span className="text-xs font-medium text-slate-700">
@@ -1117,7 +1125,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             {!editable && task.tags && task.tags.length > 0 && (
                               <div className="flex gap-0.5">
                                 {task.tags.map(tag => (
-                                  <span key={tag} className="px-1 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-medium rounded">
+                                  <span key={tag} className="px-1 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-medium rounded">
                                     {tag}
                                   </span>
                                 ))}
@@ -1126,64 +1134,64 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             {editable && (
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <label className="flex items-center gap-1 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={task.tags?.includes(UnplannedTag.Unplanned) || false}
-                                    onChange={(e) => {
-                                      const currentTags = task.tags || [];
-                                      const newTags = e.target.checked
-                                        ? [...currentTags.filter(t => t !== UnplannedTag.Unplanned), UnplannedTag.Unplanned]
-                                        : currentTags.filter(t => t !== UnplannedTag.Unplanned);
-                                      handleUpdateTask(item.id, task.id, 'tags', newTags);
-                                    }}
-                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                                  />
-                                  <span className="text-[10px] text-slate-600">Unplanned</span>
-                                </label>
-                                <label className="flex items-center gap-1 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={task.tags?.includes(UnplannedTag.PMItem) || false}
-                                    onChange={(e) => {
-                                      const currentTags = task.tags || [];
-                                      const newTags = e.target.checked
-                                        ? [...currentTags.filter(t => t !== UnplannedTag.PMItem), UnplannedTag.PMItem]
-                                        : currentTags.filter(t => t !== UnplannedTag.PMItem);
-                                      handleUpdateTask(item.id, task.id, 'tags', newTags);
-                                    }}
-                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                                  />
-                                  <span className="text-[10px] text-slate-600">PM Item</span>
-                                </label>
-                                <label className="flex items-center gap-1 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={task.tags?.includes(UnplannedTag.RiskItem) || false}
-                                    onChange={(e) => {
-                                      const currentTags = task.tags || [];
-                                      const newTags = e.target.checked
-                                        ? [...currentTags.filter(t => t !== UnplannedTag.RiskItem), UnplannedTag.RiskItem]
-                                        : currentTags.filter(t => t !== UnplannedTag.RiskItem);
-                                      handleUpdateTask(item.id, task.id, 'tags', newTags);
-                                    }}
-                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
-                                  />
-                                  <span className="text-[10px] text-slate-600">Risk Item</span>
-                                </label>
+                                <input
+                                  type="checkbox"
+                                  checked={task.tags?.includes(UnplannedTag.Unplanned) || false}
+                                  onChange={(e) => {
+                                    const currentTags = task.tags || [];
+                                    const newTags = e.target.checked
+                                      ? [...currentTags.filter(t => t !== UnplannedTag.Unplanned), UnplannedTag.Unplanned]
+                                      : currentTags.filter(t => t !== UnplannedTag.Unplanned);
+                                    handleUpdateTask(item.id, task.id, 'tags', newTags);
+                                  }}
+                                  className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 accent-purple-500"
+                                />
+                                <span className="text-[10px] text-slate-600">Unplanned</span>
+                              </label>
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={task.tags?.includes(UnplannedTag.PMItem) || false}
+                                  onChange={(e) => {
+                                    const currentTags = task.tags || [];
+                                    const newTags = e.target.checked
+                                      ? [...currentTags.filter(t => t !== UnplannedTag.PMItem), UnplannedTag.PMItem]
+                                      : currentTags.filter(t => t !== UnplannedTag.PMItem);
+                                    handleUpdateTask(item.id, task.id, 'tags', newTags);
+                                  }}
+                                  className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 accent-purple-500"
+                                />
+                                <span className="text-[10px] text-slate-600">PM Item</span>
+                              </label>
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={task.tags?.includes(UnplannedTag.RiskItem) || false}
+                                  onChange={(e) => {
+                                    const currentTags = task.tags || [];
+                                    const newTags = e.target.checked
+                                      ? [...currentTags.filter(t => t !== UnplannedTag.RiskItem), UnplannedTag.RiskItem]
+                                      : currentTags.filter(t => t !== UnplannedTag.RiskItem);
+                                    handleUpdateTask(item.id, task.id, 'tags', newTags);
+                                  }}
+                                  className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 accent-purple-500"
+                                />
+                                <span className="text-[10px] text-slate-600">Risk Item</span>
+                              </label>
                               </div>
                             )}
                           </div>
                         </div>
                         
                         {/* Column 3: Owner */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 whitespace-nowrap min-w-[120px]">
+                        <div className="px-2.5 py-2 border-r border-blue-200 whitespace-nowrap min-w-[120px]">
                           {editable ? (
                             <input
                               type="text"
                               value={task.owner || ''}
                               onChange={(e) => handleUpdateTask(item.id, task.id, 'owner', e.target.value || undefined)}
                               placeholder="Owner..."
-                              className="text-xs px-1.5 py-0.5 border border-purple-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white w-24"
+                              className="text-xs px-1.5 py-0.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white w-24 transition-all duration-200"
                             />
                           ) : (
                             <div className="flex items-center justify-center">
@@ -1197,12 +1205,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                         
                         {/* Column 4: Status (aligned with Status column) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 text-center min-w-[100px]">
+                        <div className="px-2.5 py-2 border-r border-blue-200 text-center min-w-[100px]">
                           {editable ? (
                             <select
                               value={task.status}
                               onChange={(e) => handleUpdateTask(item.id, task.id, 'status', e.target.value as Status)}
-                              className={`w-full text-[11px] font-bold border focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-1.5 py-1 rounded-md cursor-pointer ${getStatusSelectStyle(task.status)}`}
+                              className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer transition-all duration-200 ${getStatusSelectStyle(task.status)}`}
                             >
                               {getStatuses(config).filter(s => s !== Status.Deleted).map(s => (
                                 <option key={s} value={s} className="bg-white text-slate-900">{s}</option>
@@ -1216,12 +1224,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                         
                         {/* Column 5: Priority (aligned with Priority column) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 text-center min-w-[70px]">
+                        <div className="px-2.5 py-2 border-r border-blue-200 text-center min-w-[70px]">
                           {editable ? (
                             <select
                               value={task.priority || Priority.P2}
                               onChange={(e) => handleUpdateTask(item.id, task.id, 'priority', e.target.value as Priority)}
-                              className={`w-full text-[11px] font-bold border focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-1.5 py-1 rounded-md cursor-pointer ${getPrioritySelectStyle(task.priority || Priority.P2)}`}
+                              className={`w-full text-[11px] font-bold border focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-1.5 py-1 rounded-md cursor-pointer transition-all duration-200 ${getPrioritySelectStyle(task.priority || Priority.P2)}`}
                             >
                               {getPriorities(config).map(p => (
                                 <option key={p} value={p} className="bg-white text-slate-900">{p}</option>
@@ -1235,7 +1243,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                         
                         {/* Column 6: Effort (aligned with Effort column) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 min-w-[150px]">
+                        <div className="px-2.5 py-2 border-r border-blue-200 min-w-[150px]">
                           {editable ? (() => {
                             // Get display unit from parent initiative
                             const taskDisplayUnit = getDisplayUnit(item.id);
@@ -1251,7 +1259,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const decrement = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'actualEffort', Math.max(0, currentWeeks - decrement));
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
+                                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                                 >
                                   <ArrowDown size={12} />
@@ -1272,7 +1280,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       handleUpdateTask(item.id, task.id, 'actualEffort', weeksValue);
                                     }
                                   }}
-                                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-blue-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   title="Actual Effort"
                                 />
                                 <button
@@ -1284,7 +1292,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const increment = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'actualEffort', currentWeeks + increment);
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
+                                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                                 >
                                   <ArrowUp size={12} />
@@ -1301,7 +1309,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const decrement = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'estimatedEffort', Math.max(0, currentWeeks - decrement));
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
+                                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                                 >
                                   <ArrowDown size={12} />
@@ -1322,7 +1330,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       handleUpdateTask(item.id, task.id, 'estimatedEffort', weeksValue);
                                     }
                                   }}
-                                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  className="w-16 bg-white text-xs font-mono text-slate-700 border border-blue-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md text-right transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   title="Planned Effort"
                                 />
                                 <button
@@ -1334,14 +1342,14 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     const increment = taskDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
                                     handleUpdateTask(item.id, task.id, 'estimatedEffort', currentWeeks + increment);
                                   }}
-                                  className="p-0.5 hover:bg-purple-100 rounded text-slate-500 hover:text-purple-600 transition-colors flex-shrink-0"
+                                  className="p-0.5 hover:bg-blue-100 rounded text-slate-500 hover:text-blue-600 transition-all duration-200 flex-shrink-0"
                                   title={taskDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                                 >
                                   <ArrowUp size={12} />
                                 </button>
                               </div>
                               {setDisplayUnit && (
-                                <div className="flex items-center gap-0.5 border border-purple-300 rounded ml-1">
+                                <div className="flex items-center gap-0.5 border border-blue-300 rounded ml-1">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1349,9 +1357,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       e.stopPropagation();
                                       setDisplayUnit(item.id, 'days');
                                     }}
-                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
+                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-all duration-200 ${
                                       taskDisplayUnit === 'days' 
-                                        ? 'bg-purple-600 text-white' 
+                                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm' 
                                         : 'text-slate-600 hover:bg-slate-100 bg-white'
                                     }`}
                                     title="Switch to days"
@@ -1365,9 +1373,9 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       e.stopPropagation();
                                       setDisplayUnit(item.id, 'weeks');
                                     }}
-                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-colors ${
+                                    className={`px-1 py-0.5 text-[9px] font-medium rounded transition-all duration-200 ${
                                       taskDisplayUnit === 'weeks' 
-                                        ? 'bg-purple-600 text-white' 
+                                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm' 
                                         : 'text-slate-600 hover:bg-slate-100 bg-white'
                                     }`}
                                     title="Switch to weeks"
@@ -1384,7 +1392,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             const taskDisplayUnit = getDisplayUnit(item.id);
                             return (
                             <div className="flex justify-center">
-                              <span className="font-mono text-slate-700 text-xs font-semibold bg-purple-50 px-2 py-1 rounded">
+                              <span className="font-mono text-slate-700 text-xs font-semibold bg-blue-50 px-2 py-1 rounded">
                                 {taskDisplayUnit === 'days'
                                   ? `${weeksToDays(task.actualEffort || 0).toFixed(1)}/${weeksToDays(task.estimatedEffort || 0).toFixed(1)}d`
                                   : `${(task.actualEffort || 0).toFixed(2)}/${(task.estimatedEffort || 0).toFixed(2)}w`}
@@ -1395,22 +1403,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         </div>
                         
                         {/* Column 7: Progress - Empty (tasks don't have progress) */}
-                        <div className="px-2.5 py-2 border-r border-purple-200 text-center min-w-[60px]">
+                        <div className="px-2.5 py-2 border-r border-blue-200 text-center min-w-[60px]">
                           <span className="text-slate-400 text-xs">-</span>
                         </div>
                         
                         {/* Column 8: ETA (aligned with ETA / Update column) */}
-                        <div className="px-2.5 py-2 min-w-[100px] border-r border-purple-200">
+                        <div className="px-2.5 py-2 min-w-[100px] border-r border-blue-200">
                           {editable ? (
                             <input
                               type="date"
                               value={task.eta || ''}
                               onChange={(e) => handleUpdateTask(item.id, task.id, 'eta', e.target.value)}
-                              className="w-full bg-white text-xs border border-purple-200 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 px-2 py-1 rounded-md"
+                              className="w-full bg-white text-xs border border-blue-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 px-2 py-1 rounded-md transition-all duration-200 font-mono"
                             />
                           ) : (
                             <div className="flex justify-center">
-                              <span className="text-xs font-semibold text-slate-700">{task.eta || 'N/A'}</span>
+                              <span className="text-xs font-semibold text-slate-700 font-mono">{task.eta || 'N/A'}</span>
                             </div>
                           )}
                         </div>
@@ -1433,36 +1441,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 </div>
               )}
               
-              {/* Add Task Button / Form */}
-              {editable && (
+              {/* Add Task Form */}
+              {editable && isAddingTask && (
                 <div className="border-t border-slate-200 pt-3 mt-3">
-                  {!isAddingTask ? (
-                    <button
-                      onClick={() => {
-                        setAddingTaskFor(item.id);
-                        const defaultEta = new Date().toISOString().split('T')[0];
-                        setNewTaskForm({
-                          title: '',
-                          estimatedEffort: 0,
-                          actualEffort: 0,
-                          eta: defaultEta,
-                          owner: '',
-                          status: Status.NotStarted,
-                          priority: Priority.P2,
-                          tags: [],
-                          initiativeId: item.id,
-                          tradeOffInitiativeId: undefined,
-                          tradeOffTaskId: undefined,
-                          tradeOffEta: undefined
-                        });
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors"
-                    >
-                      <Plus size={16} />
-                      Add New Task
-                    </button>
-                  ) : (
-                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm p-2.5 space-y-2.5">
+                  <div className="bg-white/95 backdrop-blur-sm border border-blue-200 rounded-lg shadow-lg p-2.5 space-y-2.5 animate-scale-in">
                       {/* Header */}
                       <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
                         <h3 className="text-xs font-semibold text-slate-800">New Task</h3>
@@ -1511,7 +1493,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             value={newTaskForm.title || ''}
                             onChange={(e) => setNewTaskForm(prev => ({ ...prev, title: e.target.value }))}
                             placeholder="Enter task title..."
-                            className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            className="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                           />
                         </div>
 
@@ -1562,7 +1544,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 </button>
                               </div>
                               <span className="text-slate-400 text-[10px]">/</span>
-                              {/* Planned Effort - Blue theme */}
+                              {/* Planned Effort - Amber theme */}
                               <div className="flex items-center gap-0.5 bg-blue-50 border border-blue-200 rounded-md px-0.5 py-0.5">
                                 <button
                                   type="button"
@@ -1571,7 +1553,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     e.stopPropagation();
                                     setNewTaskForm(prev => ({ ...prev, estimatedEffort: Math.max(0, Number(prev.estimatedEffort || 0) - 0.25) }));
                                   }}
-                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
+                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-all duration-200"
                                   title="Decrease planned"
                                 >
                                   <ArrowDown size={9} />
@@ -1593,7 +1575,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     e.stopPropagation();
                                     setNewTaskForm(prev => ({ ...prev, estimatedEffort: Number(prev.estimatedEffort || 0) + 0.25 }));
                                   }}
-                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-colors"
+                                  className="p-0.5 hover:bg-blue-100 rounded text-blue-600 hover:text-blue-800 transition-all duration-200"
                                   title="Increase planned"
                                 >
                                   <ArrowUp size={9} />
@@ -1612,7 +1594,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               type="date"
                               value={newTaskForm.eta || ''}
                               onChange={(e) => setNewTaskForm(prev => ({ ...prev, eta: e.target.value }))}
-                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-mono"
                             />
                           </div>
 
@@ -1626,7 +1608,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                               value={newTaskForm.owner || ''}
                               onChange={(e) => setNewTaskForm(prev => ({ ...prev, owner: e.target.value || undefined }))}
                               placeholder="Enter name..."
-                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                             />
                           </div>
 
@@ -1638,7 +1620,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             <select
                               value={newTaskForm.status || Status.NotStarted}
                               onChange={(e) => setNewTaskForm(prev => ({ ...prev, status: e.target.value as Status }))}
-                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                              className="w-full px-1.5 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                             >
                               {Object.values(Status).filter(s => s !== Status.Deleted).map(s => (
                                 <option key={s} value={s}>{s}</option>
@@ -1654,7 +1636,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                             <select
                               value={newTaskForm.priority || Priority.P2}
                               onChange={(e) => setNewTaskForm(prev => ({ ...prev, priority: e.target.value as Priority }))}
-                              className={`w-full px-1.5 py-1.5 text-xs border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${getPrioritySelectStyle(newTaskForm.priority || Priority.P2)}`}
+                              className={`w-full px-1.5 py-1.5 text-xs border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${getPrioritySelectStyle(newTaskForm.priority || Priority.P2)}`}
                             >
                               {getPriorities(config).map(p => (
                                 <option key={p} value={p} className="bg-white text-slate-900">{p}</option>
@@ -1679,7 +1661,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       : currentTags.filter(t => t !== UnplannedTag.Unplanned);
                                     setNewTaskForm(prev => ({ ...prev, tags: newTags }));
                                   }}
-                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-500"
                                 />
                                 <span>Unplanned</span>
                               </label>
@@ -1694,7 +1676,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       : currentTags.filter(t => t !== UnplannedTag.PMItem);
                                     setNewTaskForm(prev => ({ ...prev, tags: newTags }));
                                   }}
-                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-500"
                                 />
                                 <span>PM</span>
                               </label>
@@ -1709,7 +1691,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                       : currentTags.filter(t => t !== UnplannedTag.RiskItem);
                                     setNewTaskForm(prev => ({ ...prev, tags: newTags }));
                                   }}
-                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                  className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-500"
                                 />
                                 <span>Risk</span>
                               </label>
@@ -1739,7 +1721,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                     tradeOffEta: selectedInitiative?.eta || prev.tradeOffEta
                                   }));
                                 }}
-                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                               >
                                 <option value="">Select...</option>
                                 {allInitiativesList
@@ -1776,7 +1758,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                   const activeTasks = tradeOffInitiative?.tasks?.filter(t => t.status !== Status.Deleted) || [];
                                   return !tradeOffInitiative || activeTasks.length === 0;
                                 })()}
-                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               >
                                 <option value="">Select task...</option>
                                 {newTaskForm.tradeOffInitiativeId && (() => {
@@ -1802,7 +1784,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                 value={newTaskForm.tradeOffEta || ''}
                                 onChange={(e) => setNewTaskForm(prev => ({ ...prev, tradeOffEta: e.target.value || undefined }))}
                                 disabled={!newTaskForm.tradeOffInitiativeId}
-                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                className="w-full px-2 py-1 text-[11px] border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-mono disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                               />
                               {newTaskForm.tradeOffInitiativeId && !newTaskForm.tradeOffEta && (() => {
                                 const tradeOffInitiative = allInitiativesList.find(i => i.id === newTaskForm.tradeOffInitiativeId);
@@ -1864,13 +1846,12 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         <button
                           onClick={() => handleAddTask(item.id)}
                           disabled={!newTaskForm.eta}
-                          className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 rounded-md hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-500 disabled:hover:to-blue-600"
                         >
                           Add Task
                         </button>
                       </div>
                     </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1895,10 +1876,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   const someSelected = isAdmin && selectedItems.size > 0 && selectedItems.size < filteredInitiatives.length;
   
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px] relative">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px] relative  ">
       <div ref={scrollContainerRef} className="overflow-auto custom-scrollbar flex-1">
         <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 z-20 shadow-md">
+          <thead className="sticky top-0 z-20 shadow-lg">
             <tr className="bg-gradient-to-b from-slate-100 to-slate-50 border-b-2 border-slate-300">
               {isAdmin && (
                 <th className="w-12 px-2 py-2.5 text-center border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
@@ -1909,22 +1890,22 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                       if (input) input.indeterminate = someSelected;
                     }}
                     onChange={handleSelectAll}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer"
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 cursor-pointer accent-blue-500"
                     title={allSelected ? 'Deselect all' : 'Select all'}
                   />
                 </th>
               )}
-              <th className="w-12 px-3 py-2.5 text-center font-bold text-slate-500 text-xs border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none">
+              <th className="w-12 px-3 py-2.5 text-center font-bold text-slate-700 text-xs border-r border-slate-200 bg-gradient-to-b from-slate-100 to-slate-50 select-none ">
                 ID
               </th>
               <SortableHeader label={`Initiative (${filteredInitiatives.length})`} sortKey="title" />
               <SortableHeader label="Owner" sortKey="owner" />
               <SortableHeader label="Status" sortKey="status" />
               <SortableHeader label="Priority" sortKey="priority" />
-              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px]">
+              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none min-w-[150px] ">
                 Effort (act/plan)
               </th>
-              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none">Progress</th>
+              <th className="px-3 py-2.5 text-center font-bold text-slate-700 bg-gradient-to-b from-slate-100 to-slate-50 border-r border-slate-200 text-xs tracking-wider whitespace-nowrap select-none ">Progress</th>
               <SortableHeader label="ETA / Update" sortKey="eta" />
             </tr>
           </thead>
@@ -1936,21 +1917,21 @@ export const TaskTable: React.FC<TaskTableProps> = ({
         </table>
       </div>
       {isAdmin && selectedItems.size > 0 && (
-        <div className="sticky bottom-0 left-0 right-0 bg-white border-t-2 border-red-300 shadow-lg z-30 px-4 py-3 flex items-center justify-between">
+        <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-r from-blue-50 to-blue-100/50 border-t-2 border-blue-300 shadow-xl z-30 px-4 py-3 flex items-center justify-between backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-slate-700">
+            <span className="text-sm font-semibold text-slate-800 ">
               {selectedItems.size} {selectedItems.size === 1 ? 'item' : 'items'} selected
             </span>
             <button
               onClick={handleClearSelection}
-              className="text-xs text-slate-500 hover:text-slate-700 underline"
+              className="text-xs text-slate-600 hover:text-slate-800 underline font-medium transition-colors"
             >
               Clear selection
             </button>
           </div>
           <button
             onClick={handleBulkDelete}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+            className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md shadow-red-500/20"
           >
             Delete Selected
           </button>

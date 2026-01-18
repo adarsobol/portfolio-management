@@ -780,7 +780,7 @@ const StaleUpdateRow = memo<{ item: Initiative; getOwnerName: (id: string) => st
       <td className="px-3 py-2">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
           item.status === Status.AtRisk ? 'bg-red-100 text-red-700' :
-          item.status === Status.InProgress ? 'bg-blue-100 text-blue-700' :
+          item.status === Status.InProgress ? 'bg-cyan-100 text-cyan-700' :
           'bg-slate-100 text-slate-600'
         }`}>
           {item.status}
@@ -813,7 +813,7 @@ const OverlookedItemRow = memo<{ item: Initiative; getOwnerName: (id: string) =>
       <td className="px-3 py-2">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
           item.status === Status.AtRisk ? 'bg-red-100 text-red-700' :
-          item.status === Status.InProgress ? 'bg-blue-100 text-blue-700' :
+          item.status === Status.InProgress ? 'bg-cyan-100 text-cyan-700' :
           'bg-slate-100 text-slate-600'
         }`}>
           {item.status}
@@ -850,7 +850,7 @@ const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortP
         : undefined;
     
     return (
-      <tr className="hover:bg-blue-50/30 transition-colors">
+      <tr className="hover:bg-cyan-50/30 transition-colors ">
         <td className="px-3 py-2 font-semibold truncate max-w-[200px] text-slate-800 text-xs" title={item.title}>
           <div className="flex items-center gap-2">
             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-mono font-semibold rounded flex-shrink-0">
@@ -881,7 +881,7 @@ const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortP
         <td className="px-3 py-2 text-slate-500 font-mono text-xs">{item.originalEta || 'N/A'}</td>
         <td className={`px-3 py-2 font-mono text-xs ${
           item.eta !== item.originalEta 
-            ? (isSignificantEta ? 'text-red-600 font-bold' : 'text-blue-600 font-semibold')
+            ? (isSignificantEta ? 'text-red-600 font-bold' : 'text-cyan-600 font-semibold')
             : 'text-slate-500'
         }`}>
           {item.eta || 'N/A'}
@@ -892,7 +892,7 @@ const VarianceItemRow = memo<{ item: Initiative & { effortDiff?: number; effortP
         <td className="px-3 py-2 text-xs">
           {tradeOffDisplay ? (
             <span 
-              className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-medium cursor-help" 
+              className="inline-flex items-center px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 font-medium cursor-help" 
               title={tradeOffTooltip}
             >
               {tradeOffDisplay}
@@ -1165,7 +1165,7 @@ const MetricTooltip: React.FC<{
     if (metricKey === 'healthScore' || metricKey === 'onTimeRate' || metricKey === 'estimationAccuracy' || 
         metricKey === 'riskLogCompliance' || metricKey === 'avgCompletionRate') {
       if (value >= 80) return { bg: 'bg-emerald-900/30', border: 'border-emerald-700/50', text: 'text-emerald-100' };
-      if (value >= 60) return { bg: 'bg-blue-900/30', border: 'border-blue-700/50', text: 'text-blue-100' };
+      if (value >= 60) return { bg: 'bg-cyan-900/30', border: 'border-cyan-700/50', text: 'text-cyan-100' };
       if (value >= 40) return { bg: 'bg-amber-900/30', border: 'border-amber-700/50', text: 'text-amber-100' };
       return { bg: 'bg-red-900/30', border: 'border-red-700/50', text: 'text-red-100' };
     }
@@ -1286,15 +1286,15 @@ const ChangesListModal: React.FC<{
         <div className="fixed inset-0 bg-slate-900/60 transition-opacity" onClick={onClose} />
         
         {/* Modal */}
-        <div className="relative bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden">
+        <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[85vh] overflow-hidden ">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-800 to-blue-900 px-6 py-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 flex items-center justify-between ">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <FileEdit className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">All Changes</h2>
+                <h2 className="text-lg font-bold text-white  tracking-tight">All Changes</h2>
                 <p className="text-sm text-slate-400">{allChanges.length} total changes</p>
               </div>
             </div>
@@ -1432,15 +1432,15 @@ const InfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen,
         <div className="fixed inset-0 bg-slate-900/60 transition-opacity" onClick={onClose} />
         
         {/* Modal */}
-        <div className="relative bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden">
+        <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[85vh] overflow-hidden ">
           {/* Header */}
-          <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-4 flex items-center justify-between ">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <Info className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Workplan Health Metrics Guide</h2>
+                <h2 className="text-lg font-bold text-white  tracking-tight">Workplan Health Metrics Guide</h2>
                 <p className="text-sm text-slate-400">Understanding your dashboard metrics</p>
               </div>
             </div>
@@ -2001,10 +2001,10 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
 
       <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 via-slate-850 to-slate-900 px-8 py-6 rounded-2xl shadow-xl border border-slate-700/50">
+      <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-8 py-6 rounded-2xl shadow-xl border border-slate-200  ">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-white">Workplan Health Overview</h2>
+            <h2 className="text-xl font-bold text-white  tracking-tight">Workplan Health Overview</h2>
             <p className="text-slate-400 text-sm">
               Analyzing {healthMetrics.initiativeCount} initiatives
             </p>
@@ -2026,7 +2026,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
         {/* Schedule Health Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           <MetricTooltip metricKey="avgDelay" position="bottom" value={healthMetrics.avgDelay}>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-lg hover:border-amber-300/50 transition-all duration-200 h-[160px] flex flex-col justify-between w-full ">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-slate-400" />
@@ -2049,7 +2049,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
           </MetricTooltip>
 
           <MetricTooltip metricKey="onTimeRate" position="bottom" value={healthMetrics.onTimeRate}>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-lg hover:border-amber-300/50 transition-all duration-200 h-[160px] flex flex-col justify-between w-full ">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-slate-400" />
@@ -2074,7 +2074,7 @@ const ResourcesDashboardComponent: React.FC<WorkplanHealthDashboardProps> = ({
           </MetricTooltip>
 
           <MetricTooltip metricKey="etaSlippage" position="bottom" value={healthMetrics.etaSlippageCount}>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-md hover:border-slate-300 transition-all h-[160px] flex flex-col justify-between w-full">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm cursor-help hover:shadow-lg hover:border-amber-300/50 transition-all duration-200 h-[160px] flex flex-col justify-between w-full ">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-slate-400" />

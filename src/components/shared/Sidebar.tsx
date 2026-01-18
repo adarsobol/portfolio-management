@@ -131,28 +131,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }) => (
     <button 
       onClick={() => setCurrentView(view)} 
-      className={`w-full flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-all font-medium text-sm ${
+      className={`relative w-full flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-200 font-medium text-sm group ${
         currentView === view 
-          ? `bg-gradient-to-r ${activeGradient} text-white shadow-lg` 
-          : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+          ? `bg-gradient-to-r ${activeGradient} text-white shadow-md` 
+          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
       }`}
     >
-      <Icon size={16} />
-      <span className="text-xs">{label}</span>
+      <Icon size={16} className={`transition-transform duration-200 ${currentView !== view ? 'group-hover:scale-110' : ''}`} />
+      <span className="text-xs tracking-tight">{label}</span>
     </button>
   );
 
   return (
-    <aside className="w-full md:w-52 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white flex flex-col sticky top-0 md:h-screen z-20">
-      <div className="px-4 py-3 border-b border-slate-800/50">
-        <h1 className="text-base font-black tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">PortfolioMgr</h1>
-        <p className="text-[10px] text-slate-500 mt-0.5 font-medium">Work Plan Management</p>
+    <aside className="w-full md:w-52 bg-white border-r border-slate-200 flex flex-col sticky top-0 md:h-screen z-20">
+      <div className="px-4 py-4 border-b border-slate-200">
+        <h1 className="text-base font-extrabold tracking-tight text-slate-900">PortfolioMgr</h1>
+        <p className="text-[10px] text-slate-600 mt-1 font-medium tracking-wide">Work Plan Management</p>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         <NavButton view="all" icon={LayoutDashboard} label="All Tasks" activeGradient="from-blue-500 to-blue-600" />
         <NavButton view="dependencies" icon={GitBranch} label="Dependencies" activeGradient="from-indigo-500 to-indigo-600" />
         <NavButton view="timeline" icon={Calendar} label="Timeline" activeGradient="from-purple-500 to-purple-600" />
-        <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-amber-500 to-amber-600" />
+        <NavButton view="workflows" icon={Zap} label="Workflows" activeGradient="from-purple-500 to-purple-600" />
         {canAccessWorkplanHealth && (
           <NavButton view="resources" icon={Gauge} label="Workplan Health" activeGradient="from-cyan-500 to-cyan-600" />
         )}
@@ -160,35 +160,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <NavButton view="admin" icon={Settings} label="Admin" activeGradient="from-slate-600 to-slate-700" />
         )}
       </nav>
-      <div className="p-3 border-t border-slate-800/50 bg-slate-950/50">
-        <div className="flex items-center gap-2.5 mb-3 p-1.5 bg-slate-800/30 rounded-lg">
+      <div className="p-3 border-t border-slate-200">
+        <div className="flex items-center gap-2.5 mb-3 p-2 bg-slate-50 rounded-lg">
           <img 
             src={currentUser.avatar} 
             alt={currentUser.name} 
-            className="w-9 h-9 rounded-lg ring-2 ring-slate-700 shadow-lg"
+            className="w-9 h-9 rounded-lg ring-2 ring-blue-500/30"
           />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
-            <p className="text-[10px] text-slate-500 truncate font-medium">{currentUser.role}</p>
+            <p className="text-xs font-semibold text-slate-900 truncate">{currentUser.name}</p>
+            <p className="text-[10px] text-slate-600 truncate font-medium">{currentUser.role}</p>
           </div>
         </div>
         
-        {/* Capacity Adjustment */}
+        {/* Capacity Adjustment - Keep semi-transparent */}
         {(hasCapacity || true) && (
-          <div className="mb-3 p-2 bg-slate-800/30 rounded-lg border border-slate-700/50">
-            <label className="block text-xs font-medium text-slate-300 mb-2">
+          <div className="mb-3 p-2.5 bg-white/50 backdrop-blur-sm rounded-lg border border-slate-200">
+            <label className="block text-xs font-semibold text-slate-700 mb-2 tracking-tight">
               Capacity Adjustment
             </label>
             <div className="mb-2 space-y-1">
-              <p className="text-[10px] text-slate-400 text-center">
+              <p className="text-[10px] text-slate-600 text-center font-mono">
                 Base: {baseCapacityDisplay.weeks}w {baseCapacityDisplay.days > 0 ? `${baseCapacityDisplay.days}d` : ''}
               </p>
-              <p className="text-[10px] text-slate-300 text-center font-medium">
+              <p className="text-[10px] text-blue-600 text-center font-mono font-medium">
                 Adjusted: {adjustedCapacityDisplay.weeks}w {adjustedCapacityDisplay.days > 0 ? `${adjustedCapacityDisplay.days}d` : ''}
               </p>
             </div>
             {/* Add/Deduct Toggle */}
-            <div className="mb-2 flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-slate-700/50">
+            <div className="mb-2 flex gap-1 bg-slate-100 rounded-lg p-1">
               <button
                 type="button"
                 onClick={() => {
@@ -202,8 +202,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                   adjustmentMode === 'add'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-transparent text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Add
@@ -221,8 +221,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                   adjustmentMode === 'deduct'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-transparent text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Deduct
@@ -243,12 +243,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       handleCapacityChange();
                     }
                   }}
-                  className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-slate-900 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0"
                 />
                 <p className="text-[10px] text-slate-500 mt-0.5 text-center">weeks</p>
               </div>
-              <span className="text-slate-500 text-xs pt-4">/</span>
+              <span className="text-slate-600 text-xs pt-4">/</span>
               <div className="flex-1">
                 <input
                   type="number"
@@ -263,14 +263,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       handleCapacityChange();
                     }
                   }}
-                  className="w-full px-2 py-1 bg-slate-900/50 border border-slate-700/50 rounded text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-slate-900 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0"
                 />
                 <p className="text-[10px] text-slate-500 mt-0.5 text-center">days</p>
               </div>
             </div>
             {hasChanges && (
-              <p className="text-[10px] text-amber-400 mt-1 text-center">Press Enter or click outside to save</p>
+              <p className="text-[10px] text-slate-500 mt-1.5 text-center font-medium">Press Enter or click outside to save</p>
             )}
             <p className="text-[10px] text-slate-500 mt-1 text-center">
               {adjustmentMode === 'add' ? 'Add to base capacity' : 'Deduct from base capacity'}
@@ -280,7 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         
         <button
           onClick={onLogout}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 rounded-lg transition-all text-xs font-medium border border-slate-700/50"
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-all text-xs font-medium border border-slate-200"
         >
             <LogOut size={12} />
           Sign Out
