@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Calendar, ChevronLeft, ChevronRight, AlertTriangle, PlayCircle, CheckCircle, Edit, Check, X, History } from 'lucide-react';
 import { Initiative, Status, Priority, User, AppConfig } from '../../types';
 import { getStatuses } from '../../utils/valueLists';
@@ -100,6 +101,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   showToast,
   config
 }) => {
+  const navigate = useNavigate();
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -227,6 +229,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const ghost = dragElement.cloneNode(true) as HTMLElement;
     ghost.style.position = 'absolute';
     ghost.style.top = '-1000px';
+    ghost.style.width = `${rect.width}px`;
     ghost.style.opacity = '0.5';
     document.body.appendChild(ghost);
     e.dataTransfer.setDragImage(ghost, rect.width / 2, rect.height / 2);
@@ -596,7 +599,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                            draggedItemId === item.id ? 'opacity-50 scale-95' : ''
                          }`}
                          title={`${item.id} - ${item.title}`}
-                         onClick={() => { setEditingItem(item); setIsModalOpen(true); }}
+                         onClick={(e) => {
+                           e.preventDefault();
+                           e.stopPropagation();
+                           navigate(`/item/${encodeURIComponent(item.id)}`);
+                         }}
                        >
                          {/* Status Icon */}
                          <div className="absolute top-0.5 left-1">
