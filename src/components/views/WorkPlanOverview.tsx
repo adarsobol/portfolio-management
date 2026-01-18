@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, ChevronDown, Maximize2, Minimize2, Building2, FolderOpen, Target, FileText, Gauge, HelpCircle, ChevronUp, Square } from 'lucide-react';
+import { ChevronRight, ChevronDown, Maximize2, Minimize2, Building2, FolderOpen, Target, FileText, Square } from 'lucide-react';
 import { Initiative, Status, User, AppConfig, InitiativeType, UserCommentReadState, Comment as CommentType } from '../../types';
 import { calculateCompletionRate } from '../../utils';
 
@@ -51,15 +51,6 @@ interface StrategicWorkloadItem {
   efficiencyIndex: number;
   statusBreakdown: StatusBreakdown;
   itemCount: number;
-}
-
-interface StrategicInsight {
-  type: 'efficiency_leak' | 'risk_density' | 'estimation_variance' | 'investment_heavy' | 'velocity_leader';
-  severity: 'critical' | 'warning' | 'positive';
-  pillar?: string;
-  responsibility?: string;
-  message: string;
-  metric?: number;
 }
 
 // Asset class color mapping
@@ -547,109 +538,6 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
     return count;
   }, [groupedData]);
 
-  // Calculate insights from all pillars and responsibilities
-  const insights = useMemo((): StrategicInsight[] => {
-    const allInsights: StrategicInsight[] = [];
-    
-    // Collect all initiatives for pillar/responsibility analysis
-    const pillarMap = new Map<string, Initiative[]>();
-    const responsibilityMap = new Map<string, Initiative[]>();
-    
-    Object.values(groupedData).forEach((assetGroups) => {
-      Object.entries(assetGroups).forEach(([pillar, pillarGroups]) => {
-        Object.entries(pillarGroups).forEach(([responsibility, responsibilityGroups]) => {
-          Object.values(responsibilityGroups).forEach((initiatives) => {
-            // Add to pillar map
-            if (!pillarMap.has(pillar)) {
-              pillarMap.set(pillar, []);
-            }
-            pillarMap.get(pillar)!.push(...initiatives);
-            
-            // Add to responsibility map
-            if (!responsibilityMap.has(responsibility)) {
-              responsibilityMap.set(responsibility, []);
-            }
-            responsibilityMap.get(responsibility)!.push(...initiatives);
-          });
-        });
-      });
-    });
-
-    // Generate insights for pillars
-    pillarMap.forEach((initiatives, pillar) => {
-      const metrics = calculateStrategicMetrics(initiatives);
-      if (!metrics) return;
-
-      // Efficiency Leak
-      if (metrics.burnRate > metrics.weightedProgress + 20 && metrics.totalAllocated > 0) {
-        const gap = Math.round(metrics.burnRate - metrics.weightedProgress);
-        allInsights.push({
-          type: 'efficiency_leak',
-          severity: gap > 40 ? 'critical' : 'warning',
-          pillar,
-          message: `${pillar} has invested ${metrics.burnRate.toFixed(0)}% of allocated effort but only achieved ${metrics.weightedProgress.toFixed(0)}% progress (${gap}% gap)`,
-          metric: gap,
-        });
-      }
-
-      // Risk Density
-      const atRiskEffort = initiatives
-        .filter(i => i.status === Status.AtRisk)
-        .reduce((sum, i) => sum + (i.estimatedEffort || 0), 0);
-      const riskPercentage = metrics.totalAllocated > 0 ? (atRiskEffort / metrics.totalAllocated) * 100 : 0;
-      if (riskPercentage > 40) {
-        allInsights.push({
-          type: 'risk_density',
-          severity: riskPercentage > 60 ? 'critical' : 'warning',
-          pillar,
-          message: `${pillar} has ${riskPercentage.toFixed(0)}% of its allocated effort currently marked 'At Risk'`,
-          metric: riskPercentage,
-        });
-      }
-
-      // Velocity Leaders
-      if (metrics.efficiencyIndex > 1.1 && metrics.totalAllocated > 5) {
-        allInsights.push({
-          type: 'velocity_leader',
-          severity: 'positive',
-          pillar,
-          message: `${pillar} is delivering ${(metrics.efficiencyIndex * 100).toFixed(0)}% efficiency (progress vs. invested effort)`,
-          metric: metrics.efficiencyIndex,
-        });
-      }
-    });
-
-    // Generate insights for responsibilities
-    responsibilityMap.forEach((initiatives, responsibility) => {
-      const metrics = calculateStrategicMetrics(initiatives);
-      if (!metrics) return;
-
-      // Efficiency Leak
-      if (metrics.burnRate > metrics.weightedProgress + 20 && metrics.totalAllocated > 0) {
-        const gap = Math.round(metrics.burnRate - metrics.weightedProgress);
-        allInsights.push({
-          type: 'efficiency_leak',
-          severity: gap > 40 ? 'critical' : 'warning',
-          responsibility,
-          message: `${responsibility} has invested ${metrics.burnRate.toFixed(0)}% of allocated effort but only achieved ${metrics.weightedProgress.toFixed(0)}% progress (${gap}% gap)`,
-          metric: gap,
-        });
-      }
-    });
-
-    // Sort by severity
-    const severityOrder = { critical: 0, warning: 1, positive: 2 };
-    allInsights.sort((a, b) => {
-      const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-      if (severityDiff !== 0) return severityDiff;
-      return Math.abs(b.metric || 0) - Math.abs(a.metric || 0);
-    });
-
-    return allInsights;
-  }, [groupedData]);
-
-  const [insightsCollapsed, setInsightsCollapsed] = useState(false);
-
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden card-glow">
       {/* Header with expand/collapse controls */}
@@ -696,51 +584,6 @@ export const WorkPlanOverview: React.FC<WorkPlanOverviewProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Automated Insights Summary */}
-      {insights.length > 0 && (
-        <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 px-4 py-3 border-b border-slate-200">
-          <button
-            onClick={() => setInsightsCollapsed(!insightsCollapsed)}
-            className="flex items-center gap-2 w-full mb-3 hover:opacity-80 transition-opacity"
-          >
-            <Gauge className="w-4 h-4 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-800">Automated Insights</h3>
-            <HelpCircle className="w-3 h-3 text-slate-400" />
-            <span className="text-[10px] text-slate-500 ml-auto">Based on Active Portfolio (In Progress, At Risk, Done)</span>
-            {insightsCollapsed ? (
-              <ChevronDown className="w-4 h-4 text-slate-600" />
-            ) : (
-              <ChevronUp className="w-4 h-4 text-slate-600" />
-            )}
-          </button>
-          {!insightsCollapsed && (
-            <div className="space-y-1.5 max-h-96 overflow-y-auto">
-              {insights.map((insight, idx) => {
-                const severityColors = {
-                  critical: 'bg-red-50 border-red-200 text-red-800',
-                  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-                  positive: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-                };
-                const severityIcons = {
-                  critical: '🔴',
-                  warning: '🟡',
-                  positive: '🟢',
-                };
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-start gap-2 p-2 rounded-lg border ${severityColors[insight.severity]}`}
-                  >
-                    <span className="text-sm flex-shrink-0">{severityIcons[insight.severity]}</span>
-                    <p className="text-xs font-medium flex-1 leading-relaxed">{insight.message}</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Column headers */}
       <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2 px-3 py-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
