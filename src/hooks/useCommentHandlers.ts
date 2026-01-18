@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Initiative, Comment, User, Notification, NotificationType, UserCommentReadState } from '../types';
 import { sheetsSync } from '../services';
-import { parseMentions, generateId } from '../utils';
+import { parseMentions } from '../utils';
 
 interface UseCommentHandlersOptions {
   setInitiatives: React.Dispatch<React.SetStateAction<Initiative[]>>;
