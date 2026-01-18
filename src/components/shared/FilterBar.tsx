@@ -287,7 +287,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   }, [availablePriorities, prioritySearchQuery]);
 
   return (
-    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm card-glow overflow-visible relative z-10">
+    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm card-glow overflow-visible relative z-40">
       {/* Filter Row */}
       <div className="flex flex-wrap gap-3 items-center overflow-visible">
         <div className="flex items-center text-slate-700 bg-gradient-to-r from-amber-50 to-amber-100/50 px-3 py-1.5 rounded-lg border border-amber-200/50">
