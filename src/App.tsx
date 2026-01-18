@@ -415,27 +415,31 @@ export default function App() {
   }, [initiatives]);
 
   // View State - sync with route
-  const getViewFromPath = (pathname: string): ViewType => {
+  const getViewFromPath = (pathname: string): ViewType | null => {
     if (pathname === '/admin') return 'admin';
     if (pathname === '/timeline') return 'timeline';
     if (pathname === '/workflows') return 'workflows';
     if (pathname === '/dependencies') return 'dependencies';
     if (pathname === '/resources') return 'resources';
     if (pathname === '/workplan') return 'workplan';
-    if (pathname.startsWith('/item/')) return 'all'; // Item detail opens in 'all' view
+    if (pathname.startsWith('/item/')) return null; // Preserve current view when opening item modal
     return 'all'; // Default to 'all' (dashboard)
   };
   
-  const [currentView, setCurrentView] = useState<ViewType>(getViewFromPath(location.pathname));
+  const [currentView, setCurrentView] = useState<ViewType>(getViewFromPath(location.pathname) || 'all');
   const [viewLayout, setViewLayout] = useState<'table' | 'tree'>('table');
   
-  // Sync currentView with route changes
+  // Sync currentView with route changes (preserve view when opening item modal)
   useEffect(() => {
+    // Don't change view when navigating to /item/:id - preserve current view
+    if (location.pathname.startsWith('/item/')) {
+      return;
+    }
     const viewFromRoute = getViewFromPath(location.pathname);
-    if (viewFromRoute !== currentView) {
+    if (viewFromRoute !== null && viewFromRoute !== currentView) {
       setCurrentView(viewFromRoute);
     }
-  }, [location.pathname]);
+  }, [location.pathname, currentView]);
   
   // Effort Display Unit State (Weeks, Days, or Hours)
   const [effortDisplayUnit, setEffortDisplayUnit] = useLocalStorage<'weeks' | 'days' | 'hours'>('effort-display-unit', 'weeks');
@@ -540,12 +544,7 @@ export default function App() {
       const initiative = initiatives.find(i => i.id === initiativeId);
       
       if (initiative) {
-        // Ensure we're on dashboard view (set view state without navigating away from /item/:id)
-        if (location.pathname.startsWith('/item/') && currentView !== 'all') {
-          setCurrentView('all');
-        }
-        
-        // Open the modal with the initiative
+        // Open the modal with the initiative (preserve current view)
         setEditingItem(initiative);
         setIsModalOpen(true);
       } else {
@@ -2614,9 +2613,18 @@ export default function App() {
         onClose={() => {
           setIsModalOpen(false);
           setEditingItem(null);
-          // Navigate back to dashboard if we're on /item/:id route
+          // Navigate back to the route matching current view (preserve view when closing modal)
           if (location.pathname.startsWith('/item/')) {
-            navigate('/dashboard', { replace: true });
+            const routeMap: Record<ViewType, string> = {
+              'all': '/dashboard',
+              'admin': '/admin',
+              'timeline': '/timeline',
+              'workflows': '/workflows',
+              'dependencies': '/dependencies',
+              'resources': '/resources',
+              'workplan': '/workplan'
+            };
+            navigate(routeMap[currentView] || '/dashboard', { replace: true });
           }
         }}
         onSave={handleSave}
