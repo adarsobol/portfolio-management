@@ -73,13 +73,27 @@ export function createNotificationRoutes(io: SocketIOServer): Router {
 
       const gcs = getGCSStorage();
       if (gcs) {
-        const success = await gcs.addNotification(targetUserId, notification);
-        if (success) {
+        const result = await gcs.addNotification(targetUserId, notification);
+        if (result.success) {
           // Emit real-time notification to the target user via Socket.IO
           io.emit('notification:received', { userId: targetUserId, notification });
           res.json({ success: true });
         } else {
-          res.status(500).json({ error: 'Failed to save notification' });
+          // Log the error with full context for debugging
+          serverLogger.error('Failed to save notification', {
+            context: 'NotificationService.createNotification',
+            metadata: {
+              targetUserId,
+              notificationId: notification.id,
+              notificationTitle: notification.title,
+              notificationType: notification.type,
+              error: result.error
+            }
+          });
+          res.status(500).json({ 
+            error: 'Failed to save notification',
+            details: result.error || 'Unknown error occurred'
+          });
         }
       } else {
         // Emit via Socket.IO even without GCS persistence
@@ -87,7 +101,14 @@ export function createNotificationRoutes(io: SocketIOServer): Router {
         res.json({ success: true, message: 'Notification sent via real-time only (no persistence)' });
       }
     } catch (error) {
-      serverLogger.error('Error creating notification', { context: 'Notification', error: error as Error });
+      serverLogger.error('Error creating notification', { 
+        context: 'NotificationService.createNotification',
+        error: error as Error,
+        metadata: {
+          targetUserId: req.body?.targetUserId,
+          notificationId: req.body?.notification?.id
+        }
+      });
       res.status(500).json({ error: String(error) });
     }
   });

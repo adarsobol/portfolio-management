@@ -8,6 +8,8 @@
 // Note: This module requires @google-cloud/storage package
 // Install with: npm install @google-cloud/storage
 
+import { serverLogger } from './logger.js';
+
 // Interfaces matching the main types
 interface Initiative {
   id: string;
@@ -64,11 +66,19 @@ const PATHS = {
 // GCS STORAGE CLASS
 // ============================================
 
+// Result type for notification operations
+export interface NotificationResult {
+  success: boolean;
+  error?: string;
+}
+
 export class GCSStorage {
   private config: GCSConfig;
   private storage: unknown; // Will be typed when @google-cloud/storage is installed
   private bucket: unknown;
   private initialized = false;
+  // Per-user locks to prevent race conditions in notification operations
+  private notificationLocks: Map<string, Promise<void>> = new Map();
 
   constructor(config: GCSConfig) {
     this.config = config;
@@ -314,6 +324,76 @@ export class GCSStorage {
   // ============================================
 
   /**
+   * Acquire a lock for a user's notification operations
+   * Waits for any pending operation to complete before proceeding
+   */
+  private async acquireNotificationLock(userId: string): Promise<() => void> {
+    // Wait for any existing lock to complete
+    const existingLock = this.notificationLocks.get(userId);
+    if (existingLock) {
+      await existingLock;
+    }
+
+    // Create a new lock for this operation
+    let releaseLock: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    this.notificationLocks.set(userId, lockPromise);
+
+    return () => {
+      releaseLock();
+      this.notificationLocks.delete(userId);
+    };
+  }
+
+  /**
+   * Retry a GCS operation with exponential backoff
+   * Useful for transient network errors or rate limiting
+   */
+  private async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries = 3,
+    baseDelayMs = 100
+  ): Promise<T> {
+    let lastError: Error | unknown;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on the last attempt
+        if (attempt === maxRetries) {
+          break;
+        }
+
+        // Check if error is retryable (network errors, rate limits, etc.)
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isRetryable = 
+          errorMessage.includes('ECONNRESET') ||
+          errorMessage.includes('ETIMEDOUT') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('429') ||
+          errorMessage.includes('503') ||
+          errorMessage.includes('500');
+
+        if (!isRetryable) {
+          // Not a retryable error, fail immediately
+          throw error;
+        }
+
+        // Exponential backoff: 100ms, 200ms, 400ms
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
    * Get the file path for a user's notifications
    */
   private getNotificationFilePath(userId: string): string {
@@ -339,7 +419,12 @@ export class GCSStorage {
       const [contents] = await file.download();
       return JSON.parse(contents.toString());
     } catch (error) {
-      console.error(`Failed to load notifications for user ${userId} from GCS:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      serverLogger.error('Failed to load notifications from GCS', {
+        context: 'GCSStorage.loadNotifications',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        metadata: { userId }
+      });
       return [];
     }
   }
@@ -358,77 +443,167 @@ export class GCSStorage {
       // Keep only last 100 notifications per user to prevent unbounded growth
       const trimmedNotifications = notifications.slice(0, 100);
       
-      await file.save(JSON.stringify(trimmedNotifications, null, 2), {
-        contentType: 'application/json',
-        metadata: {
-          cacheControl: 'private, max-age=0'
-        }
+      // Retry with exponential backoff for transient failures
+      await this.retryWithBackoff(async () => {
+        await file.save(JSON.stringify(trimmedNotifications, null, 2), {
+          contentType: 'application/json',
+          metadata: {
+            cacheControl: 'private, max-age=0'
+          }
+        });
       });
       
       return true;
     } catch (error) {
-      console.error(`Failed to save notifications for user ${userId} to GCS:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      serverLogger.error(`Failed to save notifications for user ${userId} to GCS`, {
+        context: 'GCSStorage.saveNotifications',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        metadata: { userId, notificationCount: notifications.length }
+      });
       return false;
     }
   }
 
   /**
    * Add a new notification for a user
+   * Uses per-user locking to prevent race conditions in concurrent operations
    */
-  async addNotification(userId: string, notification: Notification): Promise<boolean> {
+  async addNotification(userId: string, notification: Notification): Promise<NotificationResult> {
+    const releaseLock = await this.acquireNotificationLock(userId);
+    
     try {
       const notifications = await this.loadNotifications(userId);
       notifications.unshift(notification); // Add to beginning (newest first)
-      return this.saveNotifications(userId, notifications);
+      const saved = await this.saveNotifications(userId, notifications);
+      
+      if (saved) {
+        return { success: true };
+      } else {
+        const errorMsg = 'Failed to save notification to GCS';
+        serverLogger.error('Failed to add notification', {
+          context: 'GCSStorage.addNotification',
+          metadata: { userId, notificationId: notification.id, notificationTitle: notification.title }
+        });
+        return { success: false, error: errorMsg };
+      }
     } catch (error) {
-      console.error(`Failed to add notification for user ${userId}:`, error);
-      return false;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      serverLogger.error('Failed to add notification', {
+        context: 'GCSStorage.addNotification',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        metadata: { userId, notificationId: notification.id, notificationTitle: notification.title }
+      });
+      return { success: false, error: errorMessage };
+    } finally {
+      releaseLock();
     }
   }
 
   /**
    * Mark a notification as read
+   * Uses per-user locking to prevent race conditions
    */
   async markNotificationRead(userId: string, notificationId: string): Promise<boolean> {
+    const releaseLock = await this.acquireNotificationLock(userId);
+    
     try {
       const notifications = await this.loadNotifications(userId);
       const index = notifications.findIndex(n => n.id === notificationId);
       
       if (index === -1) {
+        serverLogger.warn('Notification not found when marking as read', {
+          context: 'GCSStorage.markNotificationRead',
+          metadata: { userId, notificationId }
+        });
         return false; // Notification not found
       }
       
       notifications[index].read = true;
-      return this.saveNotifications(userId, notifications);
+      const saved = await this.saveNotifications(userId, notifications);
+      
+      if (!saved) {
+        serverLogger.error('Failed to save notification after marking as read', {
+          context: 'GCSStorage.markNotificationRead',
+          metadata: { userId, notificationId }
+        });
+      }
+      
+      return saved;
     } catch (error) {
-      console.error(`Failed to mark notification ${notificationId} as read:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      serverLogger.error('Failed to mark notification as read', {
+        context: 'GCSStorage.markNotificationRead',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        metadata: { userId, notificationId }
+      });
       return false;
+    } finally {
+      releaseLock();
     }
   }
 
   /**
    * Mark all notifications as read for a user
+   * Uses per-user locking to prevent race conditions
    */
   async markAllNotificationsRead(userId: string): Promise<boolean> {
+    const releaseLock = await this.acquireNotificationLock(userId);
+    
     try {
       const notifications = await this.loadNotifications(userId);
       const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
-      return this.saveNotifications(userId, updatedNotifications);
+      const saved = await this.saveNotifications(userId, updatedNotifications);
+      
+      if (!saved) {
+        serverLogger.error('Failed to save notifications after marking all as read', {
+          context: 'GCSStorage.markAllNotificationsRead',
+          metadata: { userId, notificationCount: notifications.length }
+        });
+      }
+      
+      return saved;
     } catch (error) {
-      console.error(`Failed to mark all notifications as read for user ${userId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      serverLogger.error('Failed to mark all notifications as read', {
+        context: 'GCSStorage.markAllNotificationsRead',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        metadata: { userId }
+      });
       return false;
+    } finally {
+      releaseLock();
     }
   }
 
   /**
    * Clear all notifications for a user
+   * Uses per-user locking to prevent race conditions
    */
   async clearNotifications(userId: string): Promise<boolean> {
+    const releaseLock = await this.acquireNotificationLock(userId);
+    
     try {
-      return this.saveNotifications(userId, []);
+      const saved = await this.saveNotifications(userId, []);
+      
+      if (!saved) {
+        serverLogger.error('Failed to clear notifications', {
+          context: 'GCSStorage.clearNotifications',
+          metadata: { userId }
+        });
+      }
+      
+      return saved;
     } catch (error) {
-      console.error(`Failed to clear notifications for user ${userId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      serverLogger.error('Failed to clear notifications', {
+        context: 'GCSStorage.clearNotifications',
+        error: error instanceof Error ? error : new Error(errorMessage),
+        metadata: { userId }
+      });
       return false;
+    } finally {
+      releaseLock();
     }
   }
 }
