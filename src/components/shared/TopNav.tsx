@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, AlertTriangle, Layers } from 'lucide-react';
-import { User as UserType, ViewType, AppConfig, Role } from '../../types';
+import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, Layers } from 'lucide-react';
+import { User as UserType, ViewType, AppConfig } from '../../types';
 import { canViewTab, canAccessAdmin } from '../../utils';
 import { daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
 

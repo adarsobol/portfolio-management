@@ -5,7 +5,7 @@ import { Initiative, User, Status, Priority, WorkType, AppConfig, Comment, UserC
 import { StatusBadge, PriorityBadge, getStatusCellBg, getPriorityCellBg } from '../shared/Shared';
 import { CommentPopover } from '../shared/CommentPopover';
 import { checkOutdated, generateId, canEditAllTasks, canEditOwnTasks, canDeleteTaskItem, canEditTaskItem } from '../../utils';
-import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks, daysToHours, hoursToDays } from '../../utils/effortConverter';
+import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks } from '../../utils/effortConverter';
 import { sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
 import { getStatuses, getPriorities } from '../../utils/valueLists';

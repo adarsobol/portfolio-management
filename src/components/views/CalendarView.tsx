@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, AlertTriangle, PlayCircle, CheckCircle, Edit, Check, X, History } from 'lucide-react';
-import { Initiative, Status, InitiativeType, Priority, User, AppConfig } from '../../types';
+import { Initiative, Status, Priority, User, AppConfig } from '../../types';
 import { getStatuses } from '../../utils/valueLists';
 
 interface CalendarViewProps {
