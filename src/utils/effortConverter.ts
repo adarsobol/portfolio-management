@@ -1,8 +1,9 @@
 /**
- * Effort conversion utilities for converting between weeks and days
- * Standard conversion: 5 working days = 1 week
+ * Effort conversion utilities for converting between weeks, days, and hours
+ * Standard conversion: 8 hours = 1 day, 5 working days = 1 week
  */
 
+export const HOURS_PER_DAY = 8; // Working hours per day
 export const DAYS_PER_WEEK = 5; // Working days per week
 
 /**
@@ -26,12 +27,51 @@ export function daysToWeeks(days: number): number {
 }
 
 /**
+ * Convert weeks to hours
+ * @param weeks - Number of weeks
+ * @returns Number of hours
+ */
+export function weeksToHours(weeks: number): number {
+  return weeks * DAYS_PER_WEEK * HOURS_PER_DAY;
+}
+
+/**
+ * Convert hours to weeks
+ * @param hours - Number of hours
+ * @returns Number of weeks (rounded to 4 decimal places for better precision)
+ */
+export function hoursToWeeks(hours: number): number {
+  return Math.round((hours / (DAYS_PER_WEEK * HOURS_PER_DAY)) * 10000) / 10000;
+}
+
+/**
+ * Convert days to hours
+ * @param days - Number of days
+ * @returns Number of hours
+ */
+export function daysToHours(days: number): number {
+  return days * HOURS_PER_DAY;
+}
+
+/**
+ * Convert hours to days
+ * @param hours - Number of hours
+ * @returns Number of days (rounded to 4 decimal places for better precision)
+ */
+export function hoursToDays(hours: number): number {
+  return Math.round((hours / HOURS_PER_DAY) * 10000) / 10000;
+}
+
+/**
  * Format effort value with unit indicator
  * @param value - Effort value
- * @param unit - Unit to display ('weeks' or 'days')
- * @returns Formatted string (e.g., "5.0w" or "25d")
+ * @param unit - Unit to display ('weeks', 'days', or 'hours')
+ * @returns Formatted string (e.g., "5.0w", "25d", or "40h")
  */
-export function formatEffort(value: number, unit: 'weeks' | 'days'): string {
+export function formatEffort(value: number, unit: 'weeks' | 'days' | 'hours'): string {
+  if (unit === 'hours') {
+    return `${value.toFixed(1)}h`;
+  }
   if (unit === 'days') {
     return `${value.toFixed(1)}d`;
   }

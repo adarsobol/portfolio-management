@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { LayoutDashboard, Gauge, Calendar, Settings, Zap, LogOut, GitBranch, ChevronDown, AlertTriangle, Layers } from 'lucide-react';
 import { User as UserType, ViewType, AppConfig, Role } from '../../types';
 import { canViewTab, canAccessAdmin } from '../../utils';
-import { ValidationResult } from '../../services/weeklyEffortValidation';
 import { daysToWeeks, DAYS_PER_WEEK } from '../../utils/effortConverter';
 
 interface TopNavProps {
@@ -13,7 +12,6 @@ interface TopNavProps {
   config: AppConfig;
   setConfig: (config: AppConfig | ((prev: AppConfig) => AppConfig)) => void;
   onLogout: () => void;
-  weeklyEffortFlags?: Map<string, ValidationResult>;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({ 
@@ -22,17 +20,13 @@ export const TopNav: React.FC<TopNavProps> = ({
   currentUser, 
   config,
   setConfig,
-  onLogout,
-  weeklyEffortFlags
+  onLogout
 }) => {
   const location = useLocation();
   const canAccessWorkplanHealth = canViewTab(config, currentUser.role, 'accessWorkplanHealth');
   const canAccessWorkplan = canViewTab(config, currentUser.role, 'accessWorkplan');
   const canAccessAdminPanel = canAccessAdmin(config, currentUser.role);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  
-  // Check if current user has an active weekly effort flag
-  const hasEffortWarning = currentUser.role === Role.TeamLead && weeklyEffortFlags?.has(currentUser.id);
   
   // Get base capacity (set by admin) and adjustment (set by user)
   const baseCapacityWeeks = config.teamCapacities[currentUser.id] || 0;
@@ -206,12 +200,6 @@ export const TopNav: React.FC<TopNavProps> = ({
           <div className="hidden sm:block text-left">
             <div className="flex items-center gap-2">
               <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
-              {hasEffortWarning && (
-                <div className="relative" title="Weekly effort exceeded threshold">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-                </div>
-              )}
             </div>
             <p className="text-[10px] text-slate-500 truncate font-medium">{currentUser.role}</p>
           </div>

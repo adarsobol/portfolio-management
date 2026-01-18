@@ -10,11 +10,9 @@ import { useLocalStorage, useVersionCheck, useUsers as useUsersHook, useInitiati
 import { useUrlState } from './hooks/useUrlState';
 import { slackService, workflowEngine, realtimeService, sheetsSync, notificationService, logService } from './services';
 import { getVersionService } from './services/versionService';
-import { validateWeeklyTeamEffort, getCurrentWeekKey, ValidationResult } from './services/weeklyEffortValidation';
 import { useAuth, useToast } from './contexts';
 import InitiativeModal from './components/modals/InitiativeModal';
 import AtRiskReasonModal from './components/modals/AtRiskReasonModal';
-import { WeeklyEffortWarningModal } from './components/modals/WeeklyEffortWarningModal';
 import { EffortExceededModal } from './components/modals/EffortExceededModal';
 
 // Components
@@ -676,8 +674,8 @@ export default function App() {
     }
   }, [location.pathname]);
   
-  // Effort Display Unit State (Days vs Weeks)
-  const [effortDisplayUnit, setEffortDisplayUnit] = useLocalStorage<'weeks' | 'days'>('effort-display-unit', 'weeks');
+  // Effort Display Unit State (Weeks, Days, or Hours)
+  const [effortDisplayUnit, setEffortDisplayUnit] = useLocalStorage<'weeks' | 'days' | 'hours'>('effort-display-unit', 'weeks');
   
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -741,10 +739,6 @@ export default function App() {
   const [isAtRiskModalOpen, setIsAtRiskModalOpen] = useState(false);
   const [pendingAtRiskInitiative, setPendingAtRiskInitiative] = useState<{ id: string; oldStatus: Status } | null>(null);
   
-  // Weekly Effort Validation State
-  const [weeklyEffortFlags, setWeeklyEffortFlags] = useState<Map<string, ValidationResult>>(new Map());
-  const [showEffortWarningPopup, setShowEffortWarningPopup] = useState(false);
-  const [currentEffortFlag, setCurrentEffortFlag] = useState<ValidationResult | null>(null);
   const [showEffortExceededModal, setShowEffortExceededModal] = useState(false);
   const [effortExceededInitiative, setEffortExceededInitiative] = useState<Initiative | null>(null);
 
@@ -1272,83 +1266,6 @@ export default function App() {
     }
   }, []);
 
-  // Weekly Effort Validation for Team Leads
-  useEffect(() => {
-    const checkWeeklyValidation = () => {
-      // Only validate if feature is enabled and user is a Team Lead
-      if (!config.weeklyEffortValidation?.enabled || currentUser.role !== Role.TeamLead) {
-        if (currentUser.role === Role.TeamLead) {
-          logger.debug('Weekly Validation: Feature disabled or user not Team Lead', {
-            context: 'App.checkWeeklyValidation',
-            metadata: { enabled: config.weeklyEffortValidation?.enabled, role: currentUser.role }
-          });
-        }
-        return;
-      }
-
-      const result = validateWeeklyTeamEffort(initiatives, config, currentUser.id);
-      
-      logger.debug('Weekly Validation Result', {
-        context: 'App.checkWeeklyValidation',
-        metadata: { flagged: result.flagged, deviationPercent: result.deviationPercent, averageWeeklyEffort: result.averageWeeklyEffort, currentWeekEffort: result.currentWeekEffort, teamLeadId: result.teamLeadId, quarter: result.quarter, threshold: config.weeklyEffortValidation?.thresholdPercent || 15 }
-      });
-      
-      if (result.flagged) {
-        // Store flag for UI display
-        setWeeklyEffortFlags(prev => new Map(prev).set(currentUser.id, result));
-        
-        // Create notification for Team Lead
-        addNotification(createNotification(
-          NotificationType.WeeklyEffortExceeded,
-          'Weekly Effort Exceeded',
-          `Your weekly effort update (${result.currentWeekEffort.toFixed(1)}w) exceeds the average (${result.averageWeeklyEffort.toFixed(1)}w) by ${result.deviationPercent.toFixed(1)}%`,
-          '', // No specific initiative
-          'Weekly Effort Validation',
-          currentUser.id,
-          { 
-            deviationPercent: result.deviationPercent,
-            averageWeeklyEffort: result.averageWeeklyEffort,
-            currentWeekEffort: result.currentWeekEffort,
-            quarter: result.quarter
-          }
-        ));
-        
-        // Show popup immediately if not already shown for this week
-        const weekKey = getCurrentWeekKey();
-        const lastShown = localStorage.getItem(`effort-warning-shown-${currentUser.id}-${weekKey}`);
-        if (!lastShown) {
-          setCurrentEffortFlag(result);
-          setShowEffortWarningPopup(true);
-          localStorage.setItem(`effort-warning-shown-${currentUser.id}-${weekKey}`, 'true');
-        }
-        
-        // Log to admin/backend
-        logger.warn('Weekly effort validation flagged', {
-          context: 'App.weeklyValidation',
-          metadata: {
-            teamLeadId: currentUser.id,
-            deviation: result.deviationPercent,
-            averageWeeklyEffort: result.averageWeeklyEffort,
-            currentWeekEffort: result.currentWeekEffort
-          }
-        });
-      } else {
-        // Clear flag if no longer exceeded
-        setWeeklyEffortFlags(prev => {
-          const updated = new Map(prev);
-          updated.delete(currentUser.id);
-          return updated;
-        });
-      }
-    };
-    
-    // Check on mount and when initiatives/config change
-    checkWeeklyValidation();
-    
-    // Also check periodically (every hour)
-    const interval = setInterval(checkWeeklyValidation, 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [initiatives, config, currentUser, addNotification, createNotification]);
 
   // Actions
   const recordChange = (initiative: Initiative, field: string, oldValue: any, newValue: any, taskId?: string, tradeOffSourceId?: string, tradeOffSourceTitle?: string): ChangeRecord => {
@@ -2579,7 +2496,6 @@ export default function App() {
         config={config}
         setConfig={setConfig}
         onLogout={logout}
-        weeklyEffortFlags={weeklyEffortFlags}
       />
 
       <Routes>
@@ -3048,15 +2964,6 @@ export default function App() {
         currentReason={pendingAtRiskInitiative ? initiatives.find(i => i.id === pendingAtRiskInitiative.id)?.riskActionLog || '' : ''}
         onSave={handleAtRiskReasonSave}
         onCancel={handleAtRiskReasonCancel}
-      />
-
-      <WeeklyEffortWarningModal
-        isOpen={showEffortWarningPopup}
-        onClose={() => {
-          setShowEffortWarningPopup(false);
-          setCurrentEffortFlag(null);
-        }}
-        validationResult={currentEffortFlag}
       />
 
       <EffortExceededModal

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { getOwnerName, generateId, generateInitiativeId, parseMentions, getMentionedUsers, canCreateTasks, canDeleteInitiative, canDeleteTaskItem, canEditTaskItem, getEligibleOwners, getCurrentQuarterString } from '../../utils';
 import { getAssetClasses, getStatuses, getPriorities, getQuarters, getUnplannedTags, getInitiativeTypes } from '../../utils/valueLists';
-import { weeksToDays, daysToWeeks } from '../../utils/effortConverter';
+import { weeksToDays, daysToWeeks, weeksToHours, hoursToWeeks } from '../../utils/effortConverter';
 import { slackService, sheetsSync } from '../../services';
 import { logger } from '../../utils/logger';
 import { BulkInitiativeSpreadsheetModal } from './BulkInitiativeSpreadsheetModal';
@@ -60,8 +60,8 @@ interface InitiativeModalProps {
   users: User[];
   allInitiatives: Initiative[];
   onDelete?: (id: string) => void;
-  effortDisplayUnit?: 'weeks' | 'days';
-  setEffortDisplayUnit?: (unit: 'weeks' | 'days') => void;
+  effortDisplayUnit?: 'weeks' | 'days' | 'hours';
+  setEffortDisplayUnit?: (unit: 'weeks' | 'days' | 'hours') => void;
   initialMode?: 'single' | 'bulk';
 }
 
@@ -1758,19 +1758,26 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {/* Planned Effort */}
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Planned Effort ({effortDisplayUnit === 'days' ? 'days' : 'weeks'}) <span className="text-red-500">*</span>
+                        Planned Effort ({effortDisplayUnit === 'hours' ? 'hours' : effortDisplayUnit === 'days' ? 'days' : 'weeks'}) <span className="text-red-500">*</span>
                       </label>
                       <div className="flex items-center gap-0.5">
                         <button
                           type="button"
                           onClick={() => {
                             const currentWeeks = formData.estimatedEffort || 0;
-                            const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            let decrement: number;
+                            if (effortDisplayUnit === 'hours') {
+                              decrement = hoursToWeeks(1);
+                            } else if (effortDisplayUnit === 'days') {
+                              decrement = daysToWeeks(1);
+                            } else {
+                              decrement = 0.25;
+                            }
                             handleChange('estimatedEffort', Math.max(0, currentWeeks - decrement));
                           }}
                           disabled={isReadOnly}
                           className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                          title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
+                          title={effortDisplayUnit === 'hours' ? 'Decrease by 1 hour' : effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                         >
                           <ArrowDown size={12} />
                         </button>
@@ -1778,15 +1785,22 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           disabled={isReadOnly}
                           type="number"
                           min="0"
-                          step={effortDisplayUnit === 'days' ? '1' : '0.25'}
-                          value={effortDisplayUnit === 'days' 
+                          step={effortDisplayUnit === 'hours' ? '1' : effortDisplayUnit === 'days' ? '1' : '0.25'}
+                          value={effortDisplayUnit === 'hours'
+                            ? weeksToHours(formData.estimatedEffort || 0).toFixed(1)
+                            : effortDisplayUnit === 'days' 
                             ? weeksToDays(formData.estimatedEffort || 0).toFixed(1)
                             : (formData.estimatedEffort || 0).toFixed(2)}
                           onChange={(e) => {
                             const inputValue = parseFloat(e.target.value) || 0;
-                            const weeksValue = effortDisplayUnit === 'days' 
-                              ? daysToWeeks(inputValue)
-                              : inputValue;
+                            let weeksValue: number;
+                            if (effortDisplayUnit === 'hours') {
+                              weeksValue = hoursToWeeks(inputValue);
+                            } else if (effortDisplayUnit === 'days') {
+                              weeksValue = daysToWeeks(inputValue);
+                            } else {
+                              weeksValue = inputValue;
+                            }
                             handleChange('estimatedEffort', weeksValue);
                           }}
                           className={`w-16 px-1 py-0.5 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
@@ -1798,12 +1812,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           type="button"
                           onClick={() => {
                             const currentWeeks = formData.estimatedEffort || 0;
-                            const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            let increment: number;
+                            if (effortDisplayUnit === 'hours') {
+                              increment = hoursToWeeks(1);
+                            } else if (effortDisplayUnit === 'days') {
+                              increment = daysToWeeks(1);
+                            } else {
+                              increment = 0.25;
+                            }
                             handleChange('estimatedEffort', currentWeeks + increment);
                           }}
                           disabled={isReadOnly}
                           className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                          title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
+                          title={effortDisplayUnit === 'hours' ? 'Increase by 1 hour' : effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                         >
                           <ArrowUp size={12} />
                         </button>
@@ -1816,19 +1837,26 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                     {/* Actual Effort */}
                     <div>
                       <label className="block text-xs font-medium text-slate-700 mb-1">
-                        Actual Effort ({effortDisplayUnit === 'days' ? 'days' : 'weeks'})
+                        Actual Effort ({effortDisplayUnit === 'hours' ? 'hours' : effortDisplayUnit === 'days' ? 'days' : 'weeks'})
                       </label>
                       <div className="flex items-center gap-0.5">
                         <button
                           type="button"
                           onClick={() => {
                             const currentWeeks = formData.actualEffort || 0;
-                            const decrement = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            let decrement: number;
+                            if (effortDisplayUnit === 'hours') {
+                              decrement = hoursToWeeks(1);
+                            } else if (effortDisplayUnit === 'days') {
+                              decrement = daysToWeeks(1);
+                            } else {
+                              decrement = 0.25;
+                            }
                             handleChange('actualEffort', Math.max(0, currentWeeks - decrement));
                           }}
                           disabled={isReadOnly}
                           className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                          title={effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
+                          title={effortDisplayUnit === 'hours' ? 'Decrease by 1 hour' : effortDisplayUnit === 'days' ? 'Decrease by 1 day' : 'Decrease by 0.25 weeks'}
                         >
                           <ArrowDown size={12} />
                         </button>
@@ -1836,15 +1864,22 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           disabled={isReadOnly}
                           type="number"
                           min="0"
-                          step={effortDisplayUnit === 'days' ? '1' : '0.25'}
-                          value={effortDisplayUnit === 'days'
+                          step={effortDisplayUnit === 'hours' ? '1' : effortDisplayUnit === 'days' ? '1' : '0.25'}
+                          value={effortDisplayUnit === 'hours'
+                            ? weeksToHours(formData.actualEffort || 0).toFixed(1)
+                            : effortDisplayUnit === 'days'
                             ? weeksToDays(formData.actualEffort || 0).toFixed(1)
                             : (formData.actualEffort || 0).toFixed(2)}
                           onChange={(e) => {
                             const inputValue = parseFloat(e.target.value) || 0;
-                            const weeksValue = effortDisplayUnit === 'days'
-                              ? daysToWeeks(inputValue)
-                              : inputValue;
+                            let weeksValue: number;
+                            if (effortDisplayUnit === 'hours') {
+                              weeksValue = hoursToWeeks(inputValue);
+                            } else if (effortDisplayUnit === 'days') {
+                              weeksValue = daysToWeeks(inputValue);
+                            } else {
+                              weeksValue = inputValue;
+                            }
                             handleChange('actualEffort', weeksValue);
                           }}
                           className="w-16 px-1 py-0.5 text-xs border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -1854,12 +1889,19 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                           type="button"
                           onClick={() => {
                             const currentWeeks = formData.actualEffort || 0;
-                            const increment = effortDisplayUnit === 'days' ? daysToWeeks(1) : 0.25;
+                            let increment: number;
+                            if (effortDisplayUnit === 'hours') {
+                              increment = hoursToWeeks(1);
+                            } else if (effortDisplayUnit === 'days') {
+                              increment = daysToWeeks(1);
+                            } else {
+                              increment = 0.25;
+                            }
                             handleChange('actualEffort', currentWeeks + increment);
                           }}
                           disabled={isReadOnly}
                           className="p-0.5 hover:bg-amber-100 rounded text-slate-500 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                          title={effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
+                          title={effortDisplayUnit === 'hours' ? 'Increase by 1 hour' : effortDisplayUnit === 'days' ? 'Increase by 1 day' : 'Increase by 0.25 weeks'}
                         >
                           <ArrowUp size={12} />
                         </button>
@@ -1949,6 +1991,17 @@ const InitiativeModal: React.FC<InitiativeModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-slate-500">Display unit:</span>
                         <div className="flex items-center gap-0.5 border border-slate-300 rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setEffortDisplayUnit('hours')}
+                            className={`px-1.5 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                              effortDisplayUnit === 'hours' 
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
+                                : 'text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            H
+                          </button>
                           <button
                             type="button"
                             onClick={() => setEffortDisplayUnit('days')}

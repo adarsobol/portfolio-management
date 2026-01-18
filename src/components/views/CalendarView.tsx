@@ -342,26 +342,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded bg-slate-100 border border-slate-300"></div>
+            <span className="font-medium text-slate-600 text-[10px]">Not Started</span>
+          </div>
+          <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-300"></div>
-            <span className="font-medium text-slate-600 text-[10px]">WP</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-300"></div>
-            <span className="font-medium text-slate-600 text-[10px]">BAU</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3 text-red-600" />
-            <span className="font-medium text-slate-600 text-[10px]">At Risk</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <PlayCircle className="w-3 h-3 text-blue-600" />
             <span className="font-medium text-slate-600 text-[10px]">In Progress</span>
           </div>
           <div className="flex items-center gap-1">
-            <CheckCircle className="w-3 h-3 text-emerald-600" />
-            <span className="font-medium text-slate-600 text-[10px]">Complete</span>
+            <div className="w-2.5 h-2.5 rounded bg-red-100 border border-red-300"></div>
+            <span className="font-medium text-slate-600 text-[10px]">At Risk</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-300"></div>
+            <span className="font-medium text-slate-600 text-[10px]">Done</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-400"></div>
+            <span className="font-medium text-slate-600 text-[10px]">Obsolete</span>
           </div>
         </div>
         <div className="ml-auto text-slate-400 italic flex items-center gap-1 text-[10px]">
@@ -534,23 +532,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                      <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none z-10"></div>
                    )}
                    {visibleItems.map(item => {
-                     const isRisk = item.status === Status.AtRisk;
-                     const isBAU = item.initiativeType === InitiativeType.BAU;
                      const overdue = isOverdue(item.eta || '');
                      const dueSoon = isDueSoon(item.eta || '');
                      
-                     // Enhanced color coding with stronger contrast
-                     let bgClass = 'bg-blue-100 text-blue-900 border border-blue-200 hover:bg-blue-200';
-                     let statusBorderColor = 'border-l-2 border-l-blue-400';
-                     if (isRisk) {
-                       bgClass = 'bg-red-100 text-red-900 border border-red-200 hover:bg-red-200';
-                       statusBorderColor = 'border-l-2 border-l-red-500';
-                     } else if (item.status === Status.Done) {
-                       bgClass = 'bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200';
-                       statusBorderColor = 'border-l-2 border-l-emerald-500';
-                     } else if (isBAU) {
-                       bgClass = 'bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200';
-                       statusBorderColor = 'border-l-2 border-l-amber-400';
+                     // Status-based color coding
+                     let bgClass = 'bg-slate-100 text-slate-900 border border-slate-200 hover:bg-slate-200'; // Default: Not Started
+                     let statusBorderColor = 'border-l-2 border-l-slate-400';
+                     
+                     switch (item.status) {
+                       case Status.AtRisk:
+                         bgClass = 'bg-red-100 text-red-900 border border-red-200 hover:bg-red-200';
+                         statusBorderColor = 'border-l-2 border-l-red-500';
+                         break;
+                       case Status.Done:
+                         bgClass = 'bg-emerald-100 text-emerald-900 border border-emerald-200 hover:bg-emerald-200';
+                         statusBorderColor = 'border-l-2 border-l-emerald-500';
+                         break;
+                       case Status.InProgress:
+                         bgClass = 'bg-blue-100 text-blue-900 border border-blue-200 hover:bg-blue-200';
+                         statusBorderColor = 'border-l-2 border-l-blue-500';
+                         break;
+                       case Status.Obsolete:
+                         bgClass = 'bg-slate-200 text-slate-600 border border-slate-300 hover:bg-slate-300';
+                         statusBorderColor = 'border-l-2 border-l-slate-500';
+                         break;
+                       // Not Started uses default slate
                      }
                      
                      // Add overdue border or due soon background
