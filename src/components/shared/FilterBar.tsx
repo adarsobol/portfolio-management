@@ -287,9 +287,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   }, [availablePriorities, prioritySearchQuery]);
 
   return (
-    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm card-glow">
+    <div className="flex flex-col gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm card-glow overflow-visible relative z-[100]">
       {/* Filter Row */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-wrap gap-3 items-center overflow-visible">
         <div className="flex items-center text-slate-700 bg-gradient-to-r from-amber-50 to-amber-100/50 px-3 py-1.5 rounded-lg border border-amber-200/50">
           <Filter size={14} className="mr-1.5 text-amber-600" />
           <span className="text-xs font-bold tracking-wide">Filters</span>
@@ -322,7 +322,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isOwnerDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[220px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[220px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
               <div className="p-2 border-b border-slate-100">
                 <input
@@ -401,7 +401,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isWorkTypeDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
               <div className="p-2 border-b border-slate-100">
                 <input
@@ -482,7 +482,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isQuarterDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
               <div className="p-2 border-b border-slate-100">
                 <input
@@ -561,7 +561,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isPriorityDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[150px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[150px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
               <div className="p-2 border-b border-slate-100">
                 <input
@@ -640,7 +640,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isStatusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
+            <div className="absolute top-full left-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[180px] max-h-[280px] flex flex-col animate-scale-in">
               {/* Search input */}
               <div className="p-2 border-b border-slate-100">
                 <input
@@ -719,7 +719,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </button>
           
           {isSavedViewsDropdownOpen && (
-            <div className="absolute top-full right-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-50 min-w-[260px] max-h-[360px] flex flex-col animate-scale-in">
+            <div className="absolute top-full right-0 mt-1.5 bg-white/95 backdrop-blur-lg border border-slate-200 rounded-xl shadow-xl z-[9999] min-w-[260px] max-h-[360px] flex flex-col animate-scale-in">
               {/* Header */}
               <div className="p-3 border-b border-slate-100">
                 <div className="flex items-center justify-between mb-2">
